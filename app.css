@@ -74,19 +74,23 @@ header{
 .tiny{font-size:12px}
 .center{text-align:center}
 .spacer{flex:1}
-.chips{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto;scrollbar-width:none}
+.chips{display:flex;gap:8px;padding:0 16px 12px;overflow-x:auto;scrollbar-width:none;
+  align-items:center}
 .chips::-webkit-scrollbar{display:none}
 .chips.types{gap:6px}
-.chips.types .chip{padding:7px 10px;font-size:13px}
-.souschips{display:flex;gap:8px;padding:2px 16px 10px;overflow-x:auto;scrollbar-width:none}
+.chips.types .chip{padding:0 12px}
+.souschips{display:flex;gap:8px;padding:2px 16px 10px;overflow-x:auto;scrollbar-width:none;
+  align-items:center}
 .souschips::-webkit-scrollbar{display:none}
-/* line-height:1 : sans lui, la hauteur de ligne héritée (1.45) décale le
-   texte dans la pilule sur Android — c'est le « pas bien centré » visible. */
-.chip{padding:9px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);
-  color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap;flex:none;
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1}
+/* Hauteur FIXE : chaque rangée avait son propre rembourrage (7, 8, 9 px…),
+   donc trois hauteurs de pilules différentes à l'écran — c'était ça, le
+   « pas aligné ». Une seule hauteur pour toutes, texte centré au pixel. */
+.chip{height:34px;padding:0 14px;border-radius:999px;background:var(--surface);
+  border:1px solid var(--line);color:var(--muted);font-size:13px;font-weight:600;
+  white-space:nowrap;flex:none;display:inline-flex;align-items:center;
+  justify-content:center;gap:6px;line-height:1}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
-.chip.chipico{padding:7px 8px;display:grid;place-items:center;flex:0 0 auto}
+.chip.chipico{width:34px;height:34px;padding:0;display:grid;place-items:center;flex:0 0 auto}
 .chip.chipico svg{width:16px;height:16px;display:block}
 .chip.chipico.ouvert{border-color:var(--accent);color:var(--accent);background:var(--surface)}
 /* Les puces de présence portent la couleur de leur sens : vert = je l'ai. */

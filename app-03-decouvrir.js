@@ -23,17 +23,21 @@ const VUES = [
   { id:'liste',    label:'Liste'     }
 ];
 
-/* Les tris possibles sont ceux que TMDB sait faire côté serveur : popularité,
-   note, date de sortie dans les deux sens, ordre alphabétique. Les tris qui
-   demanderaient les données de lecture de Jellyfin (nombre de vues, dernière
-   lecture, progression) attendront que l'export du NAS les fournisse. */
+/* Sur le modèle de Jellyfin : un critère + un sens, séparés. Les critères
+   sont ceux que les données permettent — TMDB sait trier par titre, note,
+   date de sortie et popularité ; l'aléatoire se fait ici. Date d'ajout,
+   durée, classification, note des critiques et tris de lecture demandent
+   d'enrichir l'export du NAS (aujourd'hui il n'envoie que les identifiants). */
 const TRIS = [
-  { id:'populaire', label:'Les plus populaires',      court:'populaires' },
-  { id:'note',      label:'Les mieux notés',          court:'mieux notés' },
-  { id:'recent',    label:'Sortis récemment d’abord', court:'récents' },
-  { id:'ancien',    label:'Les plus anciens d’abord', court:'anciens' },
-  { id:'az',        label:'Titre de A à Z',           court:'A → Z' },
-  { id:'za',        label:'Titre de Z à A',           court:'Z → A' }
+  { id:'populaire', label:'Popularité',            court:'populaires' },
+  { id:'nom',       label:'Nom',                   court:'nom' },
+  { id:'note',      label:'Note de la communauté', court:'note' },
+  { id:'sortie',    label:'Date de sortie',        court:'date de sortie' },
+  { id:'aleatoire', label:'Aléatoire',             court:'aléatoire' }
+];
+const ORDRES = [
+  { id:'desc', label:'Décroissant' },
+  { id:'asc',  label:'Croissant'   }
 ];
 const PERIMETRES = [
   { id:'tout',   label:'Tout le catalogue', court:'tout le catalogue' },
@@ -67,29 +71,26 @@ function discParams(){
   if(ids.length) p.with_genres = ids.join(',');
 
   const champDate = type === 'movie' ? 'primary_release_date' : 'first_air_date';
-  if(d.tri === 'note'){ p.sort_by = 'vote_average.desc'; p['vote_count.gte'] = '300'; }
-  else if(d.tri === 'recent'){
-    p.sort_by = champDate+'.desc';
+  const sens = d.sens === 'asc' ? 'asc' : 'desc';
+  if(d.tri === 'note'){ p.sort_by = 'vote_average.'+sens; p['vote_count.gte'] = '300'; }
+  else if(d.tri === 'sortie'){
+    p.sort_by = champDate+'.'+sens;
+    /* Le fond de TMDB regorge de fiches quasi vides ; un minimum de votes
+       garde les vrais titres. Et sans borne haute, le sens décroissant
+       remonterait des films annoncés pour dans deux ans dont on ne sait rien. */
     p['vote_count.gte'] = '20';
-    /* Sans borne haute, « les plus récents » remonte des titres annoncés
-       pour dans deux ans dont on ne sait rien. */
-    p[champDate+'.lte'] = todayISO();
+    if(sens === 'desc') p[champDate+'.lte'] = todayISO();
   }
-  else if(d.tri === 'ancien'){
-    p.sort_by = champDate+'.asc';
-    /* Le fond de TMDB regorge d'entrées quasi vides ; un minimum de votes
-       garde les vrais films anciens plutôt que des fiches fantômes. */
-    p['vote_count.gte'] = '20';
-  }
-  else if(d.tri === 'az' || d.tri === 'za'){
-    const sens = d.tri === 'az' ? 'asc' : 'desc';
-    /* TMDB trie sur le titre ORIGINAL (« The Godfather », pas « Le Parrain »).
-       Même garde-fou : sans filtre de votes, l'alphabet commence par des
-       fiches vides aux titres numériques. */
+  else if(d.tri === 'nom'){
+    /* TMDB trie sur le titre ORIGINAL (« The Godfather », pas « Le Parrain »),
+       c'est sa seule option. Même garde-fou de votes : sans lui, l'alphabet
+       commence par des fiches vides aux titres numériques. */
     p.sort_by = (type === 'movie' ? 'original_title.' : 'name.')+sens;
     p['vote_count.gte'] = '100';
   }
-  else p.sort_by = 'popularity.desc';
+  /* aléatoire : TMDB ne le propose pas — on pioche large côté popularité
+     et on mélange à l'arrivée, dans chargerDecouverte(). */
+  else p.sort_by = 'popularity.'+(d.tri === 'aleatoire' ? 'desc' : sens);
 
   if(d.perimetre === 'recent'){
     const champ = type === 'movie' ? 'primary_release_date' : 'first_air_date';
@@ -142,6 +143,14 @@ async function chargerDecouverte(suite){
       if(seq !== discSeq) return;
       d.pages = data.total_pages || 1;
       const trouves = garderPresence((data.results||[]).filter(r => r.poster_path), type);
+      /* Aléatoire : TMDB ne sait pas mélanger, on le fait nous-mêmes sur
+         chaque fournée reçue (Fisher-Yates). */
+      if(d.tri === 'aleatoire'){
+        for(let i = trouves.length - 1; i > 0; i--){
+          const j = Math.floor(Math.random() * (i + 1));
+          const t = trouves[i]; trouves[i] = trouves[j]; trouves[j] = t;
+        }
+      }
       d.res = d.res.concat(trouves);
       tours++;
     } while(d.res.length - avant < CIBLE_GRILLE && d.page < d.pages && tours < MAX_PAGES_PAR_TOUR);
@@ -327,6 +336,7 @@ function setVue(v){
   ouvrirFiltres();          // redessine la feuille, la grille suit toute seule (CSS)
 }
 function setTri(t){ ui.disc.tri = t; ouvrirFiltres(); chargerDecouverte(); }
+function setSens(s){ ui.disc.sens = s; ouvrirFiltres(); chargerDecouverte(); }
 function setPerimetre(p){ ui.disc.perimetre = p; ouvrirFiltres(); chargerDecouverte(); }
 function setNote(n){ ui.disc.noteMin = n; ouvrirFiltres(); chargerDecouverte(); }
 function bascGenre(i){
@@ -338,19 +348,21 @@ function bascGenre(i){
 }
 function resetFiltres(){
   const d = ui.disc;
-  d.genres = []; d.perimetre = 'tout'; d.tri = 'populaire'; d.noteMin = 0;
+  d.genres = []; d.perimetre = 'tout'; d.tri = 'populaire'; d.sens = 'desc'; d.noteMin = 0;
   ouvrirFiltres(); chargerDecouverte();
 }
 function filtresActifs(){
   const d = ui.disc;
-  return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' || d.tri !== 'populaire';
+  return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' ||
+         d.tri !== 'populaire' || (d.sens||'desc') !== 'desc';
 }
 function resumeFiltres(){
   const d = ui.disc;
   const bouts = [];
   const pres = PRESENCES.find(p=>p.id === ui.presence);
   if(ui.presence !== 'tout') bouts.push(pres.label.toLowerCase());
-  bouts.push((TRIS.find(t=>t.id===d.tri)||{}).court);
+  const tri = TRIS.find(t=>t.id===d.tri) || {};
+  bouts.push(tri.court + (d.tri !== 'aleatoire' && d.sens === 'asc' ? ' croissant' : ''));
   if(d.perimetre === 'recent') bouts.push('sorties récentes');
   if(d.noteMin) bouts.push('note '+d.noteMin+' et +');
   d.genres.forEach(n=> bouts.push(n.toLowerCase()));
@@ -369,9 +381,13 @@ function ouvrirFiltres(){
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
       '" onclick="setPerimetre(\''+p.id+'\')">'+p.label+'</button>').join('')+'</div>';
-  h += '<div class="fgrp">Dans quel ordre</div><div class="fchips">'+
+  h += '<div class="fgrp">Trier par</div><div class="fchips">'+
     TRIS.map(t=>'<button class="chip '+(d.tri===t.id?'on':'')+
       '" onclick="setTri(\''+t.id+'\')">'+t.label+'</button>').join('')+'</div>';
+  if(d.tri !== 'aleatoire')
+    h += '<div class="fgrp">Ordre de tri</div><div class="fchips">'+
+      ORDRES.map(o=>'<button class="chip '+((d.sens||'desc')===o.id?'on':'')+
+        '" onclick="setSens(\''+o.id+'\')">'+o.label+'</button>').join('')+'</div>';
   h += '<div class="fgrp">Note minimale</div><div class="fchips">'+
     NOTES.map(n=>'<button class="chip '+(d.noteMin===n.v?'on':'')+
       '" onclick="setNote('+n.v+')">'+n.label+'</button>').join('')+'</div>';

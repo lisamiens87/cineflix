@@ -122,7 +122,9 @@ function menuDemande(id, type){
       (st === 'encours'
         ? 'Le titre est en cours d\'ajout sur Cinéflix. Il basculera tout seul en « Regarder » dès qu\'il sera là.'
         : 'Elle apparaît dans la file de demandes. Tu seras prévenu quand le titre arrivera.')+'</p>'+
-    '<button class="opt danger" onclick="closeSheet();annulerDemande('+id+',\''+type+'\');render()">'+
+    /* Attention à l'ordre : annulerDemande(type, id) — il a déjà été inversé
+       ici, et la fonction ne trouvait alors jamais la demande à annuler. */
+    '<button class="opt danger" onclick="closeSheet();annulerDemande(\''+type+'\','+id+');render()">'+
       'Annuler ma demande</button>'+
     '<button class="opt" onclick="closeSheet()">Fermer</button>');
 }

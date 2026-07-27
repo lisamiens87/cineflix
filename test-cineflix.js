@@ -129,9 +129,13 @@ const echecs = [];
        return getComputedStyle(s).overflowY === 'auto' &&
               s.getBoundingClientRect().top >= 0;
      }));
-  ok('six ordres de tri sont proposés',
-     await page.locator('.chip:has-text("Titre de A à Z")').count() === 1 &&
-     await page.locator('.chip:has-text("Les plus anciens")').count() === 1);
+  ok('les tris façon Jellyfin sont proposés',
+     await page.locator('.chip:has-text("Nom")').count() === 1 &&
+     await page.locator('.chip:has-text("Aléatoire")').count() === 1 &&
+     await page.locator('.chip:has-text("Date de sortie")').count() === 1);
+  ok('le sens croissant / décroissant est proposé',
+     await page.locator('.chip:text-is("Croissant")').count() === 1 &&
+     await page.locator('.chip:text-is("Décroissant")').count() === 1);
   await page.click('.chip:has-text("Liste")');
   await page.waitForTimeout(300);
   ok('« Liste » bascule la grille en liste',
@@ -178,6 +182,18 @@ const echecs = [];
      (await page.locator('.actions .btn').first().innerText()).includes('Demandé'));
   ok('la pastille de navigation compte la demande',
      (await page.locator('nav .pastille-nav').innerText()) === '1');
+
+  // 4 bis. Annuler la demande — a déjà cassé (arguments inversés), reste testé
+  await page.locator('.actions .btn').first().click();       // menu « Demandé »
+  await page.waitForSelector('.sheet.show', {timeout:3000});
+  await page.click('.opt.danger');                            // Annuler ma demande
+  await page.waitForTimeout(400);
+  ok('annuler la demande rend le bouton « Demander »',
+     (await page.locator('.actions .btn').first().innerText()).includes('Demander'));
+  ok('la pastille de navigation s\'éteint',
+     await page.locator('nav .pastille-nav').count() === 0);
+  await page.locator('.actions .btn').first().click();       // on la redemande
+  await page.waitForTimeout(400);
 
   // 5. Favori
   await page.locator('.actions .btn').nth(1).click();
