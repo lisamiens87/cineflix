@@ -10,9 +10,13 @@ function ouvrirFiche(id, type, from){
 async function chargerFiche(){
   const id = params.id, type = params.type;
   try{
-    const extra = type === 'movie' ? 'credits,release_dates,watch/providers'
-                                   : 'credits,watch/providers';
-    const d = await tmdb('/'+type+'/'+id, { append_to_response: extra });
+    const extra = type === 'movie' ? 'credits,release_dates,watch/providers,videos'
+                                   : 'credits,watch/providers,videos';
+    /* include_video_language : sans lui, TMDB ne renvoie que les vidéos dans la
+       langue demandée, et la plupart des titres n'ont pas de bande-annonce VF.
+       On demande donc fr, en, et celles sans langue déclarée. */
+    const d = await tmdb('/'+type+'/'+id, { append_to_response: extra,
+                                            include_video_language: 'fr,en,null' });
     if(!ui.fiche || ui.fiche.id !== id) return;
     ui.fiche = { id:id, type:type, loading:false, data:d,
                  dates: type === 'movie' ? extraireDates((d.release_dates||{}).results, db.region) : null };
@@ -137,6 +141,56 @@ function blocPlateformes(o){
       (p.link ? ' · <a href="'+esc(p.link)+'" target="_blank" rel="noopener">toutes les offres</a>' : '')+'</div>';
 }
 
+/* ---------- Bande-annonce ----------
+   TMDB renvoie souvent une dizaine de vidéos : teasers, extraits, featurettes,
+   parfois plusieurs bandes-annonces. On en choisit une seule, la plus utile
+   pour décider si on veut le titre : d'abord une VF, puis une vraie
+   bande-annonce plutôt qu'un teaser, puis une officielle. */
+function meilleureVideo(videos){
+  const yt = ((videos||{}).results||[]).filter(v => v && v.site === 'YouTube' && v.key);
+  if(!yt.length) return null;
+  const rangLangue = l => l === 'fr' ? 0 : l === 'en' ? 1 : 2;
+  const rangType   = t => t === 'Trailer' ? 0 : t === 'Teaser' ? 1 : 2;
+  return yt.slice().sort((a,b)=>
+    rangLangue(a.iso_639_1) - rangLangue(b.iso_639_1) ||
+    rangType(a.type)        - rangType(b.type)        ||
+    (a.official?0:1)        - (b.official?0:1)        ||
+    (b.size||0)             - (a.size||0)
+  )[0];
+}
+
+/* On n'insère l'iframe YouTube qu'au clic : une vignette TMDB coûte une image,
+   un lecteur embarqué coûte plusieurs centaines de kilo-octets et des cookies
+   tiers sur chaque fiche ouverte. */
+function blocBandeAnnonce(d){
+  const v = meilleureVideo(d.videos);
+  if(!v) return '';
+  const cle = String(v.key).replace(/[^\w-]/g,'');
+  if(!cle) return '';
+  const img = IMG(d.backdrop_path,'w780') || IMG(d.poster_path,'w780');
+  const vf  = v.iso_639_1 === 'fr';
+  return '<div class="sectitle">Bande-annonce</div>'+
+    '<div class="wrap" style="padding-top:0">'+
+      '<div class="ba" role="button" tabindex="0" aria-label="Lire la bande-annonce" '+
+           'onclick="jouerBA(this,\''+cle+'\')" '+
+           'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jouerBA(this,\''+cle+'\')}">'+
+        (img ? '<img loading="lazy" src="'+img+'" alt="">' : '')+
+        '<span class="baplay">'+I.play+'</span>'+
+        '<span class="balbl">'+(vf ? 'VF' : 'VO')+' · '+esc(v.name || 'Bande-annonce')+'</span>'+
+      '</div>'+
+    '</div>';
+}
+
+function jouerBA(el, cle){
+  if(el.dataset.on) return;
+  el.dataset.on = '1';
+  el.removeAttribute('role'); el.removeAttribute('tabindex');
+  el.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/'+cle+
+    '?autoplay=1&rel=0&playsinline=1" title="Bande-annonce" loading="lazy" '+
+    'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" '+
+    'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
+}
+
 function blocCasting(credits){
   const cast = ((credits||{}).cast||[]).slice(0,12);
   if(!cast.length) return '';
@@ -209,6 +263,7 @@ function viewFiche(){
       '<div class="overview clamp" style="margin-top:0" onclick="this.classList.toggle(\'clamp\')">'+
       esc(d.overview)+'</div>';
 
+  html += blocBandeAnnonce(d);
   html += blocPlateformes(d);
   html += blocCasting(d.credits);
   return html + '<div style="height:32px"></div>';

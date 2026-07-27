@@ -206,6 +206,23 @@ input:focus,select:focus{border-color:var(--accent)}
 .credit{font-size:10.5px;color:var(--muted);margin:10px 16px 0}
 .credit a{color:var(--muted);text-decoration:underline}
 
+/* ---------- Bande-annonce ---------- */
+/* Vignette cliquable ; le lecteur YouTube ne s'insère qu'au clic, pour ne pas
+   charger un lecteur tiers sur chaque fiche ouverte. */
+.ba{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;
+  background:#000;border:1px solid var(--line);cursor:pointer;display:block}
+.ba img{width:100%;height:100%;object-fit:cover;display:block;opacity:.72;transition:opacity .2s}
+.ba:hover img,.ba:focus-visible img{opacity:.85}
+.ba iframe{width:100%;height:100%;border:0;display:block}
+.baplay{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:58px;height:58px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(15,17,21,.62);border:1px solid rgba(255,255,255,.28);
+  color:#fff;backdrop-filter:blur(4px);pointer-events:none}
+.baplay svg{width:26px;height:26px;margin-left:3px}
+.balbl{position:absolute;left:10px;bottom:10px;right:10px;pointer-events:none;
+  font-size:11.5px;font-weight:650;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.75);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
 /* ---------- Dates de sortie ---------- */
 /* Le tableau des trois sorties : salle, numérique, physique. C'est la raison
    d'être de l'app, il tient donc en haut de la fiche et non enfoui plus bas. */
