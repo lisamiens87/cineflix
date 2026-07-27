@@ -123,6 +123,12 @@ const echecs = [];
   // 2 bis. Affichage : liste, compacte, et les nouveaux tris
   await page.click('#fbtn');
   await page.waitForTimeout(400);
+  ok('la feuille de filtres sait défiler (plus haute que l\'écran)',
+     await page.evaluate(() => {
+       const s = document.querySelector('.sheetin');
+       return getComputedStyle(s).overflowY === 'auto' &&
+              s.getBoundingClientRect().top >= 0;
+     }));
   ok('six ordres de tri sont proposés',
      await page.locator('.chip:has-text("Titre de A à Z")').count() === 1 &&
      await page.locator('.chip:has-text("Les plus anciens")').count() === 1);

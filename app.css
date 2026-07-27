@@ -327,8 +327,13 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(15,17,21,.
 .sheet{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.6);display:none;
   align-items:flex-end;justify-content:center}
 .sheet.show{display:flex}
+/* La feuille défile en interne : depuis qu'elle porte six tris et le choix
+   d'affichage, elle dépasse l'écran d'un téléphone — sans défilement, le haut
+   devenait inatteignable et tout semblait bloqué. */
 .sheetin{background:var(--surface);border:1px solid var(--line);border-bottom:0;
-  border-radius:18px 18px 0 0;width:100%;max-width:720px;padding:18px 16px calc(24px + var(--safe-b))}
+  border-radius:18px 18px 0 0;width:100%;max-width:720px;padding:18px 16px calc(24px + var(--safe-b));
+  max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);
+  overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
 .sheetin h3{margin:0 0 4px;font-size:17px}
 .sheet .opt{display:block;width:100%;text-align:left;padding:14px 4px;
   border-top:1px solid var(--line);font-weight:600}
