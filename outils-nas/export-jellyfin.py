@@ -49,39 +49,89 @@ def appel(base, token, chemin, params):
         return json.loads(r.read().decode("utf-8"))
 
 
-def recuperer(base, token, genre):
+def utilisateur_principal(base, token):
+    """L'identifiant d'utilisateur à joindre aux requêtes.
+
+    C'est lui qui débloque les données de lecture (nombre de lectures, dernière
+    lecture) — Jellyfin les tient par utilisateur, pas par serveur. On prend le
+    premier administrateur, sauf si JELLYFIN_USER désigne quelqu'un d'autre.
+    """
+    voulu = (os.environ.get("JELLYFIN_USER") or "").strip().lower()
+    try:
+        users = appel(base, token, "/Users", {})
+    except Exception:
+        return None
+    if voulu:
+        for u in users:
+            if voulu in ((u.get("Name") or "").lower(), (u.get("Id") or "").lower()):
+                return u.get("Id")
+    admins = [u for u in users if (u.get("Policy") or {}).get("IsAdministrator")]
+    return (admins or users or [{}])[0].get("Id")
+
+
+CHAMPS = ("ProviderIds,DateCreated,RunTimeTicks,OfficialRating,CriticRating,"
+          "CommunityRating,PremiereDate,Genres")
+
+
+def resume(it, genre, tmdb_id):
+    """La fiche compacte d'un titre — ce que l'app trie sans appeler personne."""
+    ud = it.get("UserData") or {}
+    return {
+        "t": "movie" if genre == "Movie" else "tv",
+        "id": tmdb_id,
+        "nom": it.get("Name") or "",
+        "sortie": (it.get("PremiereDate") or "")[:10],
+        "ajout": (it.get("DateCreated") or "")[:10],
+        # RunTimeTicks est en unités de 100 ns : 600 000 000 ticks = 1 minute.
+        "duree": int(round((it.get("RunTimeTicks") or 0) / 600000000)),
+        "cert": it.get("OfficialRating") or "",
+        "note": it.get("CommunityRating"),
+        "noteCrit": it.get("CriticRating"),
+        "vu": ud.get("PlayCount") or 0,
+        "lu": (ud.get("LastPlayedDate") or "")[:10],
+        "genres": it.get("Genres") or [],
+    }
+
+
+def recuperer(base, token, genre, user_id):
     """Parcourt la bibliothèque page par page.
 
     On demande explicitement ProviderIds : sans ce champ Jellyfin renvoie une
     fiche allégée, et on n'aurait aucun moyen de faire le lien avec TMDB.
+    Les autres champs nourrissent les tris de l'app (date d'ajout, durée,
+    classification, notes, lectures).
     """
-    ids, debut = set(), 0
+    ids, fiches, debut = set(), [], 0
     sans_tmdb = 0
     while True:
-        d = appel(base, token, "/Items", {
+        params = {
             "IncludeItemTypes": genre,
             "Recursive": "true",
-            "Fields": "ProviderIds",
+            "Fields": CHAMPS,
             "StartIndex": debut,
             "Limit": PAGE,
             "EnableTotalRecordCount": "true",
-        })
+        }
+        if user_id:
+            params["userId"] = user_id
+        d = appel(base, token, "/Items", params)
         lot = d.get("Items", [])
         if not lot:
             break
         for it in lot:
             tmdb = (it.get("ProviderIds") or {}).get("Tmdb")
-            if tmdb:
-                try:
-                    ids.add(int(tmdb))
-                except ValueError:
-                    sans_tmdb += 1
-            else:
+            try:
+                tmdb = int(tmdb)
+            except (TypeError, ValueError):
                 sans_tmdb += 1
+                continue
+            if tmdb not in ids:
+                ids.add(tmdb)
+                fiches.append(resume(it, genre, tmdb))
         debut += len(lot)
         if debut >= d.get("TotalRecordCount", debut):
             break
-    return sorted(ids), sans_tmdb
+    return sorted(ids), fiches, sans_tmdb
 
 
 def pousser_supabase(base, key, contenu):
@@ -95,6 +145,7 @@ def pousser_supabase(base, key, contenu):
         "id": 1,
         "movies": contenu["movies"],
         "tv": contenu["tv"],
+        "items": contenu["items"],
         "maj": contenu["maj"],
     }).encode("utf-8")
     req = urllib.request.Request(url, data=corps, method="POST", headers={
@@ -129,8 +180,9 @@ def main():
         sys.exit("--supabase demande SUPABASE_URL et SUPABASE_KEY.")
 
     try:
-        films, films_ko = recuperer(a.url, a.token, "Movie")
-        series, series_ko = recuperer(a.url, a.token, "Series")
+        uid = utilisateur_principal(a.url, a.token)
+        films, fiches_f, films_ko = recuperer(a.url, a.token, "Movie", uid)
+        series, fiches_s, series_ko = recuperer(a.url, a.token, "Series", uid)
     except urllib.error.HTTPError as e:
         sys.exit("Jellyfin a répondu %s — vérifie la clé API." % e.code)
     except urllib.error.URLError as e:
@@ -146,6 +198,7 @@ def main():
         "source": "jellyfin",
         "movies": films,
         "tv": series,
+        "items": fiches_f + fiches_s,
     }
 
     if a.sortie:
