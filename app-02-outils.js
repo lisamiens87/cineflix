@@ -1,0 +1,246 @@
+"use strict";
+/* ============================ Utilitaires ============================ */
+const todayISO = ()=> new Date().toISOString().slice(0,10);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const year = iso => iso ? iso.slice(0,4) : '';
+const isoDecale = j => new Date(Date.now() + j*86400000).toISOString().slice(0,10);
+
+const MOIS = ['janv.','févr.','mars','avr.','mai','juin','juil.','août','sept.','oct.','nov.','déc.'];
+const JOURS = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
+
+function fmtDate(iso){
+  if(!iso) return 'Date inconnue';
+  const d = new Date(iso.slice(0,10)+'T12:00:00');
+  return d.getDate()+' '+MOIS[d.getMonth()]+' '+d.getFullYear();
+}
+function fmtDateCourt(iso){
+  if(!iso) return '';
+  const d = new Date(iso.slice(0,10)+'T12:00:00');
+  return d.getDate()+' '+MOIS[d.getMonth()];
+}
+function fmtJour(iso){
+  const t = todayISO();
+  if(iso === t) return "Aujourd'hui";
+  if(iso === isoDecale(-1)) return 'Hier';
+  if(iso === isoDecale(1)) return 'Demain';
+  const d = new Date(iso+'T12:00:00');
+  return JOURS[d.getDay()]+' '+d.getDate()+' '+MOIS[d.getMonth()]+
+         (d.getFullYear() !== new Date().getFullYear() ? ' '+d.getFullYear() : '');
+}
+/* « dans 3 jours », « il y a 2 semaines » — plus parlant qu'une date brute
+   quand on regarde quand un film arrive. */
+function relatif(iso){
+  if(!iso) return '';
+  const j = Math.round((Date.parse(iso.slice(0,10)+'T12:00:00') - Date.parse(todayISO()+'T12:00:00')) / 86400000);
+  if(j === 0) return "aujourd'hui";
+  const n = Math.abs(j), futur = j > 0;
+  let q;
+  if(n === 1) q = futur ? 'demain' : 'hier';
+  else if(n < 7)   q = (futur?'dans ':'il y a ')+n+' jours';
+  else if(n < 31)  { const s = Math.round(n/7); q = (futur?'dans ':'il y a ')+s+' semaine'+(s>1?'s':''); }
+  else if(n < 365) { const m = Math.round(n/30); q = (futur?'dans ':'il y a ')+m+' mois'; }
+  else             { const a = Math.round(n/365); q = (futur?'dans ':'il y a ')+a+' an'+(a>1?'s':''); }
+  return q;
+}
+function fmtDuree(min){
+  if(!min) return '—';
+  const h = Math.floor(min/60), m = min%60;
+  return h ? h+'h'+(m?String(m).padStart(2,'0'):'') : m+' min';
+}
+
+function posterEl(path, size, cls, alt){
+  if(path) return '<img class="poster '+(cls||'')+'" loading="lazy" onerror="posterFail(this)" src="'+
+    IMG(path,size)+'" alt="'+esc(alt||'')+'">';
+  return '<div class="poster ph '+(cls||'')+'">'+esc((alt||'?').slice(0,20))+'</div>';
+}
+function posterFail(img){
+  const d = document.createElement('div');
+  d.className = img.className + ' ph';
+  d.textContent = (img.getAttribute('alt')||'?').slice(0,20);
+  img.replaceWith(d);
+}
+
+/* ============================ UI ============================ */
+let toastTimer;
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function openSheet(html){
+  document.getElementById('sheetin').innerHTML = html;
+  document.getElementById('sheet').classList.add('show');
+}
+function closeSheet(){ document.getElementById('sheet').classList.remove('show'); }
+document.getElementById('sheet').addEventListener('click', e=>{ if(e.target.id === 'sheet') closeSheet(); });
+
+function header(title, opts){
+  opts = opts||{};
+  return '<header><div class="hbar">'+
+    (opts.back ? '<button class="iconbtn" onclick="'+opts.back+'">'+I.back+'</button>' : '')+
+    '<div class="htitle">'+esc(title)+'</div>'+
+    (opts.right||'')+
+  '</div>'+(opts.sub||'')+'</header>';
+}
+
+/* ============================ Navigation ============================ */
+let view = 'decouvrir';
+let params = {};
+let ui = {
+  presence:'tout',                       // tout | dispo | manquant — le filtre maison
+  disc:{ type:'movie', genres:[], tri:'populaire', noteMin:0, perimetre:'tout',
+         page:1, pages:1, res:[], loading:false, err:'', charge:false },
+  champOuvert:false, focusSearch:false,
+  searchQ:'', searchRes:null, searching:false, searchErr:'',
+  sorties:{ mode:'bluray', res:[], loading:false, err:'', charge:false },
+  listeTab:'favoris',
+  fiche:null,
+  auth:{ mode:'connexion', err:'', occupe:false }
+};
+
+const DEPTH = { auth:0, accueil:0, decouvrir:0, sorties:0, liste:0, profil:0,
+                fiche:1, reglages:1, file:1 };
+let navDir = 'none';
+const LISTES = { decouvrir:1, sorties:1, liste:1 };
+const memDefil = {};
+
+function go(v, p, dir){
+  if(view === v && JSON.stringify(params) === JSON.stringify(p||{})){ window.scrollTo(0,0); render(); return; }
+  if(LISTES[view]) memDefil[view] = window.scrollY || 0;
+  if(v === 'decouvrir' && !(ui.searchQ||'').trim()) ui.champOuvert = false;
+  const a = DEPTH[view]||0, b = DEPTH[v]||0;
+  navDir = dir || (b > a ? 'enter' : b < a ? 'back' : 'none');
+  view = v; params = p||{};
+  render();
+  const y = LISTES[v] ? (memDefil[v] || 0) : 0;
+  window.scrollTo(0, y);
+  if(y) requestAnimationFrame(()=> window.scrollTo(0, y));
+}
+function oublierDefil(v){ delete memDefil[v]; }
+
+function currentBack(){
+  if(view === 'fiche') return params.from || 'decouvrir';
+  if(view === 'reglages') return params.from || 'profil';
+  if(view === 'file') return 'profil';
+  return null;
+}
+function goBack(){
+  if(document.getElementById('sheet').classList.contains('show')) return closeSheet();
+  const t = currentBack();
+  if(t) go(t, {}, 'back');
+}
+
+/* Balayage depuis le bord gauche : le doigt entraîne l'écran, et au
+   relâchement soit on part en arrière, soit la page reprend sa place. */
+(function swipeBack(){
+  const SEUIL = 60, COURSE = 90;
+  let x0=null, y0=null, t0=0, actif=false;
+  const app = ()=> document.getElementById('app');
+
+  function suivre(dx){
+    const el = app(); if(!el) return;
+    const d = Math.max(0, Math.min(dx, COURSE));
+    el.style.transition = 'none';
+    el.style.transform = 'translate3d('+d+'px,0,0)';
+    el.style.opacity = String(1 - (d / COURSE) * 0.3);
+  }
+  function relacher(part){
+    const el = app(); if(!el) return;
+    if(part){ el.style.transition=''; el.style.transform=''; el.style.opacity=''; return; }
+    el.style.transition = 'transform .22s cubic-bezier(.16,.72,.24,1), opacity .22s';
+    el.style.transform = ''; el.style.opacity = '';
+    setTimeout(()=>{ const e2 = app(); if(e2) e2.style.transition=''; }, 240);
+  }
+  document.addEventListener('touchstart', e=>{
+    const t = e.touches[0];
+    actif = false;
+    if(t.clientX <= 28 && currentBack()){ x0=t.clientX; y0=t.clientY; t0=Date.now(); } else x0=null;
+  }, {passive:true});
+  document.addEventListener('touchmove', e=>{
+    if(x0===null) return;
+    const t = e.touches[0];
+    const dx = t.clientX-x0, dy = Math.abs(t.clientY-y0);
+    if(!actif && (dy > 20 || dx < 6)){ if(dy > 20) x0 = null; return; }
+    actif = true; suivre(dx);
+  }, {passive:true});
+  document.addEventListener('touchend', e=>{
+    if(x0===null){ if(actif) relacher(false); actif=false; return; }
+    const t = e.changedTouches[0];
+    const dx = t.clientX-x0, dy = Math.abs(t.clientY-y0);
+    const part = dx > SEUIL && dy < 45 && Date.now()-t0 < 700;
+    relacher(part);
+    if(part) goBack();
+    x0=null; actif=false;
+  }, {passive:true});
+})();
+
+/* ============================ Rendu ============================ */
+function render(){
+  const app = document.getElementById('app');
+  let html = '';
+  if(view === 'auth')           html = viewAuth();
+  else if(view === 'accueil')   html = viewAccueil();
+  else if(view === 'file')      html = viewFile();
+  else if(view === 'decouvrir') html = viewDecouvrir();
+  else if(view === 'sorties')   html = viewSorties();
+  else if(view === 'liste')     html = viewListe();
+  else if(view === 'profil')    html = viewProfil();
+  else if(view === 'reglages')  html = viewReglages();
+  else if(view === 'fiche')     html = viewFiche();
+  app.innerHTML = html;
+
+  /* La barre du bas disparaît sur les écrans qui n'ont qu'une chose à faire :
+     la mise en route, et la connexion. */
+  document.body.classList.toggle('accueil', view === 'accueil' || view === 'auth');
+  app.classList.remove('enter','back');
+  if(navDir === 'enter' || navDir === 'back'){
+    void app.offsetWidth;
+    const sens = navDir;
+    app.classList.add(sens);
+    app.addEventListener('animationend', function fini(){
+      app.classList.remove(sens);
+      app.removeEventListener('animationend', fini);
+    });
+  }
+  navDir = 'none';
+  renderNav();
+
+  if(view === 'decouvrir'){
+    const inp = document.getElementById('q');
+    if(inp && ui.focusSearch){ inp.focus(); ui.focusSearch = false; }
+    if(!ui.disc.charge && !ui.disc.loading && db.apiKey) chargerDecouverte();
+  }
+  if(view === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
+}
+
+function renderNav(){
+  const n = nbDemandes();
+  const tabs = [
+    ['decouvrir','Découvrir', I.boussole, 0],
+    ['sorties','Sorties',     I.cal,      0],
+    ['liste','Ma liste',      I.coeur,    n],
+    ['profil','Profil',       I.user,     0]
+  ];
+  const depuis = params.from === 'file' ? 'profil' : params.from;
+  const cur = view === 'fiche' ? (depuis || 'decouvrir')
+            : (view === 'reglages' || view === 'file') ? 'profil'
+            : view;
+  document.getElementById('nav').innerHTML = tabs.map(([id,label,icon,badge])=>
+    '<button class="tab '+(cur===id?'on':'')+'" onclick="go(\''+id+'\')">'+icon+
+    (badge ? '<span class="pastille-nav">'+badge+'</span>' : '')+
+    '<span>'+label+'</span></button>'
+  ).join('');
+}
+
+function banniereCle(){
+  if(db.apiKey) return '';
+  return '<div class="banner">Ajoute ta clé TMDB dans <b>Profil → Réglages</b> pour voir le catalogue.</div>';
+}
+/* Le catalogue absent n'est pas une erreur bloquante : l'app reste utilisable,
+   on prévient simplement que la distinction « sur Cinéflix » ne marche pas. */
+function banniereCatalogue(){
+  if(!CAT.erreur) return '';
+  return '<div class="banner"><b>Catalogue Cinéflix introuvable.</b><br>'+
+    'Impossible de savoir ce qui est déjà sur le serveur. Vérifie l\'adresse du '+
+    'catalogue dans les réglages.</div>';
+}

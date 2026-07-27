@@ -1,0 +1,21 @@
+{
+  "id": "/cineflix/",
+  "name": "Cinéflix",
+  "short_name": "Cinéflix",
+  "description": "Le catalogue de la médiathèque Cinéflix : ce qui est déjà sur le serveur, ce qui sort bientôt, et ce qu'on peut demander.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "categories": ["entertainment", "lifestyle"],
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
