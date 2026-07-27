@@ -89,6 +89,7 @@ let params = {};
 let ui = {
   presence:'tout',                       // tout | dispo — le filtre maison
   disc:{ type:'movie', genres:[], tri:'populaire', sens:'desc', noteMin:0, perimetre:'tout',
+         plats:[],                            // plateformes cochées (vide = toutes)
          page:1, pages:1, res:[], loading:false, err:'', charge:false },
   champOuvert:false, focusSearch:false,
   searchQ:'', searchRes:null, searching:false, searchErr:'',

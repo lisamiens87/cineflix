@@ -98,12 +98,19 @@ header{
 .chip.chipico{width:34px;height:34px;padding:0;display:grid;place-items:center;flex:0 0 auto}
 .chip.chipico svg{width:16px;height:16px;display:block}
 .chip.chipico.ouvert{border-color:var(--accent);color:var(--accent);background:var(--surface)}
-/* Les puces de présence portent la couleur de leur sens : vert = je l'ai. */
-.chip.on.vert{background:var(--ok);border-color:var(--ok);color:#08130d}
-.chip .pt{width:7px;height:7px;border-radius:50%;flex:none}
-.chip .pt.ok{background:var(--ok)}
-.chip .pt.non{background:var(--muted)}
-.chip.on .pt{background:currentColor}
+/* Chaque bouton de tête a sa couleur : contour teinté au repos, couleur
+   pleine quand il est actif. Films bleu, Séries violet, Cinéma orange,
+   Plateformes rouge, Cinéflix vert. */
+.chip.c-films{border-color:#3b82f680}
+.chip.c-films.on{background:#3b82f6;border-color:#3b82f6;color:#fff}
+.chip.c-series{border-color:#a855f780}
+.chip.c-series.on{background:#a855f7;border-color:#a855f7;color:#fff}
+.chip.c-cinema{border-color:#f59e0b80}
+.chip.c-cinema.on{background:#f59e0b;border-color:#f59e0b;color:#221600}
+.chip.c-plats{border-color:#ef444480}
+.chip.c-plats.on{background:#ef4444;border-color:#ef4444;color:#fff}
+.chip.c-flix{border-color:#3ecf8e80}
+.chip.c-flix.on{background:#3ecf8e;border-color:#3ecf8e;color:#08130d}
 .btn{background:var(--accent);color:#fff;border-radius:11px;padding:11px 16px;font-weight:650;
   display:inline-flex;align-items:center;justify-content:center;gap:8px;line-height:1.2}
 .btn svg{width:18px;height:18px;flex:none}
@@ -112,6 +119,11 @@ header{
 .btn.vert{background:var(--ok);color:#08130d}
 .btn.attente{background:var(--surface2);color:var(--warn);border:1px solid #ffb84d55}
 .btn.block{display:flex;width:100%}
+/* Boutons de plateformes sur la fiche (vue Plateformes) : ils se partagent
+   la ligne, et passent à la ligne s'il y en a trop. */
+.actions.plats{flex-wrap:wrap}
+.btn.plat{flex:1 1 0;min-width:96px;background:var(--surface2);color:var(--text);
+  border:1px solid var(--line)}
 .btn[disabled]{opacity:.45;pointer-events:none}
 input[type=text],input[type=search],input[type=password],select{
   width:100%;background:var(--surface);border:1px solid var(--line);border-radius:11px;

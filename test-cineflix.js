@@ -60,7 +60,8 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
       d.release_dates = { results:[{ iso_3166_1:'FR', release_dates:[
         { type:3, release_date:'2024-03-06T00:00:00.000Z' },
         { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
-      d['watch/providers'] = { results:{ FR:{ link:'https://x', flatrate:[{provider_name:'Netflix', logo_path:'/n.jpg'}] } } };
+      d['watch/providers'] = { results:{ FR:{ link:'https://x',
+        flatrate:[{provider_id:8, provider_name:'Netflix', logo_path:'/n.jpg'}] } } };
       /* Volontairement en désordre : le teaser anglais arrive avant la
          bande-annonce VF, c'est le tri qui doit choisir la seconde. */
       d.videos = { results:[
@@ -113,6 +114,46 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
   ok('« Plateformes » interroge TMDB avec les fournisseurs français',
      dernierFournisseurs === '8|119|337|381');
   ok('« Plateformes » remplit la grille', await page.locator('.gcard').count() >= 20);
+
+  // 2 a. Couleurs et libellés des puces
+  ok('plus de point vert — des contours colorés à la place',
+     await page.locator('.souschips .pt').count() === 0 &&
+     await page.locator('.souschips .chip.c-flix').count() === 1 &&
+     await page.locator('.souschips .chip.c-plats').count() === 1 &&
+     await page.locator('.chips.types .chip.c-films').count() === 1 &&
+     await page.locator('.chips.types .chip.c-series').count() === 1);
+  await page.click('.chips.types .chip:has-text("Séries")');
+  await page.waitForTimeout(700);
+  ok('en mode séries, la puce du bas dit « Séries » (plus « Cinéma »)',
+     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Séries');
+  await page.click('.chips.types .chip:has-text("Films")');
+  await page.waitForTimeout(900);
+
+  // 2 b. Fiche ouverte depuis Plateformes : boutons des plateformes
+  await page.locator('.gcard:not(:has(.tag.dispo))').first().click();
+  await page.waitForSelector('.actions', {timeout:5000});
+  ok('les boutons des plateformes remplacent « Demander »',
+     await page.locator('.btn.plat').count() === 1 &&
+     (await page.locator('.btn.plat').innerText()).includes('Netflix') &&
+     !(await page.locator('#app').innerText()).includes('Demander'));
+  ok('« Aussi en streaming » a disparu sur cette vue',
+     !(await page.locator('#app').innerText()).includes('Aussi en streaming'));
+  await page.click('header .iconbtn');
+  await page.waitForTimeout(700);
+
+  // 2 c. Filtrer par plateforme
+  await page.click('#fbtn');
+  await page.waitForTimeout(400);
+  ok('le filtre par plateforme est proposé',
+     await page.locator('.chip:text-is("Disney+")').count() === 1 &&
+     await page.locator('.chip:text-is("Canal+")').count() === 1);
+  await page.click('.chip:text-is("Netflix")');
+  await page.waitForTimeout(900);
+  ok('cocher Netflix ne demande que Netflix à TMDB', dernierFournisseurs === '8');
+  await page.click('.chip:text-is("Netflix")');          // on décoche
+  await page.waitForTimeout(900);
+  await page.click('button:has-text("Voir les résultats")');
+  await page.waitForTimeout(400);
 
   await page.click('.souschips .chip:has-text("Cinéflix")');
   await page.waitForTimeout(900);

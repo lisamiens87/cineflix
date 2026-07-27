@@ -1,7 +1,9 @@
 "use strict";
 /* ============================ Découvrir ============================ */
 
-const TYPES = [ {id:'movie', label:'Films'}, {id:'tv', label:'Séries'} ];
+/* Chaque bouton de tête porte sa couleur (classe c-…) : un contour teinté
+   au repos, la couleur pleine quand il est actif. */
+const TYPES = [ {id:'movie', label:'Films', cl:'c-films'}, {id:'tv', label:'Séries', cl:'c-series'} ];
 
 /* Les trois sources, réparties sur la largeur de l'écran :
    « Cinéma »      — tout le catalogue TMDB ;
@@ -9,15 +11,21 @@ const TYPES = [ {id:'movie', label:'Films'}, {id:'tv', label:'Séries'} ];
                      (Canal+, Netflix, Prime Video, Disney+) ;
    « Cinéflix »    — la bibliothèque du serveur, et elle seule. */
 const PRESENCES = [
-  { id:'tout',  label:'Cinéma' },
-  { id:'plats', label:'Plateformes' },
-  { id:'dispo', label:'Cinéflix', pt:'ok' }
+  { id:'tout',  cl:'c-cinema' },                    // « Cinéma » / « Séries »
+  { id:'plats', label:'Plateformes', cl:'c-plats' },
+  { id:'dispo', label:'Cinéflix',    cl:'c-flix' }
 ];
-const labelTout = ()=> 'Cinéma';   // le même mot pour films et séries, voulu ainsi
+const labelTout = ()=> ui.disc.type === 'movie' ? 'Cinéma' : 'Séries';
 
-/* Identifiants TMDB des plateformes retenues : Netflix 8, Prime Video 119,
-   Disney+ 337, Canal+ 381. Le filtre est fait par TMDB (données JustWatch). */
-const FOURNISSEURS = '8|119|337|381';
+/* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
+   et l'adresse de leur recherche — pour ouvrir un titre directement chez elles. */
+const PLATEFORMES = [
+  { id:8,   nom:'Netflix',     lien:t=>'https://www.netflix.com/search?q='+encodeURIComponent(t) },
+  { id:119, nom:'Prime Video', lien:t=>'https://www.primevideo.com/search/?phrase='+encodeURIComponent(t) },
+  { id:337, nom:'Disney+',     lien:t=>'https://www.disneyplus.com/search?q='+encodeURIComponent(t) },
+  { id:381, nom:'Canal+',      lien:t=>'https://www.canalplus.com/recherche?q='+encodeURIComponent(t) }
+];
+const FOURNISSEURS = PLATEFORMES.map(p=>p.id).join('|');
 
 /* Affichage : compacte (4 colonnes), normale (3), ou liste. Réglable,
    mémorisé par appareil. « Grandes » a existé : sur un téléphone elle
@@ -89,10 +97,11 @@ async function chargerGenres(type){
 function discParams(){
   const d = ui.disc, type = d.type;
   const p = { include_adult:'false', page:String(d.page), region: db.region || 'FR' };
-  /* Vue « Plateformes » : TMDB filtre lui-même sur l'abonnement en France. */
+  /* Vue « Plateformes » : TMDB filtre lui-même sur l'abonnement en France.
+     Si l'utilisateur a coché des plateformes précises, on ne demande qu'elles. */
   if(ui.presence === 'plats'){
     p.watch_region = db.region || 'FR';
-    p.with_watch_providers = FOURNISSEURS;
+    p.with_watch_providers = (d.plats && d.plats.length) ? d.plats.join('|') : FOURNISSEURS;
     p.with_watch_monetization_types = 'flatrate';
   }
   const ids = d.genres.map(n => genreParNom(type, n)).filter(x => x != null);
@@ -478,6 +487,12 @@ function setPresence(p){
   render();
   if(!enRecherche()) chargerDecouverte();
 }
+function bascPlateforme(id){
+  const sel = ui.disc.plats || (ui.disc.plats = []);
+  const k = sel.indexOf(id);
+  if(k < 0) sel.push(id); else sel.splice(k,1);
+  ouvrirFiltres(); chargerDecouverte();
+}
 function setVue(v){
   db.vue = v; saveDB();
   appliquerVue();
@@ -497,18 +512,22 @@ function bascGenre(i){
 function resetFiltres(){
   const d = ui.disc;
   d.genres = []; d.perimetre = 'tout'; d.tri = 'populaire'; d.sens = 'desc'; d.noteMin = 0;
+  d.plats = [];
   ouvrirFiltres(); chargerDecouverte();
 }
 function filtresActifs(){
   const d = ui.disc;
   return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' ||
-         d.tri !== 'populaire' || (d.sens||'desc') !== 'desc';
+         d.tri !== 'populaire' || (d.sens||'desc') !== 'desc' ||
+         (ui.presence === 'plats' && (d.plats||[]).length > 0);
 }
 function resumeFiltres(){
   const d = ui.disc;
   const bouts = [];
   const pres = PRESENCES.find(p=>p.id === ui.presence);
-  if(ui.presence !== 'tout') bouts.push(pres.label.toLowerCase());
+  if(ui.presence !== 'tout') bouts.push((pres.label||'').toLowerCase());
+  if(ui.presence === 'plats' && (d.plats||[]).length)
+    bouts.push(d.plats.map(id => (PLATEFORMES.find(p=>p.id===id)||{}).nom).filter(Boolean).join(' + '));
   const tri = TRIS.concat(TRIS_LOCAUX).find(t=>t.id===d.tri) || {};
   bouts.push(tri.court + (d.tri !== 'aleatoire' && d.sens === 'asc' ? ' croissant' : ''));
   if(d.perimetre === 'recent') bouts.push('sorties récentes');
@@ -526,6 +545,12 @@ function ouvrirFiltres(){
   const genres = genresTMDB[d.type] || [];
   let h = '<h3>Filtres</h3><div class="small muted" style="margin-top:-4px">Appliqués aux '+
     (d.type === 'movie' ? 'films' : 'séries')+'.</div>';
+  /* Sur la vue Plateformes : choisir lesquelles. Rien de coché = toutes. */
+  if(ui.presence === 'plats'){
+    h += '<div class="fgrp">Plateformes'+((d.plats||[]).length?' ('+d.plats.length+')':'')+'</div><div class="fchips">'+
+      PLATEFORMES.map(pf=>'<button class="chip '+((d.plats||[]).indexOf(pf.id)>=0?'on':'')+
+        '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>';
+  }
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
       '" onclick="setPerimetre(\''+p.id+'\')">'+p.label+'</button>').join('')+'</div>';
@@ -583,15 +608,14 @@ function viewDecouvrir(){
     '<div class="chips types">'+
       '<button class="chip chipico '+(ui.champOuvert?'ouvert':'')+'" onclick="ouvrirChamp()" '+
         'aria-label="Chercher">'+(ui.champOuvert ? I.close : I.search)+'</button>'+
-      TYPES.map(t=>'<button class="chip '+(d.type===t.id?'on':'')+
+      TYPES.map(t=>'<button class="chip '+t.cl+' '+(d.type===t.id?'on':'')+
         '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
     '</div>'+
-    /* La rangée de présence est la deuxième, toujours visible : c'est le
+    /* La rangée des sources est la deuxième, toujours visible : c'est le
        geste central de l'app, il ne se cache pas derrière un panneau. */
     '<div class="souschips">'+
-      PRESENCES.map(p=>'<button class="chip '+(ui.presence===p.id?'on'+(p.id==='dispo'?' vert':''):'')+
-        '" onclick="setPresence(\''+p.id+'\')">'+
-        (p.pt ? '<i class="pt '+p.pt+'"></i>' : '')+(p.label || labelTout())+'</button>').join('')+
+      PRESENCES.map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
+        '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
     '</div>'+
     '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
 

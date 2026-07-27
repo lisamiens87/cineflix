@@ -60,13 +60,44 @@ function blocSorties(dates){
 }
 
 /* ---------- Boutons d'action ---------- */
+/* Les plateformes (parmi les quatre retenues) qui proposent ce titre par
+   abonnement en France, d'après TMDB/JustWatch. */
+function platsDuTitre(o){
+  const p = ((o['watch/providers']||{}).results||{})[db.region||'FR'];
+  const abo = (p && p.flatrate) || [];
+  return PLATEFORMES.filter(pf => abo.some(f => f.provider_id === pf.id ||
+    (f.provider_name||'').toLowerCase().indexOf(pf.nom.toLowerCase()) === 0));
+}
+function ouvrirPlateforme(id){
+  const pf = PLATEFORMES.find(p=>p.id===id);
+  if(!pf) return;
+  const o = ficheObjet();
+  window.open(pf.lien(o.title || o.name || ''), '_blank', 'noopener');
+}
+
 /* Un seul bouton principal, qui dit exactement où on en est :
-   Demander → Demandé → En cours → Regarder. */
+   Demander → Demandé → En cours → Regarder. Exception : quand la fiche est
+   ouverte depuis la vue « Plateformes », demander n'a pas de sens — le titre
+   se regarde là-bas. On affiche à la place le bouton de chaque plateforme
+   qui le propose. */
 function actionsFiche(o, type){
   const st = statut(type, o.id);
   const it = item(type, o.id);
   const fav = !!(it && it.fav);
   const ref = 'ficheObjet()';
+
+  if(ui.presence === 'plats' && st !== 'obtenu'){
+    const dispo = platsDuTitre(o);
+    if(dispo.length){
+      const boutons = dispo.map(pf =>
+        '<button class="btn plat" onclick="ouvrirPlateforme('+pf.id+')">'+esc(pf.nom)+'</button>').join('');
+      const coeurP = '<button class="btn ghost" style="flex:0 0 54px'+(fav?';color:var(--accent)':'')+
+        '" onclick="basculerFavori('+ref+',\''+type+'\');render()" aria-label="Favori">'+
+        (fav ? I.coeurPlein : I.coeur)+'</button>';
+      return '<div class="actions plats">'+boutons+coeurP+'</div>';
+    }
+    /* Aucune des quatre ne l'a (cas limite) : on retombe sur le bouton normal. */
+  }
 
   let principal;
   if(st === 'obtenu'){
@@ -131,6 +162,9 @@ function menuDemande(id, type){
 
 /* ---------- Où regarder (JustWatch via TMDB) ---------- */
 function blocPlateformes(o){
+  /* Sur la vue Plateformes, l'information est déjà dans les boutons
+     d'action : répéter « Aussi en streaming » ferait doublon. */
+  if(ui.presence === 'plats') return '';
   const p = ((o['watch/providers']||{}).results||{})[db.region||'FR'];
   if(!p) return '';
   const abo = p.flatrate || [];
