@@ -65,8 +65,11 @@ function blocSorties(dates){
 function platsDuTitre(o){
   const p = ((o['watch/providers']||{}).results||{})[db.region||'FR'];
   const abo = (p && p.flatrate) || [];
-  return PLATEFORMES.filter(pf => abo.some(f => f.provider_id === pf.id ||
-    (f.provider_name||'').toLowerCase().indexOf(pf.nom.toLowerCase()) === 0));
+  return PLATEFORMES.map(pf => {
+    const f = abo.find(f => f.provider_id === pf.id ||
+      (f.provider_name||'').toLowerCase().indexOf(pf.nom.toLowerCase()) === 0);
+    return f ? Object.assign({}, pf, { logo: f.logo_path || '' }) : null;
+  }).filter(Boolean);
 }
 function ouvrirPlateforme(id){
   const pf = PLATEFORMES.find(p=>p.id===id);
@@ -89,8 +92,11 @@ function actionsFiche(o, type){
   if(ui.presence === 'plats' && st !== 'obtenu'){
     const dispo = platsDuTitre(o);
     if(dispo.length){
+      /* Chaque bouton porte le sigle et la couleur de sa plateforme. */
       const boutons = dispo.map(pf =>
-        '<button class="btn plat" onclick="ouvrirPlateforme('+pf.id+')">'+esc(pf.nom)+'</button>').join('');
+        '<button class="btn plat '+pf.cl+'" onclick="ouvrirPlateforme('+pf.id+')">'+
+        (pf.logo ? '<img class="plogo" src="'+IMG(pf.logo,'w92')+'" alt="">' : '')+
+        esc(pf.nom)+'</button>').join('');
       const coeurP = '<button class="btn ghost" style="flex:0 0 54px'+(fav?';color:var(--accent)':'')+
         '" onclick="basculerFavori('+ref+',\''+type+'\');render()" aria-label="Favori">'+
         (fav ? I.coeurPlein : I.coeur)+'</button>';
@@ -227,16 +233,92 @@ function jouerBA(el, cle){
     'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
 }
 
+/* Réalisation en tête, puis le casting — et chaque personne est cliquable :
+   sa fiche liste tout ce qu'elle a fait. */
 function blocCasting(credits){
-  const cast = ((credits||{}).cast||[]).slice(0,12);
+  const real = ((credits||{}).crew||[]).filter(p => p.job === 'Director').slice(0,2)
+    .map(p => Object.assign({}, p, { character:'Réalisation' }));
+  const cast = real.concat(((credits||{}).cast||[]).slice(0,12));
   if(!cast.length) return '';
-  return '<div class="sectitle">Casting</div><div class="cast">'+cast.map(p=>
-    '<div class="cperson">'+
+  return '<div class="sectitle">Réalisation & casting</div><div class="cast">'+cast.map(p=>
+    '<button class="cperson" onclick="ouvrirPersonne('+p.id+')">'+
       (p.profile_path ? '<img loading="lazy" src="'+IMG(p.profile_path,'w185')+'" alt="">'
                       : '<div class="ph2">'+esc((p.name||'?')[0])+'</div>')+
       '<div class="cname">'+esc(p.name)+'</div>'+
       '<div class="crole">'+esc(p.character||'')+'</div>'+
-    '</div>').join('')+'</div>';
+    '</button>').join('')+'</div>';
+}
+
+/* ============================ Fiche d'une personne ============================ */
+function ouvrirPersonne(pid){
+  ui.personne = { id:pid, loading:true, data:null };
+  /* Les coordonnées de la fiche d'origine voyagent dans les paramètres :
+     le bouton retour saura la rouvrir telle quelle. */
+  go('personne', { id:pid, fid:params.id, ftype:params.type, ffrom:params.from });
+  chargerPersonne();
+}
+
+async function chargerPersonne(){
+  const id = (ui.personne||{}).id;
+  try{
+    const d = await tmdb('/person/'+id, { append_to_response:'combined_credits' });
+    if(!ui.personne || ui.personne.id !== id) return;
+    ui.personne = { id:id, loading:false, data:d };
+  }catch(e){
+    if(!ui.personne || ui.personne.id !== id) return;
+    ui.personne = { id:id, loading:false,
+      error: e.message === 'BADKEY' ? 'Clé TMDB refusée' : 'Impossible de charger la fiche' };
+  }
+  if(view === 'personne') render();
+}
+
+/* Toute l'œuvre d'une personne : devant et derrière la caméra, sans doublon,
+   du plus récent au plus ancien. */
+function filmographie(d){
+  const cc = d.combined_credits || {};
+  const vus = {}, l = [];
+  (cc.cast||[]).concat(cc.crew||[]).forEach(w=>{
+    if(!w || (w.media_type !== 'movie' && w.media_type !== 'tv')) return;
+    const k = w.media_type+':'+w.id;
+    if(vus[k]) return;
+    vus[k] = 1; l.push(w);
+  });
+  l.sort((a,b)=> String(b.release_date||b.first_air_date||'')
+    .localeCompare(String(a.release_date||a.first_air_date||'')));
+  return l;
+}
+
+function viewPersonne(){
+  const st = ui.personne || {};
+  const back = 'goBack()';
+  if(st.loading) return header('Chargement…',{back:back})+
+    '<div class="empty"><span class="spin"></span><p style="margin-top:12px">Chargement…</p></div>';
+  if(st.error || !st.data) return header('Erreur',{back:back})+
+    '<div class="empty"><h3>Oups</h3><p>'+esc(st.error||'Fiche introuvable')+'</p></div>';
+
+  const d = st.data;
+  const jobs = { Acting:'Acteur / actrice', Directing:'Réalisation',
+                 Writing:'Scénario', Production:'Production' };
+  const l = filmographie(d);
+  let h = header(d.name||'', {back:back});
+  h += '<div class="dhead" style="margin-top:16px">'+
+    '<div style="width:92px;flex:none">'+
+      (d.profile_path ? '<img class="poster" src="'+IMG(d.profile_path,'w342')+'" alt="">'
+                      : '<div class="poster ph">'+esc((d.name||'?')[0])+'</div>')+'</div>'+
+    '<div class="dmeta"><h2>'+esc(d.name||'')+'</h2>'+
+      '<div class="small muted">'+esc(jobs[d.known_for_department] || d.known_for_department || '')+
+        (d.birthday ? ' · '+esc(String(d.birthday).slice(0,4)) : '')+
+        (d.deathday ? ' – '+esc(String(d.deathday).slice(0,4)) : '')+'</div>'+
+    '</div></div>';
+  if(d.biography)
+    h += '<div class="sectitle">Biographie</div>'+
+      '<div class="overview clamp" style="margin-top:0" onclick="this.classList.toggle(\'clamp\')">'+
+      esc(d.biography)+'</div>';
+  /* La grille réutilise les cartes de Découvrir : la coche verte « déjà sur
+     Cinéflix » et les statuts de demande viennent avec, gratuitement. */
+  h += '<div class="sectitle">Filmographie <span class="cnt">'+l.length+'</span></div>'+
+    '<div class="grid">'+ l.map(w=>carteTitre(w, w.media_type)).join('') +'</div>';
+  return h + '<div style="height:32px"></div>';
 }
 
 /* ---------- La vue ---------- */

@@ -177,7 +177,11 @@ function ligneSortie(x, m){
       ? '<img class="cposter" loading="lazy" src="'+IMG(r.poster_path,'w154')+'" alt="">'
       : '<div class="cposter"></div>')+
     '<div class="cinfo">'+
-      '<div class="cname2">'+esc(r.title||'')+'</div>'+
+      '<div class="cname2">'+esc(r.title||'')+
+        /* La coche verte suit le titre partout : ici aussi, on voit d'un
+           coup d'œil ce qui est déjà sur le serveur. */
+        (surCineflix('movie', r.id) ? ' <span class="cfx" aria-label="Sur Cinéflix">'+I.check+'</span>' : '')+
+      '</div>'+
       '<div class="csub">'+esc(relatif(x.quand))+
         (x.source && x.source !== (db.region||'FR') ? ' · date '+esc(x.source) : '')+'</div>'+
       marque+

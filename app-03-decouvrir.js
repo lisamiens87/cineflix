@@ -20,10 +20,10 @@ const labelTout = ()=> ui.disc.type === 'movie' ? 'Cinéma' : 'Séries';
 /* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
    et l'adresse de leur recherche — pour ouvrir un titre directement chez elles. */
 const PLATEFORMES = [
-  { id:8,   nom:'Netflix',     lien:t=>'https://www.netflix.com/search?q='+encodeURIComponent(t) },
-  { id:119, nom:'Prime Video', lien:t=>'https://www.primevideo.com/search/?phrase='+encodeURIComponent(t) },
-  { id:337, nom:'Disney+',     lien:t=>'https://www.disneyplus.com/search?q='+encodeURIComponent(t) },
-  { id:381, nom:'Canal+',      lien:t=>'https://www.canalplus.com/recherche?q='+encodeURIComponent(t) }
+  { id:8,   nom:'Netflix',     cl:'p-netflix', lien:t=>'https://www.netflix.com/search?q='+encodeURIComponent(t) },
+  { id:119, nom:'Prime Video', cl:'p-prime',   lien:t=>'https://www.primevideo.com/search/?phrase='+encodeURIComponent(t) },
+  { id:337, nom:'Disney+',     cl:'p-disney',  lien:t=>'https://www.disneyplus.com/search?q='+encodeURIComponent(t) },
+  { id:381, nom:'Canal+',      cl:'p-canal',   lien:t=>'https://www.canalplus.com/recherche?q='+encodeURIComponent(t) }
 ];
 const FOURNISSEURS = PLATEFORMES.map(p=>p.id).join('|');
 
@@ -481,7 +481,7 @@ function setPresence(p){
      TMDB ignore quand un titre est arrivé sur le NAS ou combien de fois
      il a été vu. On retombe sur la popularité. */
   if(p !== 'dispo' && TRI_LOCAL(ui.disc.tri)){
-    ui.disc.tri = 'populaire'; ui.disc.sens = 'desc';
+    ui.disc.tri = 'sortie'; ui.disc.sens = 'desc';
     toast('Ce tri n\'existe que sur la vue Cinéflix');
   }
   render();
@@ -511,14 +511,14 @@ function bascGenre(i){
 }
 function resetFiltres(){
   const d = ui.disc;
-  d.genres = []; d.perimetre = 'tout'; d.tri = 'populaire'; d.sens = 'desc'; d.noteMin = 0;
+  d.genres = []; d.perimetre = 'tout'; d.tri = 'sortie'; d.sens = 'desc'; d.noteMin = 0;
   d.plats = [];
   ouvrirFiltres(); chargerDecouverte();
 }
 function filtresActifs(){
   const d = ui.disc;
   return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' ||
-         d.tri !== 'populaire' || (d.sens||'desc') !== 'desc' ||
+         d.tri !== 'sortie' || (d.sens||'desc') !== 'desc' ||
          (ui.presence === 'plats' && (d.plats||[]).length > 0);
 }
 function resumeFiltres(){
@@ -548,7 +548,7 @@ function ouvrirFiltres(){
   /* Sur la vue Plateformes : choisir lesquelles. Rien de coché = toutes. */
   if(ui.presence === 'plats'){
     h += '<div class="fgrp">Plateformes'+((d.plats||[]).length?' ('+d.plats.length+')':'')+'</div><div class="fchips">'+
-      PLATEFORMES.map(pf=>'<button class="chip '+((d.plats||[]).indexOf(pf.id)>=0?'on':'')+
+      PLATEFORMES.map(pf=>'<button class="chip '+pf.cl+' '+((d.plats||[]).indexOf(pf.id)>=0?'on':'')+
         '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>';
   }
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+

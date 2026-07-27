@@ -14,6 +14,7 @@ function film(id, titre){
 
 const echecs = [];
 let dernierFournisseurs = null;    // le paramètre with_watch_providers du dernier /discover
+let dernierTri = null;             // le sort_by du dernier /discover
 
 (async () => {
   const browser = await chromium.launch();
@@ -37,6 +38,7 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
     else if(p.startsWith('/genre/')) body = { genres:[{id:28,name:'Action'},{id:35,name:'Comédie'}] };
     else if(p.startsWith('/discover/')){
       dernierFournisseurs = u.searchParams.get('with_watch_providers');
+      dernierTri = u.searchParams.get('sort_by');
       const page_ = Number(u.searchParams.get('page')||1);
       // 20 résultats par page ; seuls les 5 premiers ids de la page 1 sont au catalogue
       const res = [];
@@ -53,10 +55,19 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
         { type:4, release_date:'2024-05-14T00:00:00.000Z' },
         { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
     }
+    else if(/\/person\/\d+$/.test(p)){
+      const f1 = film(550,'Fight Club');  f1.media_type = 'movie';   // au catalogue
+      const f2 = film(999002,'Autre');    f2.media_type = 'movie';   // absent
+      body = { id:777, name:'A. Acteur', profile_path:'/a.jpg',
+               known_for_department:'Acting', birthday:'1970-01-01',
+               biography:'Une carrière bien remplie.',
+               combined_credits:{ cast:[f1, f2], crew:[] } };
+    }
     else if(/\/(movie|tv)\/\d+$/.test(p)){
       const id = Number(p.split('/').pop());
       const d = film(id, 'Titre '+id);
-      d.credits = { cast:[{name:'A. Acteur', character:'Rôle', profile_path:'/a.jpg'}] };
+      d.credits = { cast:[{id:777, name:'A. Acteur', character:'Rôle', profile_path:'/a.jpg'}],
+                    crew:[{id:888, name:'R. Réalisateur', job:'Director', profile_path:''}] };
       d.release_dates = { results:[{ iso_3166_1:'FR', release_dates:[
         { type:3, release_date:'2024-03-06T00:00:00.000Z' },
         { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
@@ -100,6 +111,8 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
   // 1. Grille et onglets
   ok('4 onglets de navigation', await page.locator('nav .tab').count() === 4);
   ok('grille remplie', await page.locator('.gcard').count() >= 20);
+  ok('le tri par défaut est la date de sortie',
+     dernierTri === 'primary_release_date.desc');
   ok('pastille « Cinéflix » sur les titres du catalogue',
      await page.locator('.tag.dispo').count() === 5);
 
@@ -136,9 +149,27 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
      await page.locator('.btn.plat').count() === 1 &&
      (await page.locator('.btn.plat').innerText()).includes('Netflix') &&
      !(await page.locator('#app').innerText()).includes('Demander'));
+  ok('le bouton porte le sigle et la couleur Netflix',
+     await page.locator('.btn.plat.p-netflix').count() === 1 &&
+     await page.locator('.btn.plat .plogo').count() === 1);
   ok('« Aussi en streaming » a disparu sur cette vue',
      !(await page.locator('#app').innerText()).includes('Aussi en streaming'));
-  await page.click('header .iconbtn');
+
+  // 2 b'. La filmographie : réalisateur en tête, personnes cliquables
+  ok('la réalisation apparaît avec le casting',
+     (await page.locator('.cast').innerText()).includes('Réalisation'));
+  await page.locator('.cperson').first().click();
+  await page.waitForSelector('.grid', {timeout:5000});
+  ok('la fiche de la personne liste sa filmographie',
+     /filmographie/i.test(await page.locator('#app').innerText()) &&
+     await page.locator('.gcard').count() === 2);
+  ok('la coche verte marque ce qui est déjà sur Cinéflix',
+     await page.locator('.tag.dispo').count() === 1);
+  await page.click('header .iconbtn');                 // retour vers la fiche du film
+  await page.waitForSelector('.actions', {timeout:5000});
+  ok('le retour rouvre la fiche du titre',
+     await page.locator('.btn.plat').count() === 1);
+  await page.click('header .iconbtn');                 // retour vers la grille
   await page.waitForTimeout(700);
 
   // 2 c. Filtrer par plateforme
@@ -252,6 +283,8 @@ let dernierFournisseurs = null;    // le paramètre with_watch_providers du dern
   await page.click('nav .tab:has-text("Sorties")');
   await page.waitForSelector('.crow, .empty h3', {timeout:15000});
   ok('le calendrier des sorties se remplit', await page.locator('.crow').count() > 0);
+  ok('la coche verte marque les sorties déjà sur Cinéflix',
+     await page.locator('.crow .cfx').count() > 0);
   ok('les modes de sortie sont proposés', await page.locator('.chips .chip').count() === 3);
 
   // 7. Persistance

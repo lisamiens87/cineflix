@@ -88,7 +88,7 @@ let view = 'decouvrir';
 let params = {};
 let ui = {
   presence:'tout',                       // tout | dispo — le filtre maison
-  disc:{ type:'movie', genres:[], tri:'populaire', sens:'desc', noteMin:0, perimetre:'tout',
+  disc:{ type:'movie', genres:[], tri:'sortie', sens:'desc', noteMin:0, perimetre:'tout',
          plats:[],                            // plateformes cochées (vide = toutes)
          page:1, pages:1, res:[], loading:false, err:'', charge:false },
   champOuvert:false, focusSearch:false,
@@ -100,7 +100,7 @@ let ui = {
 };
 
 const DEPTH = { auth:0, accueil:0, decouvrir:0, sorties:0, liste:0, profil:0,
-                fiche:1, reglages:1, file:1 };
+                fiche:1, reglages:1, file:1, personne:2 };
 let navDir = 'none';
 const LISTES = { decouvrir:1, sorties:1, liste:1 };
 const memDefil = {};
@@ -120,6 +120,7 @@ function go(v, p, dir){
 function oublierDefil(v){ delete memDefil[v]; }
 
 function currentBack(){
+  if(view === 'personne') return params.ffrom || 'decouvrir';
   if(view === 'fiche') return params.from || 'decouvrir';
   if(view === 'reglages') return params.from || 'profil';
   if(view === 'file') return 'profil';
@@ -127,6 +128,10 @@ function currentBack(){
 }
 function goBack(){
   if(document.getElementById('sheet').classList.contains('show')) return closeSheet();
+  /* Depuis la fiche d'une personne, on revient sur la fiche du titre qui
+     l'a ouverte — ses coordonnées voyagent dans les paramètres. */
+  if(view === 'personne' && params.fid)
+    return ouvrirFiche(params.fid, params.ftype, params.ffrom);
   const t = currentBack();
   if(t) go(t, {}, 'back');
 }
@@ -188,6 +193,7 @@ function render(){
   else if(view === 'profil')    html = viewProfil();
   else if(view === 'reglages')  html = viewReglages();
   else if(view === 'fiche')     html = viewFiche();
+  else if(view === 'personne')  html = viewPersonne();
   app.innerHTML = html;
 
   /* La barre du bas disparaît sur les écrans qui n'ont qu'une chose à faire :
@@ -222,8 +228,8 @@ function renderNav(){
     ['liste','Ma liste',      I.coeur,    n],
     ['profil','Profil',       I.user,     0]
   ];
-  const depuis = params.from === 'file' ? 'profil' : params.from;
-  const cur = view === 'fiche' ? (depuis || 'decouvrir')
+  const depuis = params.from === 'file' ? 'profil' : (params.from || params.ffrom);
+  const cur = (view === 'fiche' || view === 'personne') ? (depuis || 'decouvrir')
             : (view === 'reglages' || view === 'file') ? 'profil'
             : view;
   document.getElementById('nav').innerHTML = tabs.map(([id,label,icon,badge])=>
