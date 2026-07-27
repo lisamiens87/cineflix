@@ -116,10 +116,8 @@ const appels = [];                       // trace des écritures vers Supabase
   ok('les pastilles « Cinéflix » utilisent le catalogue distant',
      await page.locator('.tag.dispo').count() === 5);
 
-  // 4. Une demande part vers le serveur
-  await page.click('.souschips .chip:has-text("Pas encore")');
-  await page.waitForTimeout(1200);
-  await page.locator('.gcard').first().click();
+  // 4. Une demande part vers le serveur — une carte absente du catalogue
+  await page.locator('.gcard:not(:has(.tag.dispo))').first().click();
   await page.waitForSelector('.actions', {timeout:5000});
   await page.locator('.actions .btn').first().click();
   await page.waitForTimeout(500);

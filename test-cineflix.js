@@ -59,6 +59,14 @@ const echecs = [];
         { type:3, release_date:'2024-03-06T00:00:00.000Z' },
         { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
       d['watch/providers'] = { results:{ FR:{ link:'https://x', flatrate:[{provider_name:'Netflix', logo_path:'/n.jpg'}] } } };
+      /* Volontairement en désordre : le teaser anglais arrive avant la
+         bande-annonce VF, c'est le tri qui doit choisir la seconde. */
+      d.videos = { results:[
+        { site:'YouTube', key:'enTeaser01', type:'Teaser',  iso_639_1:'en', official:true,  name:'Teaser' },
+        { site:'Vimeo',   key:'vimeoIgnore', type:'Trailer', iso_639_1:'fr', official:true, name:'Vimeo' },
+        { site:'YouTube', key:'frTrailer01', type:'Trailer', iso_639_1:'fr', official:true,  name:'Bande-annonce VF' },
+        { site:'YouTube', key:'enTrailer01', type:'Trailer', iso_639_1:'en', official:true,  name:'Official Trailer' }
+      ] };
       body = d;
     }
     else body = {};
@@ -66,6 +74,10 @@ const echecs = [];
   });
   await page.route('**://image.tmdb.org/**', r => r.fulfill({status:200, contentType:'image/gif',
     body: Buffer.from('R0lGODlhAQABAAAAACw=','base64')}));
+
+  // le lecteur YouTube : simulé, pour que la suite reste hermétique au réseau
+  await page.route('**://www.youtube-nocookie.com/**', r => r.fulfill({status:200,
+    contentType:'text/html', body:'<!doctype html><title>bande-annonce</title>'}));
 
   // le sondage du serveur Jellyfin : on simule une réponse
   await page.route('**://100.95.13.53*/**', r => r.fulfill({status:200, body:'{}'}));
@@ -89,20 +101,37 @@ const echecs = [];
      await page.locator('.tag.dispo').count() === 5);
 
   // 2. Filtre de présence — le geste central
-  await page.click('.souschips .chip:has-text("Sur Cinéflix")');
+  ok('deux puces de présence — « Pas encore » a disparu',
+     await page.locator('.souschips .chip').count() === 2);
+  ok('la première puce dit « Tous les films »',
+     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Tous les films');
+  await page.click('.chips.types .chip:has-text("Séries")');
+  await page.waitForTimeout(600);
+  ok('en mode séries, elle devient « Toutes les séries »',
+     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Toutes les séries');
+  await page.click('.chips.types .chip:has-text("Films")');
+  await page.waitForTimeout(900);
+
+  await page.click('.souschips .chip:has-text("Cinéflix")');
   await page.waitForTimeout(900);
   const nDispo = await page.locator('.gcard').count();
   const nTagDispo = await page.locator('.tag.dispo').count();
-  ok('« Sur Cinéflix » ne montre que le catalogue ('+nDispo+' titres)', nDispo > 0 && nDispo === nTagDispo);
+  ok('« Cinéflix » ne montre que le catalogue ('+nDispo+' titres)', nDispo > 0 && nDispo === nTagDispo);
+  ok('la pastille verte est la version discrète (coche seule)',
+     await page.locator('.tag.dispo.mini').count() === nTagDispo);
 
-  await page.click('.souschips .chip:has-text("Pas encore")');
-  await page.waitForTimeout(1200);
-  ok('« Pas encore » n\'en montre aucun du catalogue',
-     await page.locator('.tag.dispo').count() === 0 && await page.locator('.gcard').count() > 10);
-  ok('« Pas encore » remplit quand même la grille', await page.locator('.gcard').count() >= 20);
+  // 2 bis. Taille des affiches
+  await page.click('#fbtn');
+  await page.waitForTimeout(400);
+  await page.click('.chip:has-text("Compactes")');
+  await page.waitForTimeout(300);
+  ok('« Compactes » pose la classe de vue sur la page',
+     await page.evaluate(() => document.body.classList.contains('vue-compacte')));
+  await page.click('button:has-text("Voir les résultats")');
+  await page.waitForTimeout(300);
 
   // 3. Fiche + dates de sortie
-  await page.click('.souschips .chip:has-text("Tout")');
+  await page.click('.souschips .chip:has-text("Tous les films")');
   await page.waitForTimeout(900);
   await page.locator('.gcard').first().click();
   await page.waitForSelector('.sorties', {timeout:5000});
@@ -111,12 +140,21 @@ const echecs = [];
   ok('date Blu-ray future en couleur d\'accent', await page.locator('.srt.futur').count() >= 1);
   ok('titre déjà sur Cinéflix → bouton Regarder', await page.locator('.btn.vert').count() === 1);
 
-  // 4. Demander un titre absent
+  // 3 bis. Bande-annonce : vignette d'abord, lecteur seulement au clic
+  ok('la vignette de bande-annonce est affichée', await page.locator('.ba').count() === 1);
+  ok('la VF est préférée au teaser anglais',
+     (await page.locator('.balbl').innerText()).startsWith('VF · Bande-annonce VF'));
+  ok('aucun lecteur YouTube avant le clic', await page.locator('.ba iframe').count() === 0);
+  await page.locator('.ba').click();
+  await page.waitForTimeout(300);
+  const src = await page.locator('.ba iframe').getAttribute('src');
+  ok('le clic insère le lecteur sur la bonne vidéo',
+     !!src && src.includes('youtube-nocookie.com/embed/frTrailer01'));
+
+  // 4. Demander un titre absent — depuis « Tous les films », une carte sans pastille
   await page.click('header .iconbtn');           // retour
   await page.waitForTimeout(600);
-  await page.click('.souschips .chip:has-text("Pas encore")');
-  await page.waitForTimeout(1200);
-  await page.locator('.gcard').first().click();
+  await page.locator('.gcard:not(:has(.tag.dispo))').first().click();
   await page.waitForSelector('.actions', {timeout:5000});
   ok('titre absent → bouton Demander',
      (await page.locator('.actions .btn').first().innerText()).includes('Demander'));
@@ -148,6 +186,8 @@ const echecs = [];
   await page.waitForSelector('.gcard, .empty', {timeout:8000});
   ok('la demande survit au rechargement',
      (await page.locator('nav .pastille-nav').innerText()) === '1');
+  ok('la taille d\'affiches choisie survit aussi',
+     await page.evaluate(() => document.body.classList.contains('vue-compacte')));
 
   // 8. Profil
   await page.click('nav .tab:has-text("Profil")');

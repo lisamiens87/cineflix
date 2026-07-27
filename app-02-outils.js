@@ -87,7 +87,7 @@ function header(title, opts){
 let view = 'decouvrir';
 let params = {};
 let ui = {
-  presence:'tout',                       // tout | dispo | manquant — le filtre maison
+  presence:'tout',                       // tout | dispo — le filtre maison
   disc:{ type:'movie', genres:[], tri:'populaire', noteMin:0, perimetre:'tout',
          page:1, pages:1, res:[], loading:false, err:'', charge:false },
   champOuvert:false, focusSearch:false,

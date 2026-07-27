@@ -134,8 +134,15 @@ input:focus,select:focus{border-color:var(--accent)}
 .qclear svg{width:15px;height:15px}
 
 /* ---------- Grille ---------- */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:12px;
-  padding:4px 16px;align-items:start}
+/* La largeur minimale des vignettes est une variable : les classes de vue
+   posées sur <body> la font varier partout d'un coup. Sur un téléphone
+   (~390 px utiles) : compacte ≈ 4 colonnes, normale ≈ 3, grande ≈ 2. */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--vign,104px),1fr));
+  gap:12px;padding:4px 16px;align-items:start}
+body.vue-compacte{--vign:80px}
+body.vue-compacte .grid{gap:9px}
+body.vue-compacte .gname{font-size:11.5px}
+body.vue-grande{--vign:150px}
 .gcard{text-align:left;position:relative;width:100%}
 .wrapimg{position:relative;border-radius:9px;overflow:hidden}
 .poster{width:100%;height:auto;aspect-ratio:2/3;border-radius:9px;object-fit:cover;
@@ -151,6 +158,11 @@ input:focus,select:focus{border-color:var(--accent)}
   box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .tag svg{width:12px;height:12px}
 .tag.dispo{background:var(--ok);color:#08130d}
+/* Version discrète : une simple coche ronde, sans texte. Sur la grille
+   « Cinéflix » où chaque affiche est possédée, une étiquette par vignette
+   devenait du bruit. */
+.tag.mini{width:20px;height:20px;padding:0;border-radius:50%;justify-content:center}
+.tag.mini svg{width:11px;height:11px}
 .tag.demande{background:var(--warn);color:#2a1c00}
 .tag.encours{background:var(--accent);color:#fff}
 .tag.fav{background:rgba(10,12,16,.8);color:#fff;backdrop-filter:blur(6px)}

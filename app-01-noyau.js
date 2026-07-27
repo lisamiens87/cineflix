@@ -45,6 +45,7 @@ const CFG = Object.assign(
 
 let db = {
   pseudo:'', apiKey:'', lang:'fr-FR', region:'',
+  vue:'',                   // taille des affiches : '' normale, 'compacte', 'grande'
   jellyfin:'',              // adresse choisie à la main ; sinon on prend celle qui répond
   catalogueUrl:'',
   cleServeur:'', catServeur:'',   // dernières valeurs vues dans config.js — voir appliquerConfig()
@@ -94,6 +95,15 @@ async function askPersist(){
   }catch(e){}
 }
 
+/* La taille des affiches est une classe sur <body> : toutes les grilles de
+   l'app (Découvrir, Ma liste) suivent d'un coup, sans re-rendu. */
+function appliquerVue(){
+  const b = document.body;
+  if(!b) return;
+  b.classList.toggle('vue-compacte', db.vue === 'compacte');
+  b.classList.toggle('vue-grande',   db.vue === 'grande');
+}
+
 async function loadDB(){
   let loaded = null;
   try{ loaded = await idbGet(); }catch(e){}
@@ -103,6 +113,7 @@ async function loadDB(){
   if(loaded && typeof loaded === 'object') db = Object.assign(db, loaded);
   if(!db.items) db.items = {};
   appliquerConfig();
+  appliquerVue();
   try{ await writeNow(); }
   catch(e){
     try{ localStorage.setItem(KEY, JSON.stringify(db)); }

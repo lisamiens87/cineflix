@@ -3,12 +3,23 @@
 
 const TYPES = [ {id:'movie', label:'Films'}, {id:'tv', label:'Séries'} ];
 
-/* Les trois puces qui n'existent nulle part ailleurs : le même catalogue,
-   vu selon qu'on possède le titre ou non. */
+/* Les deux puces qui n'existent nulle part ailleurs : le même catalogue,
+   vu selon qu'on possède le titre ou non. « Tous les films » (ou « Toutes
+   les séries ») montre tout TMDB, « Cinéflix » ne garde que la bibliothèque.
+   Il y a eu une troisième puce, « Pas encore » (l'inverse de Cinéflix) :
+   retirée — dans « tous les films », la pastille suffit à distinguer. */
 const PRESENCES = [
-  { id:'tout',     label:'Tout' },
-  { id:'dispo',    label:'Sur Cinéflix', pt:'ok'  },
-  { id:'manquant', label:'Pas encore',   pt:'non' }
+  { id:'tout' },                            // label calculé selon le type
+  { id:'dispo', label:'Cinéflix', pt:'ok' }
+];
+const labelTout = ()=> ui.disc.type === 'movie' ? 'Tous les films' : 'Toutes les séries';
+
+/* Taille des affiches : sur un petit écran, la grille par défaut peut
+   sembler énorme ; sur une tablette, minuscule. Réglable, mémorisé. */
+const VUES = [
+  { id:'compacte', label:'Compactes' },
+  { id:'',         label:'Normales'  },
+  { id:'grande',   label:'Grandes'   }
 ];
 
 const TRIS = [
@@ -187,7 +198,10 @@ function carteTitre(r, type){
   const note  = r.vote_average ? Math.round(r.vote_average*10)/10 : null;
 
   let tag = '';
-  if(st === 'obtenu')       tag = '<div class="tag dispo">'+I.check+'Cinéflix</div>';
+  /* La pastille verte est volontairement minuscule : sur une grille entière
+     de titres possédés, une étiquette « Cinéflix » par affiche criait. Une
+     coche suffit — le texte sous le titre dit déjà le reste. */
+  if(st === 'obtenu')       tag = '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>';
   else if(st === 'demande') tag = '<div class="tag demande">'+I.horloge+'Demandé</div>';
   else if(st === 'encours') tag = '<div class="tag encours">'+I.horloge+'En cours</div>';
   else if(st === 'fav')     tag = '<div class="tag fav">'+I.coeurPlein+'</div>';
@@ -252,8 +266,8 @@ function corpsDecouverte(){
     if(ui.presence === 'dispo')
       return '<div class="empty">'+I.serveur+'<h3>Rien de Cinéflix ici</h3>'+
         '<p>Aucun titre de ces filtres n\'est sur le serveur. Élargis les filtres, '+
-        'ou passe sur « Tout » pour voir ce qui existe.</p>'+
-        '<button class="btn ghost" onclick="setPresence(\'tout\')">Voir tout</button></div>';
+        'ou repasse sur « '+labelTout()+' » pour voir ce qui existe.</p>'+
+        '<button class="btn ghost" onclick="setPresence(\'tout\')">'+labelTout()+'</button></div>';
     return '<div class="empty">'+I.boussole+'<h3>Rien avec ces filtres</h3>'+
       '<p>Élargis la note minimale ou retire un genre.</p>'+
       '<button class="btn ghost" onclick="ouvrirFiltres()">Ouvrir les filtres</button></div>';
@@ -283,6 +297,11 @@ function setPresence(p){
   ui.presence = p;
   render();
   if(!enRecherche()) chargerDecouverte();
+}
+function setVue(v){
+  db.vue = v; saveDB();
+  appliquerVue();
+  ouvrirFiltres();          // redessine la feuille, la grille suit toute seule (CSS)
 }
 function setTri(t){ ui.disc.tri = t; ouvrirFiltres(); chargerDecouverte(); }
 function setPerimetre(p){ ui.disc.perimetre = p; ouvrirFiltres(); chargerDecouverte(); }
@@ -333,6 +352,9 @@ function ouvrirFiltres(){
   h += '<div class="fgrp">Note minimale</div><div class="fchips">'+
     NOTES.map(n=>'<button class="chip '+(d.noteMin===n.v?'on':'')+
       '" onclick="setNote('+n.v+')">'+n.label+'</button>').join('')+'</div>';
+  h += '<div class="fgrp">Taille des affiches</div><div class="fchips">'+
+    VUES.map(v=>'<button class="chip '+((db.vue||'')===v.id?'on':'')+
+      '" onclick="setVue(\''+v.id+'\')">'+v.label+'</button>').join('')+'</div>';
   h += '<div class="fgrp">Genres'+(d.genres.length?' ('+d.genres.length+')':'')+'</div>';
   h += genres.length
     ? '<div class="fchips">'+genres.map((g,i)=>'<button class="chip '+
@@ -374,7 +396,7 @@ function viewDecouvrir(){
     '<div class="souschips">'+
       PRESENCES.map(p=>'<button class="chip '+(ui.presence===p.id?'on'+(p.id==='dispo'?' vert':''):'')+
         '" onclick="setPresence(\''+p.id+'\')">'+
-        (p.pt ? '<i class="pt '+p.pt+'"></i>' : '')+p.label+'</button>').join('')+
+        (p.pt ? '<i class="pt '+p.pt+'"></i>' : '')+(p.label || labelTout())+'</button>').join('')+
     '</div>'+
     '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
 
