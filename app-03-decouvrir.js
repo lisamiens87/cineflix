@@ -39,6 +39,23 @@ const ORDRES = [
   { id:'desc', label:'Décroissant' },
   { id:'asc',  label:'Croissant'   }
 ];
+
+/* Les tris qui n'existent que sur la vue « Cinéflix » : ils lisent les fiches
+   envoyées par le NAS (CAT.items), pas TMDB. C'est toute la bibliothèque,
+   triée d'un coup en mémoire — exactement ce que fait Jellyfin chez lui. */
+const TRIS_LOCAUX = [
+  { id:'ajout', label:'Date d’ajout',          court:'date d’ajout' },
+  { id:'lu',    label:'Date de lecture',            court:'date de lecture' },
+  { id:'vu',    label:'Nombre de lectures',         court:'nb de lectures' },
+  { id:'noteK', label:'Note des critiques',         court:'note des critiques' },
+  { id:'cert',  label:'Classification parentale',   court:'classification' },
+  { id:'duree', label:'Durée',                 court:'durée' }
+];
+const TRI_LOCAL = t => TRIS_LOCAUX.some(x => x.id === t);
+/* La vue Cinéflix trie localement dès que le NAS a fourni les fiches —
+   sauf « Popularité », donnée que seul TMDB possède. */
+const modeLocal = ()=> ui.presence === 'dispo' && (CAT.items||[]).length > 0 &&
+                       ui.disc.tri !== 'populaire';
 const PERIMETRES = [
   { id:'tout',   label:'Tout le catalogue', court:'tout le catalogue' },
   { id:'recent', label:'Sortis récemment',  court:'sorties récentes' }
@@ -115,9 +132,121 @@ function garderPresence(liste, type){
   return liste.filter(r => surCineflix(type, r.id) === veutDispo);
 }
 
+/* ---------- La vue Cinéflix triée localement ---------- */
+function melanger(l){
+  for(let i = l.length - 1; i > 0; i--){
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = l[i]; l[i] = l[j]; l[j] = t;
+  }
+  return l;
+}
+
+function catalogueFiltre(){
+  const d = ui.disc, type = d.type;
+  /* Les genres de Jellyfin et ceux de TMDB s'écrivent presque pareil
+     (« Science-Fiction » / « Science Fiction ») : on compare des versions
+     réduites aux seules lettres. */
+  const norm = s => String(s||'').toLowerCase().normalize('NFD').replace(/[^a-z]/g,'');
+  const voulus = d.genres.map(norm).filter(Boolean);
+  let l = (CAT.items||[]).filter(i => i && i.t === type);
+  if(voulus.length)
+    l = l.filter(i => {
+      const g = (i.genres||[]).map(norm);
+      return voulus.every(v => g.some(x => x === v || x.includes(v) || v.includes(x)));
+    });
+  if(d.noteMin) l = l.filter(i => (i.note||0) >= d.noteMin);
+  if(d.perimetre === 'recent') l = l.filter(i => (i.sortie||'') >= isoDecale(-FENETRE));
+  return l;
+}
+
+/* L'ordre des classifications : Tous publics avant -10, -12, -16, -18.
+   Les libellés varient (« FR-12 », « 12 », « TP », « U ») : on lit le nombre,
+   et « tous publics » vaut zéro. Inconnu → à la fin, quel que soit le sens. */
+function rangCert(c){
+  c = String(c||'').toUpperCase();
+  if(!c) return null;
+  if(/TP|TOUS|^U$|^G$|APPROVED|PASSED/.test(c)) return 0;
+  const m = c.match(/(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
+function comparerLocal(tri, sens){
+  const dir = sens === 'asc' ? 1 : -1;
+  const val = i =>
+    tri === 'nom'    ? (i.nom||'') :
+    tri === 'sortie' ? (i.sortie||'') :
+    tri === 'ajout'  ? (i.ajout||'') :
+    tri === 'lu'     ? (i.lu||'') :
+    tri === 'vu'     ? (i.vu||0) :
+    tri === 'duree'  ? (i.duree||0) :
+    tri === 'noteK'  ? (i.noteCrit == null ? null : i.noteCrit) :
+    tri === 'cert'   ? rangCert(i.cert) :
+    tri === 'note'   ? (i.note == null ? null : i.note) : 0;
+  return (a,b)=>{
+    const va = val(a), vb = val(b);
+    const vida = va == null || va === '', vidb = vb == null || vb === '';
+    if(vida && vidb) return 0;
+    if(vida) return 1;                       // les fiches muettes vont à la fin
+    if(vidb) return -1;
+    if(typeof va === 'string') return dir * va.localeCompare(vb, 'fr');
+    return dir * (va - vb);
+  };
+}
+
+/* TMDB ne fournit ici que l'affiche : tout le reste (titre, date, note) est
+   déjà dans la fiche du NAS. Chaque affiche n'est demandée qu'une fois. */
+const cacheTitres = {};
+async function detailsTitre(type, i){
+  const k = type+':'+i.id;
+  if(cacheTitres[k]) return cacheTitres[k];
+  let r = null;
+  try{ r = await tmdb('/'+type+'/'+i.id); }
+  catch(e){ if(e.message === 'BADKEY') throw e; }
+  const o = {
+    id: i.id,
+    title: (r && r.title) || i.nom,  name: (r && r.name) || i.nom,
+    poster_path: (r && r.poster_path) || '',
+    release_date: (r && r.release_date) || i.sortie,
+    first_air_date: (r && r.first_air_date) || i.sortie,
+    vote_average: (r && r.vote_average) || i.note || 0
+  };
+  cacheTitres[k] = o;
+  return o;
+}
+
+async function chargerLocale(suite){
+  const d = ui.disc;
+  const seq = ++discSeq;
+  if(!suite){
+    d.page = 0; d.res = [];
+    d.locale = catalogueFiltre();
+    if(d.tri === 'aleatoire') melanger(d.locale);
+    else d.locale.sort(comparerLocal(d.tri, d.sens === 'asc' ? 'asc' : 'desc'));
+    d.pages = Math.max(1, Math.ceil(d.locale.length / CIBLE_GRILLE));
+    oublierDefil('decouvrir');
+    if(view === 'decouvrir' && !enRecherche()) window.scrollTo(0,0);
+  }
+  d.loading = true; d.err = '';
+  peindre();
+  const part = (d.locale||[]).slice(d.page * CIBLE_GRILLE, (d.page + 1) * CIBLE_GRILLE);
+  try{
+    const fiches = await Promise.all(part.map(i => detailsTitre(d.type, i)));
+    if(seq !== discSeq) return;
+    d.page += 1;
+    d.res = d.res.concat(fiches.filter(Boolean));
+    d.loading = false; d.err = ''; d.charge = true;
+  }catch(e){
+    if(seq !== discSeq) return;
+    d.loading = false; d.charge = true;
+    d.err = (e.message === 'BADKEY') ? 'Clé TMDB refusée' : 'Pas de connexion';
+  }
+  peindre();
+}
+
 async function chargerDecouverte(suite){
   const d = ui.disc;
   if(!db.apiKey){ toast('Ajoute ta clé TMDB dans les réglages'); return go('reglages', {from:'decouvrir'}); }
+  if(modeLocal()) return chargerLocale(suite);
   const seq = ++discSeq;
   if(!suite){
     d.page = 0; d.res = []; d.pages = 1;
@@ -327,6 +456,13 @@ function setType(t){
 function setPresence(p){
   if(ui.presence === p) return;
   ui.presence = p;
+  /* Les tris de bibliothèque n'ont pas de sens sur « tous les films » :
+     TMDB ignore quand un titre est arrivé sur le NAS ou combien de fois
+     il a été vu. On retombe sur la popularité. */
+  if(p !== 'dispo' && TRI_LOCAL(ui.disc.tri)){
+    ui.disc.tri = 'populaire'; ui.disc.sens = 'desc';
+    toast('Ce tri n\'existe que sur la vue Cinéflix');
+  }
   render();
   if(!enRecherche()) chargerDecouverte();
 }
@@ -361,7 +497,7 @@ function resumeFiltres(){
   const bouts = [];
   const pres = PRESENCES.find(p=>p.id === ui.presence);
   if(ui.presence !== 'tout') bouts.push(pres.label.toLowerCase());
-  const tri = TRIS.find(t=>t.id===d.tri) || {};
+  const tri = TRIS.concat(TRIS_LOCAUX).find(t=>t.id===d.tri) || {};
   bouts.push(tri.court + (d.tri !== 'aleatoire' && d.sens === 'asc' ? ' croissant' : ''));
   if(d.perimetre === 'recent') bouts.push('sorties récentes');
   if(d.noteMin) bouts.push('note '+d.noteMin+' et +');
@@ -381,9 +517,17 @@ function ouvrirFiltres(){
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
       '" onclick="setPerimetre(\''+p.id+'\')">'+p.label+'</button>').join('')+'</div>';
+  const bibli = ui.presence === 'dispo' && (CAT.items||[]).length > 0;
+  const tris = bibli ? TRIS.concat(TRIS_LOCAUX) : TRIS;
   h += '<div class="fgrp">Trier par</div><div class="fchips">'+
-    TRIS.map(t=>'<button class="chip '+(d.tri===t.id?'on':'')+
+    tris.map(t=>'<button class="chip '+(d.tri===t.id?'on':'')+
       '" onclick="setTri(\''+t.id+'\')">'+t.label+'</button>').join('')+'</div>';
+  if(!bibli)
+    h += '<div class="small muted" style="margin:6px 2px 0">'+
+      (ui.presence === 'dispo'
+        ? 'Date d\'ajout, durée, lectures… arrivent avec la prochaine mise à jour du serveur (toutes les heures).'
+        : 'Date d\'ajout, durée, lectures… : ces tris s\'appliquent à la vue « Cinéflix », '+
+          'où l\'app connaît ta bibliothèque.')+'</div>';
   if(d.tri !== 'aleatoire')
     h += '<div class="fgrp">Ordre de tri</div><div class="fchips">'+
       ORDRES.map(o=>'<button class="chip '+((d.sens||'desc')===o.id?'on':'')+

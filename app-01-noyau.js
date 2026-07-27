@@ -188,7 +188,11 @@ const sleep = ms => new Promise(r=>setTimeout(r,ms));
    Tout tient en mémoire : quelques milliers d'entiers, quelques dizaines de
    Ko. C'est ce qui rend le filtre « Sur Cinéflix » instantané, là où un
    service qui interroge le serveur titre par titre ne peut pas suivre. */
-const CAT = { movie:new Set(), tv:new Set(), maj:null, charge:false, erreur:'' };
+/* items : les fiches compactes envoyées par le NAS (nom, dates, durée,
+   classification, notes, lectures). C'est ce qui permet de trier la vue
+   « Cinéflix » comme Jellyfin le fait — l'app a toute la bibliothèque
+   en mémoire, aucun serveur ne sait faire ce tri à sa place. */
+const CAT = { movie:new Set(), tv:new Set(), items:[], maj:null, charge:false, erreur:'' };
 
 const cle = (type,id) => type+':'+id;
 const surCineflix = (type,id) => CAT[type === 'movie' ? 'movie' : 'tv'].has(Number(id));
@@ -208,6 +212,7 @@ async function chargerCatalogue(){
     const d = await r.json();
     CAT.movie = new Set((d.movies||d.films||[]).map(Number));
     CAT.tv    = new Set((d.tv||d.series||[]).map(Number));
+    CAT.items = Array.isArray(d.items) ? d.items : [];
     CAT.maj   = d.maj || d.updated || null;
     CAT.charge = true; CAT.erreur = '';
   }catch(e){

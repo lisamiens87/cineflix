@@ -61,7 +61,16 @@ const appels = [];                       // trace des écritures vers Supabase
       return j({ access_token:'jeton', refresh_token:'refresh', user:{id:UID, email:'alex@exemple.fr'} });
     if(p === '/rest/v1/profils')  return route.fulfill({status:204, body:''});
     if(p === '/rest/v1/catalogue')
-      return j([{ movies:CAT_MOVIES, tv:[1396], maj:'2026-07-27T08:00:00Z' }]);
+      return j([{ movies:CAT_MOVIES, tv:[1396], maj:'2026-07-27T08:00:00Z',
+        /* fiches façon export enrichi : durées croissantes avec l'id, pour
+           tester le tri local — la plus longue est 680 */
+        items: CAT_MOVIES.map((id,k)=>({ t:'movie', id, nom:'Film '+id,
+          sortie:'200'+k+'-01-01', ajout:'2026-07-'+(10+k), duree:90+k*10,
+          cert:'FR-'+(k?k*4+2:12), note:6+k*0.5, noteCrit:50+k*10, vu:k,
+          lu:k?'2026-07-0'+k:'', genres:['Action'] }))
+          .concat([{ t:'tv', id:1396, nom:'Série', sortie:'2008-01-20',
+            ajout:'2026-07-01', duree:47, cert:'FR-16', note:9,
+            noteCrit:96, vu:3, lu:'2026-07-10', genres:['Drame'] }]) }]);
     if(p === '/rest/v1/admins')   return j([{ user_id:UID }]);       // on teste le cas admin
     if(p === '/rest/v1/elements'){
       if(m === 'GET') return j(elements);
@@ -115,6 +124,38 @@ const appels = [];                       // trace des écritures vers Supabase
      appels.includes('GET /rest/v1/catalogue'));
   ok('les pastilles « Cinéflix » utilisent le catalogue distant',
      await page.locator('.tag.dispo').count() === 5);
+
+  // 3 bis. Les tris de bibliothèque sur la vue Cinéflix (données du NAS)
+  await page.click('.souschips .chip:has-text("Cinéflix")');
+  await page.waitForTimeout(900);
+  await page.click('#fbtn');
+  await page.waitForTimeout(400);
+  ok('les tris de bibliothèque apparaissent sur la vue Cinéflix',
+     await page.locator('.chip:text-is("Durée")').count() === 1 &&
+     await page.locator('.chip:has-text("Date d’ajout")').count() === 1 &&
+     await page.locator('.chip:has-text("Nombre de lectures")').count() === 1);
+  await page.click('.chip:text-is("Durée")');
+  await page.waitForTimeout(800);
+  await page.click('button:has-text("Voir les résultats")');
+  await page.waitForTimeout(600);
+  ok('le tri par durée liste toute la bibliothèque', await page.locator('.gcard').count() === 5);
+  ok('le plus long en premier (durée décroissante)',
+     ((await page.locator('.gcard').first().getAttribute('onclick'))||'').includes('ouvrirFiche(680'));
+  await page.click('#fbtn');
+  await page.waitForTimeout(400);
+  await page.click('.chip:text-is("Croissant")');
+  await page.waitForTimeout(800);
+  await page.click('button:has-text("Voir les résultats")');
+  await page.waitForTimeout(600);
+  ok('l\'ordre croissant inverse la bibliothèque',
+     ((await page.locator('.gcard').first().getAttribute('onclick'))||'').includes('ouvrirFiche(550'));
+  // retour à l'état attendu par la suite du test
+  await page.click('#fbtn'); await page.waitForTimeout(400);
+  await page.click('.chip:text-is("Décroissant")'); await page.waitForTimeout(400);
+  await page.click('.chip:has-text("Popularité")'); await page.waitForTimeout(600);
+  await page.click('button:has-text("Voir les résultats")'); await page.waitForTimeout(400);
+  await page.click('.souschips .chip:has-text("Tous les films")');
+  await page.waitForTimeout(1000);
 
   // 4. Une demande part vers le serveur — une carte absente du catalogue
   await page.locator('.gcard:not(:has(.tag.dispo))').first().click();

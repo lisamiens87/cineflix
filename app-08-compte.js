@@ -108,10 +108,11 @@ async function majProfil(){
 
 /* ---------- Catalogue ---------- */
 async function catalogueDepuisSupabase(){
-  const r = await sbFetch('/rest/v1/catalogue?select=movies,tv,maj&id=eq.1', {});
+  const r = await sbFetch('/rest/v1/catalogue?select=movies,tv,maj,items&id=eq.1', {});
   const d = (Array.isArray(r) && r[0]) || {};
   CAT.movie = new Set((d.movies||[]).map(Number));
   CAT.tv    = new Set((d.tv||[]).map(Number));
+  CAT.items = Array.isArray(d.items) ? d.items : [];
   CAT.maj   = d.maj ? String(d.maj).slice(0,10) : null;
   CAT.charge = true; CAT.erreur = '';
 }
