@@ -185,6 +185,42 @@ const appels = [];                       // trace des écritures vers Supabase
   ok('la déconnexion ramène à l\'écran de connexion',
      await page.locator('.acc .btn').count() === 1);
 
+  // 9. Session zombie : le compte a été supprimé côté serveur.
+  //    L'app présente un jeton mort, le renouvellement échoue aussi —
+  //    elle doit ramener à la connexion avec un message, pas rester plantée.
+  const ctxZ = await browser.newContext({ viewport:{width:390,height:844},
+                                          serviceWorkers:'block' });
+  const pz = await ctxZ.newPage();
+  pz.on('pageerror', e => echecs.push('pageerror(zombie): '+e.message));
+  await pz.route('**://api.themoviedb.org/**', r => r.fulfill({status:200,
+    contentType:'application/json', body:'{"results":[],"genres":[]}'}));
+  await pz.route(SB+'/**', route => {
+    const p = new URL(route.request().url()).pathname;
+    if(p === '/auth/v1/token')
+      return route.fulfill({status:400, contentType:'application/json',
+        body:'{"error_description":"Invalid Refresh Token"}'});
+    return route.fulfill({status:401, contentType:'application/json',
+      body:'{"message":"JWT expired"}'});
+  });
+  await pz.route('**/config.js', r => r.fulfill({status:200, contentType:'application/javascript',
+    body:"window.CINEFLIX={tmdbKey:'k',jellyfinHosts:[],catalogue:'./cineflix.json',region:'FR',"+
+         "supabase:{url:'"+SB+"',key:'anon'}};"}));
+  await pz.addInitScript(([uid])=>{
+    localStorage.setItem('cineflix.v1', JSON.stringify({
+      apiKey:'k', pseudo:'Alex', onboarde:true, region:'FR', items:{},
+      auth:{ token:'jeton-mort', refresh:'refresh-mort', uid:uid, email:'a@b.fr' } }));
+  }, [UID]);
+  await pz.goto(url);
+  await pz.waitForSelector('.acc', {timeout:8000});
+  ok('une session morte ramène à l\'écran de connexion',
+     await pz.locator('.acc .btn').count() === 1);
+  ok('avec une explication visible',
+     (await pz.locator('.accerr').innerText()).includes('expiré'));
+  await pz.waitForTimeout(500);        // la sauvegarde locale est différée de 150 ms
+  ok('la session morte a été purgée du stockage',
+     await pz.evaluate(() => !(JSON.parse(localStorage.getItem('cineflix.v1')||'{}').auth)));
+  await ctxZ.close();
+
   await browser.close();
   console.log('');
   if(echecs.length){ console.log('ÉCHECS :'); echecs.forEach(e=>console.log('  - '+e)); process.exit(1); }

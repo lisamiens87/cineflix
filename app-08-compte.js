@@ -19,9 +19,13 @@ async function sbFetch(path, opt, retry){
   if(connecte() && !opt.noAuth) h.Authorization = 'Bearer ' + db.auth.token;
   const r = await fetch(sbBase()+path, Object.assign({}, opt, {headers:h}));
   /* Un jeton expiré ne doit pas ressembler à une panne : on le renouvelle
-     une fois, en silence, et on rejoue la requête. */
-  if(r.status === 401 && connecte() && !retry){
-    if(await sbRefresh()) return sbFetch(path, opt, true);
+     une fois, en silence, et on rejoue la requête. Si même le renouvellement
+     échoue, la session est morte — compte supprimé, par exemple — et la
+     garder ferait de l'app un zombie où plus rien ne répond : on déconnecte
+     proprement, direction l'écran de connexion. */
+  if(r.status === 401 && connecte() && !opt.noAuth){
+    if(!retry && await sbRefresh()) return sbFetch(path, opt, true);
+    sessionMorte();
   }
   const txt = await r.text();
   let body = null;
@@ -61,6 +65,20 @@ async function sbRefresh(){
     appliquerSession(d); return true;
   }catch(e){ return false; }
 }
+/* La session ne peut plus être sauvée (jeton mort, compte supprimé…) :
+   on purge et on ramène à la connexion avec un mot d'explication, plutôt
+   que de laisser chaque écran échouer en silence. */
+function sessionMorte(){
+  db.auth = null; db.items = {};
+  estAdmin = false; file.charge = false;
+  saveDB();
+  ui.auth = { mode:'connexion', err:'Ta session a expiré — reconnecte-toi.', occupe:false };
+  if(typeof view !== 'undefined' && view !== 'auth'){
+    view = 'auth'; params = {};
+    try{ render(); }catch(e){}
+  }
+}
+
 function seDeconnecter(){
   openSheet('<h3>Se déconnecter ?</h3>'+
     '<p class="small muted" style="margin:0 0 8px">Tes favoris et tes demandes restent '+
