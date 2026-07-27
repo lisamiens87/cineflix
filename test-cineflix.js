@@ -21,7 +21,7 @@ const echecs = [];
      worker est bloqué car ses requêtes échappent à l'interception. */
   const page = await browser.newPage({ viewport:{width:390,height:844},
                                        serviceWorkers:'block' });
-  await page.route('**/config.js', r => r.fulfill({status:200, contentType:'application/javascript',
+  await page.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
     body: "window.CINEFLIX={tmdbKey:'',jellyfinHosts:['http://100.95.13.53:30013'],"+
           "catalogue:'./cineflix.json',region:'FR',nom:'Cinéflix',supabase:{url:'',key:''}};"}));
 
@@ -237,7 +237,7 @@ const echecs = [];
       body: JSON.stringify({page:1,total_pages:1,results:[film(550,'Fight Club')],genres:[],images:{}})}));
   await p2.route('**://image.tmdb.org/**', r => r.fulfill({status:200, contentType:'image/gif',
     body: Buffer.from('R0lGODlhAQABAAAAACw=','base64')}));
-  await p2.route('**/config.js', r => r.fulfill({status:200, contentType:'application/javascript',
+  await p2.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
     body: "window.CINEFLIX={tmdbKey:'cle-du-serveur',jellyfinHosts:[],catalogue:'./cineflix.json',region:'FR'};"}));
   await p2.goto(url);
   await p2.waitForSelector('.acc', {timeout:8000});

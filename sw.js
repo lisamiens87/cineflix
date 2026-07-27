@@ -2,12 +2,16 @@
    Réseau d'abord sur les fichiers de l'app (pour recevoir les mises à jour),
    repli sur le cache quand le réseau manque. Les appels TMDB ne sont jamais
    mis en cache, et le catalogue Cinéflix non plus : une liste périmée
-   afficherait « déjà sur le serveur » pour un titre qui n'y est plus. */
-const CACHE = 'cineflix-v1';
-const SHELL = ['./', './index.html', './app.css', './manifest.json', './config.js',
-               './app-01-noyau.js', './app-02-outils.js', './app-03-decouvrir.js',
-               './app-04-sorties.js', './app-05-fiche.js', './app-06-maliste.js',
-               './app-07-profil.js', './app-08-compte.js'];
+   afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
+
+   VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
+const BUILD = '2807a';
+const CACHE = 'cineflix-' + BUILD;
+const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
+               './app.css', './config.js', './app-01-noyau.js', './app-02-outils.js',
+               './app-03-decouvrir.js', './app-04-sorties.js', './app-05-fiche.js',
+               './app-06-maliste.js', './app-07-profil.js', './app-08-compte.js']
+  .map(p => p.endsWith('.js') || p.endsWith('.css') ? p + '?b=' + BUILD : p);
 
 self.addEventListener('install', e => {
   e.waitUntil(
@@ -35,7 +39,11 @@ self.addEventListener('fetch', e => {
   if(url.pathname.endsWith('cineflix.json')) return;  // catalogue : toujours frais
 
   e.respondWith(
-    fetch(req)
+    /* cache:'no-cache' : sans lui, « réseau d'abord » passait en réalité par
+       le cache HTTP du téléphone (max-age de 10 min sur GitHub Pages), et une
+       mise à jour pouvait mettre de longues minutes à apparaître — vécu. Ici
+       on revalide systématiquement auprès du serveur (un 304 ne coûte rien). */
+    fetch(req, {cache:'no-cache'})
       .then(res => {
         /* On ne met en cache qu'une vraie réponse : une page 404 gardée en
            secours rendrait l'app inutilisable hors-ligne. */

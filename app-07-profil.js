@@ -81,7 +81,10 @@ function viewProfil(){
   '</div>';
 
   return html + '<div class="wrap tiny muted center" style="padding-bottom:30px">'+
-    'Cinéflix · données films et séries fournies par TMDB</div>';
+    'Cinéflix · données films et séries fournies par TMDB'+
+    /* Le numéro de version, posé par index.html : quand un téléphone semble
+       afficher une vieille version, ce numéro tranche en un coup d'œil. */
+    (window.BUILD ? ' · v'+esc(window.BUILD) : '')+'</div>';
 }
 
 async function rafraichirCatalogue(){

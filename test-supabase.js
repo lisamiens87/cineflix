@@ -88,7 +88,7 @@ const appels = [];                       // trace des écritures vers Supabase
   });
 
   // config.js branché sur le faux Supabase
-  await page.route('**/config.js', r => r.fulfill({status:200, contentType:'application/javascript',
+  await page.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
     body: "window.CINEFLIX={tmdbKey:'cle',jellyfinHosts:[],catalogue:'./cineflix.json',"+
           "region:'FR',nom:'Cinéflix',supabase:{url:'"+SB+"',key:'anon'}};"}));
 
@@ -243,7 +243,7 @@ const appels = [];                       // trace des écritures vers Supabase
     return route.fulfill({status:401, contentType:'application/json',
       body:'{"message":"JWT expired"}'});
   });
-  await pz.route('**/config.js', r => r.fulfill({status:200, contentType:'application/javascript',
+  await pz.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
     body:"window.CINEFLIX={tmdbKey:'k',jellyfinHosts:[],catalogue:'./cineflix.json',region:'FR',"+
          "supabase:{url:'"+SB+"',key:'anon'}};"}));
   await pz.addInitScript(([uid])=>{

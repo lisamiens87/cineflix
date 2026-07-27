@@ -13,7 +13,13 @@
 <link rel="apple-touch-icon" href="./icon-192.png">
 <title>Cinéflix</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230f1115'/%3E%3Crect x='16' y='24' width='68' height='52' rx='8' fill='none' stroke='%233b82f6' stroke-width='7'/%3E%3Cpath d='M42 40l22 10-22 10z' fill='%233b82f6'/%3E%3C/svg%3E">
-<link rel="stylesheet" href="./app.css">
+<!-- BUILD : à incrémenter à CHAQUE livraison, ici et nulle part ailleurs.
+     Le numéro versionne les adresses des fichiers (?b=…) : une nouvelle
+     version a des adresses neuves, qu'aucun cache — navigateur, CDN,
+     service worker — n'a jamais vues. Il s'affiche aussi en bas du profil,
+     pour savoir d'un coup d'œil quelle version un téléphone fait tourner. -->
+<script>window.BUILD='2807a';</script>
+<link rel="stylesheet" href="./app.css?b=2807a">
 </head>
 <body class="booting">
 <div class="app" id="app"></div>
@@ -21,14 +27,14 @@
 <div class="toast" id="toast"></div>
 <div class="sheet" id="sheet"><div class="sheetin" id="sheetin"></div></div>
 
-<script src="./config.js"></script>
-<script src="./app-01-noyau.js"></script>
-<script src="./app-02-outils.js"></script>
-<script src="./app-03-decouvrir.js"></script>
-<script src="./app-04-sorties.js"></script>
-<script src="./app-05-fiche.js"></script>
-<script src="./app-06-maliste.js"></script>
-<script src="./app-07-profil.js"></script>
-<script src="./app-08-compte.js"></script>
+<script src="./config.js?b=2807a"></script>
+<script src="./app-01-noyau.js?b=2807a"></script>
+<script src="./app-02-outils.js?b=2807a"></script>
+<script src="./app-03-decouvrir.js?b=2807a"></script>
+<script src="./app-04-sorties.js?b=2807a"></script>
+<script src="./app-05-fiche.js?b=2807a"></script>
+<script src="./app-06-maliste.js?b=2807a"></script>
+<script src="./app-07-profil.js?b=2807a"></script>
+<script src="./app-08-compte.js?b=2807a"></script>
 </body>
 </html>
