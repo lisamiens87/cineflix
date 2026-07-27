@@ -14,18 +14,26 @@ const PRESENCES = [
 ];
 const labelTout = ()=> ui.disc.type === 'movie' ? 'Tous les films' : 'Toutes les séries';
 
-/* Taille des affiches : sur un petit écran, la grille par défaut peut
-   sembler énorme ; sur une tablette, minuscule. Réglable, mémorisé. */
+/* Affichage : compacte (4 colonnes), normale (3), ou liste. Réglable,
+   mémorisé par appareil. « Grandes » a existé : sur un téléphone elle
+   donnait le même rendu que la normale, remplacée par la liste. */
 const VUES = [
   { id:'compacte', label:'Compactes' },
   { id:'',         label:'Normales'  },
-  { id:'grande',   label:'Grandes'   }
+  { id:'liste',    label:'Liste'     }
 ];
 
+/* Les tris possibles sont ceux que TMDB sait faire côté serveur : popularité,
+   note, date de sortie dans les deux sens, ordre alphabétique. Les tris qui
+   demanderaient les données de lecture de Jellyfin (nombre de vues, dernière
+   lecture, progression) attendront que l'export du NAS les fournisse. */
 const TRIS = [
-  { id:'populaire', label:'Les plus populaires', court:'populaires' },
-  { id:'note',      label:'Les mieux notés',     court:'mieux notés' },
-  { id:'recent',    label:'Les plus récents',    court:'récents' }
+  { id:'populaire', label:'Les plus populaires',      court:'populaires' },
+  { id:'note',      label:'Les mieux notés',          court:'mieux notés' },
+  { id:'recent',    label:'Sortis récemment d’abord', court:'récents' },
+  { id:'ancien',    label:'Les plus anciens d’abord', court:'anciens' },
+  { id:'az',        label:'Titre de A à Z',           court:'A → Z' },
+  { id:'za',        label:'Titre de Z à A',           court:'Z → A' }
 ];
 const PERIMETRES = [
   { id:'tout',   label:'Tout le catalogue', court:'tout le catalogue' },
@@ -58,13 +66,28 @@ function discParams(){
   const ids = d.genres.map(n => genreParNom(type, n)).filter(x => x != null);
   if(ids.length) p.with_genres = ids.join(',');
 
+  const champDate = type === 'movie' ? 'primary_release_date' : 'first_air_date';
   if(d.tri === 'note'){ p.sort_by = 'vote_average.desc'; p['vote_count.gte'] = '300'; }
   else if(d.tri === 'recent'){
-    p.sort_by = type === 'movie' ? 'primary_release_date.desc' : 'first_air_date.desc';
+    p.sort_by = champDate+'.desc';
     p['vote_count.gte'] = '20';
     /* Sans borne haute, « les plus récents » remonte des titres annoncés
        pour dans deux ans dont on ne sait rien. */
-    p[(type === 'movie' ? 'primary_release_date' : 'first_air_date')+'.lte'] = todayISO();
+    p[champDate+'.lte'] = todayISO();
+  }
+  else if(d.tri === 'ancien'){
+    p.sort_by = champDate+'.asc';
+    /* Le fond de TMDB regorge d'entrées quasi vides ; un minimum de votes
+       garde les vrais films anciens plutôt que des fiches fantômes. */
+    p['vote_count.gte'] = '20';
+  }
+  else if(d.tri === 'az' || d.tri === 'za'){
+    const sens = d.tri === 'az' ? 'asc' : 'desc';
+    /* TMDB trie sur le titre ORIGINAL (« The Godfather », pas « Le Parrain »).
+       Même garde-fou : sans filtre de votes, l'alphabet commence par des
+       fiches vides aux titres numériques. */
+    p.sort_by = (type === 'movie' ? 'original_title.' : 'name.')+sens;
+    p['vote_count.gte'] = '100';
   }
   else p.sort_by = 'popularity.desc';
 
@@ -352,7 +375,7 @@ function ouvrirFiltres(){
   h += '<div class="fgrp">Note minimale</div><div class="fchips">'+
     NOTES.map(n=>'<button class="chip '+(d.noteMin===n.v?'on':'')+
       '" onclick="setNote('+n.v+')">'+n.label+'</button>').join('')+'</div>';
-  h += '<div class="fgrp">Taille des affiches</div><div class="fchips">'+
+  h += '<div class="fgrp">Affichage</div><div class="fchips">'+
     VUES.map(v=>'<button class="chip '+((db.vue||'')===v.id?'on':'')+
       '" onclick="setVue(\''+v.id+'\')">'+v.label+'</button>').join('')+'</div>';
   h += '<div class="fgrp">Genres'+(d.genres.length?' ('+d.genres.length+')':'')+'</div>';

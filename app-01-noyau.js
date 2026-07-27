@@ -45,7 +45,7 @@ const CFG = Object.assign(
 
 let db = {
   pseudo:'', apiKey:'', lang:'fr-FR', region:'',
-  vue:'',                   // taille des affiches : '' normale, 'compacte', 'grande'
+  vue:'',                   // affichage : '' grille normale, 'compacte', 'liste'
   jellyfin:'',              // adresse choisie à la main ; sinon on prend celle qui répond
   catalogueUrl:'',
   cleServeur:'', catServeur:'',   // dernières valeurs vues dans config.js — voir appliquerConfig()
@@ -100,8 +100,9 @@ async function askPersist(){
 function appliquerVue(){
   const b = document.body;
   if(!b) return;
+  if(db.vue === 'grande') db.vue = '';      // valeur d'une ancienne version
   b.classList.toggle('vue-compacte', db.vue === 'compacte');
-  b.classList.toggle('vue-grande',   db.vue === 'grande');
+  b.classList.toggle('vue-liste',    db.vue === 'liste');
 }
 
 async function loadDB(){

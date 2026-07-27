@@ -120,13 +120,21 @@ const echecs = [];
   ok('la pastille verte est la version discrète (coche seule)',
      await page.locator('.tag.dispo.mini').count() === nTagDispo);
 
-  // 2 bis. Taille des affiches
+  // 2 bis. Affichage : liste, compacte, et les nouveaux tris
   await page.click('#fbtn');
   await page.waitForTimeout(400);
+  ok('six ordres de tri sont proposés',
+     await page.locator('.chip:has-text("Titre de A à Z")').count() === 1 &&
+     await page.locator('.chip:has-text("Les plus anciens")').count() === 1);
+  await page.click('.chip:has-text("Liste")');
+  await page.waitForTimeout(300);
+  ok('« Liste » bascule la grille en liste',
+     await page.evaluate(() => document.body.classList.contains('vue-liste')));
   await page.click('.chip:has-text("Compactes")');
   await page.waitForTimeout(300);
   ok('« Compactes » pose la classe de vue sur la page',
-     await page.evaluate(() => document.body.classList.contains('vue-compacte')));
+     await page.evaluate(() => document.body.classList.contains('vue-compacte') &&
+                               !document.body.classList.contains('vue-liste')));
   await page.click('button:has-text("Voir les résultats")');
   await page.waitForTimeout(300);
 

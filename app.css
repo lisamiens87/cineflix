@@ -1,6 +1,6 @@
 :root{
   --bg:#0f1115; --surface:#181b22; --surface2:#212530; --line:#2b303c;
-  --text:#e8eaf0; --muted:#8b92a4; --accent:#7c5cff; --accent-dim:#7c5cff22;
+  --text:#e8eaf0; --muted:#8b92a4; --accent:#3b82f6; --accent-dim:#3b82f622;
   --ok:#3ecf8e; --ok-dim:#3ecf8e1e; --warn:#ffb84d; --radius:14px;
   --safe-b:env(safe-area-inset-bottom,0px);
   --safe-t:env(safe-area-inset-top,0px);
@@ -80,9 +80,11 @@ header{
 .chips.types .chip{padding:7px 10px;font-size:13px}
 .souschips{display:flex;gap:8px;padding:2px 16px 10px;overflow-x:auto;scrollbar-width:none}
 .souschips::-webkit-scrollbar{display:none}
-.chip{padding:7px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);
+/* line-height:1 : sans lui, la hauteur de ligne héritée (1.45) décale le
+   texte dans la pilule sur Android — c'est le « pas bien centré » visible. */
+.chip{padding:9px 14px;border-radius:999px;background:var(--surface);border:1px solid var(--line);
   color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap;flex:none;
-  display:inline-flex;align-items:center;gap:6px}
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;line-height:1}
 .chip.on{background:var(--accent);border-color:var(--accent);color:#fff}
 .chip.chipico{padding:7px 8px;display:grid;place-items:center;flex:0 0 auto}
 .chip.chipico svg{width:16px;height:16px;display:block}
@@ -94,7 +96,7 @@ header{
 .chip .pt.non{background:var(--muted)}
 .chip.on .pt{background:currentColor}
 .btn{background:var(--accent);color:#fff;border-radius:11px;padding:11px 16px;font-weight:650;
-  display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  display:inline-flex;align-items:center;justify-content:center;gap:8px;line-height:1.2}
 .btn svg{width:18px;height:18px;flex:none}
 .btn:active{filter:brightness(.9)}
 .btn.ghost{background:var(--surface2);color:var(--text)}
@@ -135,14 +137,28 @@ input:focus,select:focus{border-color:var(--accent)}
 
 /* ---------- Grille ---------- */
 /* La largeur minimale des vignettes est une variable : les classes de vue
-   posées sur <body> la font varier partout d'un coup. Sur un téléphone
-   (~390 px utiles) : compacte ≈ 4 colonnes, normale ≈ 3, grande ≈ 2. */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--vign,104px),1fr));
+   posées sur <body> la font varier partout d'un coup. Calibrée pour un écran
+   de ~360 px utiles (Galaxy S23) : compacte = 4 colonnes, normale = 3.
+   L'ancienne « grande » donnait 2 colonnes… comme la normale sur cet écran :
+   remplacée par une vraie vue liste. */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--vign,96px),1fr));
   gap:12px;padding:4px 16px;align-items:start}
-body.vue-compacte{--vign:80px}
-body.vue-compacte .grid{gap:9px}
+body.vue-compacte{--vign:72px}
+body.vue-compacte .grid{gap:8px}
 body.vue-compacte .gname{font-size:11.5px}
-body.vue-grande{--vign:150px}
+
+/* Vue liste : mêmes cartes, posées à plat. La grille devient une colonne,
+   chaque carte une rangée affiche + textes — aucun changement de HTML. */
+body.vue-liste .grid{display:flex;flex-direction:column;gap:8px}
+body.vue-liste .gcard{display:grid;grid-template-columns:56px 1fr;column-gap:12px;
+  align-content:center;background:var(--surface);border:1px solid var(--line);
+  border-radius:12px;padding:8px 12px 8px 8px;min-height:76px}
+body.vue-liste .wrapimg{grid-row:1 / span 3;align-self:center}
+body.vue-liste .gname{margin-top:0;min-height:0;font-size:13.5px;align-self:end}
+body.vue-liste .gyear{font-size:11.5px}
+body.vue-liste .gsub{margin-top:2px}
+body.vue-liste .gnote{display:none}       /* illisible sur une affiche de 56 px */
+body.vue-liste .tag{transform:scale(.85);transform-origin:top right}
 .gcard{text-align:left;position:relative;width:100%}
 .wrapimg{position:relative;border-radius:9px;overflow:hidden}
 .poster{width:100%;height:auto;aspect-ratio:2/3;border-radius:9px;object-fit:cover;
