@@ -154,7 +154,7 @@ const appels = [];                       // trace des écritures vers Supabase
   await page.click('.chip:text-is("Décroissant")'); await page.waitForTimeout(400);
   await page.click('.chip:has-text("Popularité")'); await page.waitForTimeout(600);
   await page.click('button:has-text("Voir les résultats")'); await page.waitForTimeout(400);
-  await page.click('.souschips .chip:has-text("Tous les films")');
+  await page.click('.souschips .chip:has-text("Cinéma")');
   await page.waitForTimeout(1000);
 
   // 4. Une demande part vers le serveur — une carte absente du catalogue

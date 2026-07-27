@@ -81,6 +81,11 @@ header{
 .chips.types .chip{padding:0 12px}
 .souschips{display:flex;gap:8px;padding:2px 16px 10px;overflow-x:auto;scrollbar-width:none;
   align-items:center}
+/* Les rangées de tête occupent toute la largeur : chaque pilule prend une
+   part égale de la ligne au lieu de se tasser à gauche. Seule la loupe garde
+   sa taille ronde. */
+.chips.types .chip:not(.chipico){flex:1 1 0}
+.souschips .chip{flex:1 1 0;padding:0 8px}
 .souschips::-webkit-scrollbar{display:none}
 /* Hauteur FIXE : chaque rangée avait son propre rembourrage (7, 8, 9 px…),
    donc trois hauteurs de pilules différentes à l'écran — c'était ça, le

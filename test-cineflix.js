@@ -13,6 +13,7 @@ function film(id, titre){
 }
 
 const echecs = [];
+let dernierFournisseurs = null;    // le paramètre with_watch_providers du dernier /discover
 
 (async () => {
   const browser = await chromium.launch();
@@ -35,6 +36,7 @@ const echecs = [];
     if(p === '/configuration') body = { images:{} };
     else if(p.startsWith('/genre/')) body = { genres:[{id:28,name:'Action'},{id:35,name:'Comédie'}] };
     else if(p.startsWith('/discover/')){
+      dernierFournisseurs = u.searchParams.get('with_watch_providers');
       const page_ = Number(u.searchParams.get('page')||1);
       // 20 résultats par page ; seuls les 5 premiers ids de la page 1 sont au catalogue
       const res = [];
@@ -100,17 +102,17 @@ const echecs = [];
   ok('pastille « Cinéflix » sur les titres du catalogue',
      await page.locator('.tag.dispo').count() === 5);
 
-  // 2. Filtre de présence — le geste central
-  ok('deux puces de présence — « Pas encore » a disparu',
-     await page.locator('.souschips .chip').count() === 2);
-  ok('la première puce dit « Tous les films »',
-     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Tous les films');
-  await page.click('.chips.types .chip:has-text("Séries")');
-  await page.waitForTimeout(600);
-  ok('en mode séries, elle devient « Toutes les séries »',
-     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Toutes les séries');
-  await page.click('.chips.types .chip:has-text("Films")');
+  // 2. Les trois sources — le geste central
+  ok('trois puces : Cinéma / Plateformes / Cinéflix',
+     await page.locator('.souschips .chip').count() === 3 &&
+     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Cinéma' &&
+     await page.locator('.souschips .chip:has-text("Plateformes")').count() === 1);
+
+  await page.click('.souschips .chip:has-text("Plateformes")');
   await page.waitForTimeout(900);
+  ok('« Plateformes » interroge TMDB avec les fournisseurs français',
+     dernierFournisseurs === '8|119|337|381');
+  ok('« Plateformes » remplit la grille', await page.locator('.gcard').count() >= 20);
 
   await page.click('.souschips .chip:has-text("Cinéflix")');
   await page.waitForTimeout(900);
@@ -149,7 +151,7 @@ const echecs = [];
   await page.waitForTimeout(300);
 
   // 3. Fiche + dates de sortie
-  await page.click('.souschips .chip:has-text("Tous les films")');
+  await page.click('.souschips .chip:has-text("Cinéma")');
   await page.waitForTimeout(900);
   await page.locator('.gcard').first().click();
   await page.waitForSelector('.sorties', {timeout:5000});
@@ -169,7 +171,7 @@ const echecs = [];
   ok('le clic insère le lecteur sur la bonne vidéo',
      !!src && src.includes('youtube-nocookie.com/embed/frTrailer01'));
 
-  // 4. Demander un titre absent — depuis « Tous les films », une carte sans pastille
+  // 4. Demander un titre absent — depuis « Cinéma », une carte sans pastille
   await page.click('header .iconbtn');           // retour
   await page.waitForTimeout(600);
   await page.locator('.gcard:not(:has(.tag.dispo))').first().click();

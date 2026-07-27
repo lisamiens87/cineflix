@@ -3,16 +3,21 @@
 
 const TYPES = [ {id:'movie', label:'Films'}, {id:'tv', label:'Séries'} ];
 
-/* Les deux puces qui n'existent nulle part ailleurs : le même catalogue,
-   vu selon qu'on possède le titre ou non. « Tous les films » (ou « Toutes
-   les séries ») montre tout TMDB, « Cinéflix » ne garde que la bibliothèque.
-   Il y a eu une troisième puce, « Pas encore » (l'inverse de Cinéflix) :
-   retirée — dans « tous les films », la pastille suffit à distinguer. */
+/* Les trois sources, réparties sur la largeur de l'écran :
+   « Cinéma »      — tout le catalogue TMDB ;
+   « Plateformes » — ce qui est en streaming par abonnement en France
+                     (Canal+, Netflix, Prime Video, Disney+) ;
+   « Cinéflix »    — la bibliothèque du serveur, et elle seule. */
 const PRESENCES = [
-  { id:'tout' },                            // label calculé selon le type
+  { id:'tout',  label:'Cinéma' },
+  { id:'plats', label:'Plateformes' },
   { id:'dispo', label:'Cinéflix', pt:'ok' }
 ];
-const labelTout = ()=> ui.disc.type === 'movie' ? 'Tous les films' : 'Toutes les séries';
+const labelTout = ()=> 'Cinéma';   // le même mot pour films et séries, voulu ainsi
+
+/* Identifiants TMDB des plateformes retenues : Netflix 8, Prime Video 119,
+   Disney+ 337, Canal+ 381. Le filtre est fait par TMDB (données JustWatch). */
+const FOURNISSEURS = '8|119|337|381';
 
 /* Affichage : compacte (4 colonnes), normale (3), ou liste. Réglable,
    mémorisé par appareil. « Grandes » a existé : sur un téléphone elle
@@ -84,6 +89,12 @@ async function chargerGenres(type){
 function discParams(){
   const d = ui.disc, type = d.type;
   const p = { include_adult:'false', page:String(d.page), region: db.region || 'FR' };
+  /* Vue « Plateformes » : TMDB filtre lui-même sur l'abonnement en France. */
+  if(ui.presence === 'plats'){
+    p.watch_region = db.region || 'FR';
+    p.with_watch_providers = FOURNISSEURS;
+    p.with_watch_monetization_types = 'flatrate';
+  }
   const ids = d.genres.map(n => genreParNom(type, n)).filter(x => x != null);
   if(ids.length) p.with_genres = ids.join(',');
 
@@ -127,9 +138,10 @@ function discParams(){
    pages jusqu'à remplir la grille — sinon l'utilisateur voit trois vignettes
    et croit que sa bibliothèque est vide. */
 function garderPresence(liste, type){
-  if(ui.presence === 'tout') return liste;
-  const veutDispo = ui.presence === 'dispo';
-  return liste.filter(r => surCineflix(type, r.id) === veutDispo);
+  /* Seule la vue « Cinéflix » filtre côté client ; « Cinéma » montre tout,
+     « Plateformes » est déjà filtrée par TMDB. */
+  if(ui.presence !== 'dispo') return liste;
+  return liste.filter(r => surCineflix(type, r.id));
 }
 
 /* ---------- La vue Cinéflix triée localement ---------- */
