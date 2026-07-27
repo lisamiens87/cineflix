@@ -347,7 +347,17 @@ async function boot(){
   else if(!db.apiKey) go('reglages', {from:'decouvrir'});
   if(memoryOnly) toast('Stockage indisponible sur cet appareil');
 }
-boot();
+/* Un démarrage qui échoue ne doit jamais laisser un écran noir : le voile
+   « booting » est retiré quoi qu'il arrive, on affiche ce qu'on peut et on le
+   dit. C'est arrivé en vrai avec une session dont le compte n'existait plus. */
+boot().catch(()=>{
+  document.body.classList.remove('booting');
+  try{
+    view = (sbPret() && !connecte()) ? 'auth' : 'decouvrir';
+    render();
+    toast('Démarrage incomplet — recharge la page');
+  }catch(e){}
+});
 
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
