@@ -395,3 +395,13 @@ label.fld em{display:block;font-style:normal;font-size:12.5px;color:var(--muted)
   background:linear-gradient(135deg,var(--accent),#4b32c3);
   display:grid;place-items:center;font-size:22px;font-weight:750;color:#fff;flex:none}
 .phead{display:flex;align-items:center;gap:14px;padding:18px 16px 4px}
+
+/* ---------- Note Télérama (carrés rouges frappés d'un T) ---------- */
+.tlr{display:inline-flex;align-items:center;gap:2px;vertical-align:middle}
+.tlr .tsq{display:inline-flex;align-items:center;justify-content:center;
+  width:15px;height:15px;border-radius:3px;background:#e2001a;color:#fff;
+  font-family:Georgia,'Times New Roman',serif;font-weight:800;font-size:11px;line-height:1}
+.tlr .tverdict{margin-left:6px;font-weight:650;font-size:13px}
+.tlr.mini{gap:1px;transform:translateY(1px)}
+.tlr.mini .tsq{width:11px;height:11px;font-size:8.5px;border-radius:2px}
+body.vue-liste .tlr.mini .tsq{width:10px;height:10px;font-size:8px}

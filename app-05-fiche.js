@@ -357,6 +357,8 @@ function viewFiche(){
         (dispo ? ' · <span class="badge live">Sur Cinéflix</span>' : '')+'</div>'+
       (note ? '<div style="margin-top:6px"><span class="note">'+I.star+note+'</span>'+
         '<span class="tiny muted" style="margin-left:6px">'+(d.vote_count||0)+' votes</span></div>' : '')+
+      (function(){ const f = ficheDe(type, d.id);
+        return f && f.jt ? '<div style="margin-top:6px">'+tlrHtml(f)+'</div>' : ''; })()+
       '<div class="small muted" style="margin-top:6px">'+
         esc((d.genres||[]).map(g=>g.name).slice(0,3).join(' · '))+'</div>'+
     '</div></div>';

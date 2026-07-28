@@ -61,6 +61,7 @@ const TRIS_LOCAUX = [
   { id:'lu',    label:'Date de lecture',            court:'date de lecture' },
   { id:'vu',    label:'Nombre de lectures',         court:'nb de lectures' },
   { id:'noteK', label:'Note des critiques',         court:'note des critiques' },
+  { id:'noteT', label:'Note Télérama',              court:'note Télérama' },
   { id:'cert',  label:'Classification parentale',   court:'classification' },
   { id:'duree', label:'Durée',                 court:'durée' }
 ];
@@ -266,6 +267,7 @@ function comparerLocal(tri, sens){
     tri === 'vu'     ? (i.vu||0) :
     tri === 'duree'  ? (i.duree||0) :
     tri === 'noteK'  ? (i.noteCrit == null ? null : i.noteCrit) :
+    tri === 'noteT'  ? (i.jt || null) :
     tri === 'cert'   ? rangCert(i.cert) :
     tri === 'note'   ? (i.note == null ? null : i.note) : 0;
   return (a,b)=>{
@@ -488,7 +490,9 @@ function carteTitre(r, type){
       (note ? '<div class="gnote">'+I.star+note.toFixed(1)+'</div>' : '')+
     '</div>'+
     '<div class="gname">'+esc(titre)+'</div>'+
-    '<div class="gyear">'+esc(year(date))+'</div>'+ sous +
+    '<div class="gyear">'+esc(year(date))+
+      (function(){ const f = ficheDe(type, r.id);
+        return f && f.jt ? ' '+tlrHtml(f, true) : ''; })()+'</div>'+ sous +
   '</button>';
 }
 

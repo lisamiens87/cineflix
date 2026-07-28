@@ -198,6 +198,28 @@ const CAT = { movie:new Set(), tv:new Set(), items:[], maj:null, charge:false, e
 const cle = (type,id) => type+':'+id;
 const surCineflix = (type,id) => CAT[type === 'movie' ? 'movie' : 'tv'].has(Number(id));
 
+/* Retrouver la fiche NAS d'un titre — index construit à la première demande,
+   reconstruit dès que le catalogue change (la référence CAT.items bouge). */
+let _fIdx = null, _fSrc = null;
+function ficheDe(type, id){
+  if(_fSrc !== CAT.items){
+    _fSrc = CAT.items; _fIdx = new Map();
+    (CAT.items||[]).forEach(i => { if(i) _fIdx.set(i.t+':'+i.id, i); });
+  }
+  return _fIdx.get(type+':'+Number(id)) || null;
+}
+
+/* La note Télérama d'une fiche (jt = nombre de T, jv = verdict), dans le
+   style du journal : des carrés rouges frappés d'un T. */
+function tlrHtml(f, mini){
+  if(!f || !f.jt) return '';
+  let t = '';
+  for(let i = 0; i < Math.min(4, f.jt); i++) t += '<span class="tsq">T</span>';
+  return '<span class="tlr'+(mini ? ' mini' : '')+'" title="Note Télérama'+
+    (f.jv ? ' — '+esc(f.jv) : '')+'">'+t+
+    (f.jv && !mini ? '<span class="tverdict">'+esc(f.jv)+'</span>' : '')+'</span>';
+}
+
 /* Une demande dont le titre vient d'entrer au catalogue : on le dit tout de
    suite, en plus de la notification push envoyée par le NAS — comme ça la
    bonne nouvelle arrive aussi à ceux qui n'ont pas activé les notifications. */
