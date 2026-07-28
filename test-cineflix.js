@@ -16,6 +16,7 @@ const echecs = [];
 let dernierFournisseurs = null;    // le paramètre with_watch_providers du dernier /discover
 let dernierTri = null;             // le sort_by du dernier /discover
 let derniereBorne = null;          // le primary_release_date.gte du dernier /discover
+let dernierRegion = null;          // le paramètre region du dernier /discover
 
 (async () => {
   const browser = await chromium.launch();
@@ -41,6 +42,7 @@ let derniereBorne = null;          // le primary_release_date.gte du dernier /di
       dernierFournisseurs = u.searchParams.get('with_watch_providers');
       dernierTri = u.searchParams.get('sort_by');
       derniereBorne = u.searchParams.get('primary_release_date.gte');
+      dernierRegion = u.searchParams.get('region');
       const page_ = Number(u.searchParams.get('page')||1);
       // 20 résultats par page ; seuls les 5 premiers ids de la page 1 sont au catalogue
       const res = [];
@@ -214,6 +216,8 @@ let derniereBorne = null;          // le primary_release_date.gte du dernier /di
   await page.waitForTimeout(900);
   ok('choisir 1990 borne la requête TMDB à la décennie',
      derniereBorne === '1990-01-01');
+  ok('la découverte n\'envoie plus region= (dates originales, pas françaises)',
+     dernierRegion === null);
   await page.click('button:has-text("Voir les résultats")');
   await page.waitForTimeout(400);
   await page.click('.souschips .chip:has-text("Cinéma")');   // changement de catégorie

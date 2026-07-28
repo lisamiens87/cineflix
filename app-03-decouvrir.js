@@ -102,7 +102,13 @@ async function chargerGenres(type){
 
 function discParams(){
   const d = ui.disc, type = d.type;
-  const p = { include_adult:'false', page:String(d.page), region: db.region || 'FR' };
+  /* Pas de paramètre region ici : avec lui, TMDB renvoie et trie les dates de
+     sortie FRANÇAISES (un film de 1999 ressorti en 2021 s'affiche « 2021 »),
+     ce qui rendait le filtre décennie incohérent avec le tri par date. Les
+     dates affichées sont donc les originales — comme dans la filmographie.
+     La région reste utilisée là où elle a un sens : watch_region (plateformes)
+     et l'onglet Sorties (dates salle/numérique/Blu-ray françaises). */
+  const p = { include_adult:'false', page:String(d.page) };
   /* Vue « Plateformes » : TMDB filtre lui-même sur l'abonnement en France.
      Si l'utilisateur a coché des plateformes précises, on ne demande qu'elles. */
   if(ui.presence === 'plats'){
