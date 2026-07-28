@@ -50,6 +50,9 @@ let derniereBorne = null;          // le primary_release_date.gte du dernier /di
       }
       body = { page:page_, total_pages:5, results:res };
     }
+    else if(p.startsWith('/search/person'))
+      body = { results:[{ id:777, name:'Sean Connery', profile_path:'/sc.jpg',
+                          known_for_department:'Acting' }] };
     else if(p.startsWith('/search/')) body = { results:[film(550,'Fight Club'), film(999001,'Inconnu')] };
     else if(/\/movie\/\d+\/release_dates$/.test(p)){
       body = { results:[{ iso_3166_1:'FR', release_dates:[
@@ -58,12 +61,16 @@ let derniereBorne = null;          // le primary_release_date.gte du dernier /di
         { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
     }
     else if(/\/person\/\d+$/.test(p)){
+      /* Une longue carrière : assez de vignettes pour que la page défile,
+         c'est ce qui permet de tester la mémoire de défilement. */
+      const oeuvres = [];
       const f1 = film(550,'Fight Club');  f1.media_type = 'movie';   // au catalogue
-      const f2 = film(999002,'Autre');    f2.media_type = 'movie';   // absent
+      oeuvres.push(f1);
+      for(let i=0;i<30;i++){ const f = film(910000+i,'Œuvre '+i); f.media_type='movie'; oeuvres.push(f); }
       body = { id:777, name:'A. Acteur', profile_path:'/a.jpg',
                known_for_department:'Acting', birthday:'1970-01-01',
                biography:'Une carrière bien remplie.',
-               combined_credits:{ cast:[f1, f2], crew:[] } };
+               combined_credits:{ cast:oeuvres, crew:[] } };
     }
     else if(/\/(movie|tv)\/\d+$/.test(p)){
       const id = Number(p.split('/').pop());
@@ -164,9 +171,22 @@ let derniereBorne = null;          // le primary_release_date.gte du dernier /di
   await page.waitForSelector('.grid', {timeout:5000});
   ok('la fiche de la personne liste sa filmographie',
      /filmographie/i.test(await page.locator('#app').innerText()) &&
-     await page.locator('.gcard').count() === 2);
+     await page.locator('.gcard').count() === 31);
   ok('la coche verte marque ce qui est déjà sur Cinéflix',
      await page.locator('.tag.dispo').count() === 1);
+
+  // 2 b''. Le défilement de la filmographie survit à l'aller-retour sur un film
+  await page.locator('.gcard').nth(25).scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const yFilmo = await page.evaluate(() => window.scrollY);
+  await page.locator('.gcard').nth(25).click();
+  await page.waitForSelector('.actions', {timeout:5000});
+  await page.click('header .iconbtn');                 // retour vers la filmographie
+  await page.waitForTimeout(700);
+  const yRetour = await page.evaluate(() => window.scrollY);
+  ok('le défilement de la filmographie est retrouvé au retour ('+yFilmo+' → '+yRetour+')',
+     yFilmo > 300 && Math.abs(yRetour - yFilmo) < 8);
+
   await page.click('header .iconbtn');                 // retour vers la fiche du film
   await page.waitForSelector('.actions', {timeout:5000});
   ok('le retour rouvre la fiche du titre',
@@ -207,6 +227,25 @@ let derniereBorne = null;          // le primary_release_date.gte du dernier /di
   await page.waitForTimeout(900);
   ok('réappuyer sur la décennie la désactive', derniereBorne === null);
   await page.click('button:has-text("Voir les résultats")');
+  await page.waitForTimeout(400);
+
+  // 2 e. Chercher une personne depuis la loupe
+  await page.click('.chip.chipico');
+  await page.waitForTimeout(300);
+  await page.fill('#q', 'sean connery');
+  await page.waitForTimeout(900);
+  ok('la recherche remonte une rangée « Personnes »',
+     await page.locator('.cperson').count() === 1 &&
+     (await page.locator('.cperson').innerText()).includes('Sean Connery'));
+  await page.locator('.cperson').first().click();
+  await page.waitForSelector('.grid', {timeout:5000});
+  ok('un appui ouvre sa filmographie complète', await page.locator('.gcard').count() === 31);
+  await page.click('header .iconbtn');                 // retour vers la recherche
+  await page.waitForTimeout(600);
+  ok('le retour retombe sur les résultats de recherche',
+     await page.locator('.cperson').count() === 1 &&
+     (await page.locator('#q').inputValue()) === 'sean connery');
+  await page.click('.qclear');                          // on referme la recherche
   await page.waitForTimeout(400);
 
   await page.click('.souschips .chip:has-text("Cinéflix")');

@@ -349,7 +349,7 @@ function onSearchInput(v){
   const q = v.trim();
   if(enRecherche() !== avant){ oublierDefil('decouvrir'); window.scrollTo(0,0); }
   if(q.length < SEARCH_MIN){
-    ui.searchRes = null; ui.searching = false; ui.searchErr = '';
+    ui.searchRes = null; ui.searchPers = null; ui.searching = false; ui.searchErr = '';
     peindre(); return;
   }
   ui.searching = true; ui.searchErr = '';
@@ -365,7 +365,8 @@ function searchNow(){
 }
 function viderRecherche(){
   clearTimeout(searchTimer); abortSearch();
-  ui.searchQ = ''; ui.searchRes = null; ui.searching = false; ui.searchErr = '';
+  ui.searchQ = ''; ui.searchRes = null; ui.searchPers = null;
+  ui.searching = false; ui.searchErr = '';
   render();
 }
 async function runSearch(q){
@@ -374,22 +375,46 @@ async function runSearch(q){
   const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
   searchAbort = ctrl;
   try{
-    const d = await tmdb('/search/'+ui.disc.type, {query:q, include_adult:'false'},
-                         ctrl ? {signal:ctrl.signal} : null);
+    /* Titres ET personnes, en parallèle : taper « sean connery » remonte sa
+       fiche au-dessus des films. Si la recherche de personnes échoue seule,
+       elle disparaît en silence — les titres restent. */
+    const res = await Promise.all([
+      tmdb('/search/'+ui.disc.type, {query:q, include_adult:'false'},
+           ctrl ? {signal:ctrl.signal} : null),
+      tmdb('/search/person', {query:q, include_adult:'false'},
+           ctrl ? {signal:ctrl.signal} : null).catch(()=>null)
+    ]);
     if(seq !== searchSeq) return;
     /* La recherche par titre ignore volontairement le filtre de présence :
        quand on cherche un film précis, on veut le trouver, et c'est la
        pastille qui répond à « est-ce que je l'ai ? ». */
-    ui.searchRes = (d.results||[]).slice(0, SEARCH_MAX);
+    ui.searchRes  = (res[0].results||[]).slice(0, SEARCH_MAX);
+    ui.searchPers = res[1] ? (res[1].results||[]).slice(0, 10) : [];
     ui.searching = false; ui.searchErr = '';
     peindre();
   }catch(e){
     if((e && e.name === 'AbortError') || seq !== searchSeq) return;
     ui.searching = false;
     ui.searchErr = (e.message === 'BADKEY') ? 'Clé TMDB refusée' : 'Pas de connexion';
-    ui.searchRes = [];
+    ui.searchRes = []; ui.searchPers = [];
     peindre();
   }
+}
+
+/* La rangée « Personnes » des résultats — mêmes vignettes rondes que le
+   casting, un appui ouvre la filmographie complète. */
+function rangeePersonnes(){
+  const l = ui.searchPers || [];
+  if(!l.length) return '';
+  const roles = { Acting:'Acteur / actrice', Directing:'Réalisation',
+                  Writing:'Scénario', Production:'Production' };
+  return '<div class="sectitle">Personnes</div><div class="cast">'+
+    l.map(p=>'<button class="cperson" onclick="ouvrirPersonne('+p.id+')">'+
+      (p.profile_path ? '<img loading="lazy" src="'+IMG(p.profile_path,'w185')+'" alt="">'
+                      : '<div class="ph2">'+esc((p.name||'?')[0])+'</div>')+
+      '<div class="cname">'+esc(p.name||'')+'</div>'+
+      '<div class="crole">'+esc(roles[p.known_for_department] || p.known_for_department || '')+'</div>'+
+    '</button>').join('')+'</div>';
 }
 
 /* ---------- Vignette ---------- */
@@ -446,10 +471,15 @@ function corpsRecherche(){
     return '<div class="empty">'+I.search+'<h3>'+esc(ui.searchErr)+'</h3>'+
       '<p>Vérifie ta connexion, puis réessaie.</p>'+
       '<button class="btn ghost" onclick="searchNow()">Réessayer</button></div>';
-  if(!ui.searchRes || !ui.searchRes.length)
+  const pers = rangeePersonnes();
+  if((!ui.searchRes || !ui.searchRes.length) && !pers)
     return '<div class="empty"><h3>Rien trouvé</h3>'+
       '<p>Essaie une autre orthographe, ou change de type juste au-dessus.</p></div>';
-  return '<div class="grid">'+ui.searchRes.map(r=>carteTitre(r, ui.disc.type)).join('')+'</div>';
+  let h = pers;
+  if(ui.searchRes && ui.searchRes.length)
+    h += (pers ? '<div class="sectitle">'+(ui.disc.type === 'movie' ? 'Films' : 'Séries')+'</div>' : '')+
+      '<div class="grid">'+ui.searchRes.map(r=>carteTitre(r, ui.disc.type)).join('')+'</div>';
+  return h;
 }
 
 function corpsDecouverte(){

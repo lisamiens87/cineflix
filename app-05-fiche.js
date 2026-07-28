@@ -251,22 +251,29 @@ function blocCasting(credits){
 
 /* ============================ Fiche d'une personne ============================ */
 function ouvrirPersonne(pid){
-  ui.personne = { id:pid, loading:true, data:null };
-  /* Les coordonnées de la fiche d'origine voyagent dans les paramètres :
-     le bouton retour saura la rouvrir telle quelle. */
-  go('personne', { id:pid, fid:params.id, ftype:params.type, ffrom:params.from });
+  /* Nouvelle personne = on repart du haut. Revenir sur la MÊME fiche via le
+     bouton retour ne passe pas par ici : le défilement mémorisé est gardé. */
+  oublierDefil('personne');
+  /* D'où vient-on ? Rangé dans l'état de la personne (pas dans les paramètres
+     de navigation, qui se vident au premier aller-retour) : le bouton retour
+     rouvre la fiche d'origine même après un détour par un film. */
+  const nav = view === 'fiche'
+    ? { fid:params.id, ftype:params.type, ffrom:params.from }
+    : { ffrom:view };
+  ui.personne = { id:pid, loading:true, data:null, nav:nav };
+  go('personne', { id:pid });
   chargerPersonne();
 }
 
 async function chargerPersonne(){
-  const id = (ui.personne||{}).id;
+  const id = (ui.personne||{}).id, nav = (ui.personne||{}).nav;
   try{
     const d = await tmdb('/person/'+id, { append_to_response:'combined_credits' });
     if(!ui.personne || ui.personne.id !== id) return;
-    ui.personne = { id:id, loading:false, data:d };
+    ui.personne = { id:id, loading:false, data:d, nav:nav };
   }catch(e){
     if(!ui.personne || ui.personne.id !== id) return;
-    ui.personne = { id:id, loading:false,
+    ui.personne = { id:id, loading:false, nav:nav,
       error: e.message === 'BADKEY' ? 'Clé TMDB refusée' : 'Impossible de charger la fiche' };
   }
   if(view === 'personne') render();
