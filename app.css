@@ -405,3 +405,37 @@ label.fld em{display:block;font-style:normal;font-size:12.5px;color:var(--muted)
 .tlr.mini{gap:1px;transform:translateY(1px)}
 .tlr.mini .tsq{width:11px;height:11px;font-size:8.5px;border-radius:2px}
 body.vue-liste .tlr.mini .tsq{width:10px;height:10px;font-size:8px}
+
+/* ---------- Rangées horizontales (saisons, suggestions) ----------
+   Mêmes cartes que la grille, posées sur une ligne qui défile : une rangée
+   de suggestions ne doit pas pousser le reste de la fiche hors de l'écran. */
+.grid.rangee{display:flex;flex-wrap:nowrap;overflow-x:auto;gap:10px;
+  padding:4px 16px 8px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.grid.rangee::-webkit-scrollbar{display:none}
+.grid.rangee .gcard{width:104px;flex:0 0 104px}
+.grid.rangee .gname{min-height:0}
+/* La vue liste met la grille en colonne et aplatit les cartes : les rangées
+   gardent leur forme, sinon les suggestions occuperaient tout l'écran. */
+body.vue-liste .grid.rangee{flex-direction:row}
+body.vue-liste .grid.rangee .gcard{display:block;background:none;border:0;
+  padding:0;min-height:0}
+body.vue-liste .grid.rangee .wrapimg{width:auto}
+body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
+
+/* Un titre de section cliquable (« Avec Denzel Washington ») */
+.sectitle .secbtn{background:none;border:0;padding:0;color:var(--accent);
+  font:inherit;letter-spacing:inherit;text-transform:inherit;cursor:pointer}
+
+/* ---------- Épisodes d'une saison ---------- */
+.eps{display:flex;flex-direction:column;gap:10px;padding:4px 16px}
+.ep{display:grid;grid-template-columns:116px 1fr;gap:12px;align-items:start;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px}
+.epimg{position:relative;aspect-ratio:16/9;border-radius:8px;overflow:hidden;
+  background:var(--surface2);display:grid;place-items:center}
+.epimg img{width:100%;height:100%;object-fit:cover;display:block}
+.epimg span{font-size:20px;font-weight:750;color:var(--muted)}
+.epnum{font-size:11px;color:var(--muted)}
+.eptitre{font-size:14px;font-weight:650;margin-top:2px;line-height:1.3}
+.epres{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+.epres.clamp{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+@media (max-width:380px){ .ep{grid-template-columns:96px 1fr;gap:10px} }

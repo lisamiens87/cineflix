@@ -100,16 +100,17 @@ let ui = {
   sorties:{ mode:'bluray', res:[], loading:false, err:'', charge:false },
   listeTab:'favoris',
   fiche:null,
+  saison:null,
   auth:{ mode:'connexion', err:'', occupe:false }
 };
 
 const DEPTH = { auth:0, accueil:0, decouvrir:0, sorties:0, liste:0, profil:0,
-                fiche:1, reglages:1, file:1, personne:2 };
+                fiche:1, reglages:1, file:1, personne:2, saison:2 };
 let navDir = 'none';
 /* Les vues dont on mémorise le défilement : ouvrir un titre puis revenir
    doit ramener exactement où on en était. La filmographie d'une personne
    en fait partie — elle peut faire des centaines de vignettes. */
-const LISTES = { decouvrir:1, sorties:1, liste:1, personne:1 };
+const LISTES = { decouvrir:1, sorties:1, liste:1, personne:1, saison:1 };
 const memDefil = {};
 
 function go(v, p, dir){
@@ -128,6 +129,7 @@ function oublierDefil(v){ delete memDefil[v]; }
 
 function currentBack(){
   if(view === 'personne') return ((ui.personne||{}).nav||{}).ffrom || 'decouvrir';
+  if(view === 'saison')   return ((ui.saison||{}).nav||{}).ffrom   || 'decouvrir';
   if(view === 'fiche') return params.from || 'decouvrir';
   if(view === 'reglages') return params.from || 'profil';
   if(view === 'file') return 'profil';
@@ -138,7 +140,8 @@ function goBack(){
   /* Depuis la fiche d'une personne, on revient sur la fiche du titre qui
      l'a ouverte — ses coordonnées sont rangées dans l'état de la personne,
      et survivent donc aux allers-retours vers les films de la filmographie. */
-  const navP = (view === 'personne') && ((ui.personne||{}).nav || {});
+  const navP = view === 'personne' ? ((ui.personne||{}).nav || {})
+             : view === 'saison'   ? ((ui.saison||{}).nav   || {}) : null;
   if(navP && navP.fid) return ouvrirFiche(navP.fid, navP.ftype, navP.ffrom);
   const t = currentBack();
   if(t) go(t, {}, 'back');
@@ -202,6 +205,7 @@ function render(){
   else if(view === 'reglages')  html = viewReglages();
   else if(view === 'fiche')     html = viewFiche();
   else if(view === 'personne')  html = viewPersonne();
+  else if(view === 'saison')    html = viewSaison();
   app.innerHTML = html;
 
   /* La barre du bas disparaît sur les écrans qui n'ont qu'une chose à faire :

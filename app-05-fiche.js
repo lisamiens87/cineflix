@@ -10,8 +10,10 @@ function ouvrirFiche(id, type, from){
 async function chargerFiche(){
   const id = params.id, type = params.type;
   try{
-    const extra = type === 'movie' ? 'credits,release_dates,watch/providers,videos'
-                                   : 'credits,watch/providers,videos';
+    /* recommendations vient avec la fiche : les suggestions du bas ne coûtent
+       aucune requête supplémentaire. */
+    const extra = type === 'movie' ? 'credits,release_dates,watch/providers,videos,recommendations'
+                                   : 'credits,watch/providers,videos,recommendations';
     /* include_video_language : sans lui, TMDB ne renvoie que les vidéos dans la
        langue demandée, et la plupart des titres n'ont pas de bande-annonce VF.
        On demande donc fr, en, et celles sans langue déclarée. */
@@ -27,6 +29,9 @@ async function chargerFiche(){
       error: e.message === 'BADKEY' ? 'Clé TMDB refusée' : 'Impossible de charger la fiche' };
   }
   if(view === 'fiche') render();
+  /* Les titres « avec tel acteur » arrivent après : la fiche s'affiche tout
+     de suite, la rangée se glisse dessous une seconde plus tard. */
+  chargerAvecActeurs();
 }
 
 /* ---------- Le tableau des trois sorties ---------- */
@@ -135,7 +140,7 @@ function actionsFiche(o, type){
    où une apostrophe dans un titre suffirait à tout casser. */
 function ficheObjet(){ return (ui.fiche && ui.fiche.data) || {}; }
 
-function regarder(id, type){
+function ouvrirJellyfin(titre){
   const base = jellyBase || (db.jellyfin||'').replace(/\/+$/,'');
   if(!base){
     return openSheet('<h3>Serveur non renseigné</h3>'+
@@ -146,9 +151,11 @@ function regarder(id, type){
   }
   /* Jellyfin n'expose pas de lien par identifiant TMDB : on ouvre la recherche
      du serveur sur le titre, ce qui tombe juste dans l'immense majorité des cas. */
+  window.open(base + '/web/#/search.html?query=' + encodeURIComponent(titre||''), '_blank', 'noopener');
+}
+function regarder(id, type){
   const o = ficheObjet();
-  const titre = o.title || o.name || '';
-  window.open(base + '/web/#/search.html?query=' + encodeURIComponent(titre), '_blank', 'noopener');
+  ouvrirJellyfin(o.title || o.name || '');
 }
 
 function menuDemande(id, type){
@@ -247,6 +254,162 @@ function blocCasting(credits){
       '<div class="cname">'+esc(p.name)+'</div>'+
       '<div class="crole">'+esc(p.character||'')+'</div>'+
     '</button>').join('')+'</div>';
+}
+
+/* ============================ Saisons et épisodes ============================ */
+/* La liste des saisons arrive avec la fiche de la série : la rangée ne coûte
+   aucune requête. Le détail d'une saison (les épisodes) n'est demandé qu'au
+   moment où on l'ouvre. */
+function blocSaisons(d){
+  const l = (d.seasons||[]).filter(s => s && (s.episode_count||0) > 0);
+  if(!l.length) return '';
+  /* TMDB range les « Spéciaux » en saison 0 et les met en tête : on les
+     renvoie à la fin, on veut voir la saison 1 en premier. */
+  const rang = s => s.season_number === 0 ? 9999 : s.season_number;
+  l.sort((a,b) => rang(a) - rang(b));
+  return '<div class="sectitle">Saisons <span class="cnt">'+l.length+'</span></div>'+
+    '<div class="grid rangee">'+ l.map(s =>
+      '<button class="gcard" onclick="ouvrirSaison('+d.id+','+s.season_number+')">'+
+        '<div class="wrapimg">'+posterEl(s.poster_path,'w342','',s.name||'')+'</div>'+
+        '<div class="gname">'+esc(s.name || ('Saison '+s.season_number))+'</div>'+
+        '<div class="gyear">'+s.episode_count+' épisode'+(s.episode_count > 1 ? 's' : '')+
+          (s.air_date ? ' · '+esc(year(s.air_date)) : '')+'</div>'+
+      '</button>').join('') +'</div>';
+}
+
+function ouvrirSaison(tvId, n){
+  oublierDefil('saison');
+  const d = ficheObjet();
+  /* Comme pour les personnes : d'où l'on vient est rangé dans l'état de la
+     saison, pas dans les paramètres de navigation qui se vident. */
+  const nav = view === 'fiche'
+    ? { fid:params.id, ftype:params.type, ffrom:params.from }
+    : { ffrom:view };
+  ui.saison = { tv:tvId, n:n, serie:(d.name || d.title || ''), loading:true, data:null, nav:nav };
+  go('saison', { id:tvId, n:n });
+  chargerSaison();
+}
+
+async function chargerSaison(){
+  const st = ui.saison || {};
+  const tv = st.tv, n = st.n;
+  const memeSaison = ()=> ui.saison && ui.saison.tv === tv && ui.saison.n === n;
+  if(!memeSaison()) return;
+  ui.saison = Object.assign({}, st, { loading:true, error:'' });
+  try{
+    const d = await tmdb('/tv/'+tv+'/season/'+n);
+    if(!memeSaison()) return;
+    ui.saison = Object.assign({}, ui.saison, { loading:false, data:d });
+  }catch(e){
+    if(!memeSaison()) return;
+    ui.saison = Object.assign({}, ui.saison, { loading:false,
+      error: e.message === 'BADKEY' ? 'Clé TMDB refusée' : 'Impossible de charger la saison' });
+  }
+  if(view === 'saison') render();
+}
+
+function viewSaison(){
+  const st = ui.saison || {};
+  const back = 'goBack()';
+  const nom = st.serie || 'Série';
+  if(st.loading) return header(nom, {back:back})+
+    '<div class="empty"><span class="spin"></span><p style="margin-top:12px">Chargement des épisodes…</p></div>';
+  if(st.error || !st.data) return header(nom, {back:back})+
+    '<div class="empty"><h3>Oups</h3><p>'+esc(st.error || 'Saison introuvable')+'</p>'+
+    '<button class="btn ghost" onclick="chargerSaison()">Réessayer</button></div>';
+
+  const d = st.data;
+  const eps = d.episodes || [];
+  const titreSaison = d.name || ('Saison '+st.n);
+  let h = header(nom, {back:back});
+  h += '<div class="dhead">'+
+    '<div style="width:92px;flex:none">'+posterEl(d.poster_path,'w342','',titreSaison)+'</div>'+
+    '<div class="dmeta"><h2>'+esc(titreSaison)+'</h2>'+
+      '<div class="small muted">'+esc(nom)+
+        (d.air_date ? ' · '+esc(year(d.air_date)) : '')+
+        ' · '+eps.length+' épisode'+(eps.length > 1 ? 's' : '')+
+        (surCineflix('tv', st.tv) ? ' · <span class="badge live">Sur Cinéflix</span>' : '')+'</div>'+
+    '</div></div>';
+  if(surCineflix('tv', st.tv))
+    h += '<div class="actions"><button class="btn vert" onclick="ouvrirJellyfin('+
+      JSON.stringify(nom).replace(/"/g,'&quot;')+')">'+I.play+' Regarder sur Cinéflix</button></div>';
+  if(d.overview)
+    h += '<div class="overview clamp" onclick="this.classList.toggle(\'clamp\')">'+esc(d.overview)+'</div>';
+
+  h += '<div class="sectitle">Épisodes <span class="cnt">'+eps.length+'</span></div>'+
+    (eps.length
+      ? '<div class="eps">'+ eps.map(e =>
+          '<div class="ep">'+
+            '<div class="epimg">'+(e.still_path
+              ? '<img loading="lazy" src="'+IMG(e.still_path,'w300')+'" alt="">'
+              : '<span>'+(e.episode_number||'?')+'</span>')+'</div>'+
+            '<div>'+
+              '<div class="epnum">Épisode '+(e.episode_number||'?')+
+                (e.air_date ? ' · '+esc(fmtDateCourt(e.air_date))+' '+esc(year(e.air_date)) : '')+
+                (e.runtime ? ' · '+esc(fmtDuree(e.runtime)) : '')+'</div>'+
+              '<div class="eptitre">'+esc(e.name||'')+'</div>'+
+              (e.overview
+                ? '<div class="epres clamp" onclick="this.classList.toggle(\'clamp\')">'+esc(e.overview)+'</div>'
+                : '')+
+            '</div>'+
+          '</div>').join('') +'</div>'
+      : '<div class="empty"><p>Aucun épisode renseigné pour cette saison.</p></div>');
+  return h + '<div style="height:32px"></div>';
+}
+
+/* ============================ À voir ensuite ============================ */
+/* Deux sources : les recommandations de TMDB (livrées avec la fiche) et
+   l'œuvre des têtes d'affiche (un appel par acteur, en tâche de fond). */
+function blocReco(d, type){
+  const vus = {};
+  const l = ((d.recommendations||{}).results||[])
+    .concat(((d.similar||{}).results||[]))
+    .filter(w => {
+      if(!w || !w.id || w.id === d.id || !w.poster_path || vus[w.id]) return false;
+      vus[w.id] = 1; return true;
+    }).slice(0,20);
+  if(!l.length) return '';
+  return '<div class="sectitle">Dans le même esprit</div>'+
+    '<div class="grid rangee">'+ l.map(w => carteTitre(w, type)).join('') +'</div>';
+}
+
+function htmlAvecActeurs(){
+  const av = (ui.fiche||{}).avec || [];
+  return av.filter(a => a.l && a.l.length).map(a =>
+    '<div class="sectitle"><button class="secbtn" onclick="ouvrirPersonne('+a.id+')">'+
+      'Avec '+esc(a.nom)+'</button></div>'+
+    '<div class="grid rangee">'+ a.l.map(w => carteTitre(w, a.type)).join('') +'</div>').join('');
+}
+
+/* Un acteur consulté est gardé le temps de la session : passer d'un film à
+   l'autre du même acteur ne recharge rien. */
+const cacheActeur = {};
+async function chargerAvecActeurs(){
+  const st = ui.fiche || {};
+  const d = st.data;
+  if(!d || st.avec) return;
+  const type = st.type, id = st.id;
+  const vedettes = (((d.credits||{}).cast) || []).slice(0,2).filter(p => p && p.id);
+  if(!vedettes.length) return;
+  const res = [];
+  for(const p of vedettes){
+    let l = cacheActeur[p.id];
+    if(!l){
+      try{
+        const c = await tmdb('/person/'+p.id+'/combined_credits');
+        l = (c.cast||[]).filter(w => w && w.media_type === type && w.poster_path)
+          .sort((a,b) => (b.popularity||0) - (a.popularity||0));
+        cacheActeur[p.id] = l;
+      }catch(e){ l = []; }
+    }
+    res.push({ id:p.id, nom:p.name||'', type:type, l: l.filter(w => w.id !== d.id).slice(0,20) });
+  }
+  if(!ui.fiche || ui.fiche.id !== id) return;      // l'utilisateur a changé de fiche
+  ui.fiche.avec = res;
+  const el = document.getElementById('fsug');
+  /* On ne redessine pas toute la fiche : une bande-annonce déjà lancée
+     continuerait de jouer, et la position de lecture est préservée. */
+  if(view === 'fiche' && el) el.innerHTML = htmlAvecActeurs();
 }
 
 /* ============================ Fiche d'une personne ============================ */
@@ -390,8 +553,13 @@ function viewFiche(){
       '<div class="overview clamp" style="margin-top:0" onclick="this.classList.toggle(\'clamp\')">'+
       esc(d.overview)+'</div>';
 
+  if(isTv) html += blocSaisons(d);
   html += blocBandeAnnonce(d);
   html += blocPlateformes(d);
   html += blocCasting(d.credits);
+  html += blocReco(d, type);
+  /* Rempli par chargerAvecActeurs() — et rerempli ici quand la fiche est
+     redessinée (après une demande, par exemple). */
+  html += '<div id="fsug">'+htmlAvecActeurs()+'</div>';
   return html + '<div style="height:32px"></div>';
 }
