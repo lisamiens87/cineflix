@@ -91,6 +91,7 @@ let ui = {
   disc:{ type:'movie', genres:[], tri:'sortie', sens:'desc', noteMin:0, perimetre:'tout',
          plats:[],                            // plateformes cochées (vide = toutes)
          decennie:0,                          // 0 = toutes, sinon 1920, 1930…
+         origine:'eurna',                     // groupe de pays (REGIONS) — défaut Europe + Amér. du Nord
          /* NB : disc est commun aux trois vues (Cinéma / Plateformes /
             Cinéflix) — un filtre posé reste posé quand on en change. */
          page:1, pages:1, res:[], loading:false, err:'', charge:false },

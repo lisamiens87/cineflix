@@ -82,6 +82,30 @@ const DECENNIES = (()=>{ const l = [];
   return l; })();
 const FENETRE = 120;                 // « récemment » = les 120 derniers jours
 
+/* Le filtre « Origine » : des groupes de pays de production. TMDB filtre
+   par pays d'origine (with_origin_country, codes ISO séparés par |) ; la
+   vue Cinéflix filtre localement sur les pays que le NAS met dans les
+   fiches (champ pays). Par défaut Europe + Amérique du Nord : le tri par
+   date de sortie mondial noyait les listes sous des sorties lointaines. */
+const PAYS_EUROPE = ['FR','GB','DE','IT','ES','PT','BE','NL','LU','IE','AT','CH',
+  'SE','NO','DK','FI','IS','PL','CZ','SK','HU','RO','BG','GR','HR','SI','RS',
+  'UA','EE','LV','LT'];
+const PAYS_AMNORD = ['US','CA','MX'];
+const REGIONS = [
+  {id:'eurna',   label:'Europe + Amér. N', pays: PAYS_EUROPE.concat(PAYS_AMNORD)},
+  {id:'fr',      label:'France',           pays:['FR']},
+  {id:'europe',  label:'Europe',           pays: PAYS_EUROPE},
+  {id:'amnord',  label:'Amérique du Nord', pays: PAYS_AMNORD},
+  {id:'asie',    label:'Asie',             pays:['JP','KR','CN','HK','TW','IN','TH',
+    'ID','PH','VN','MY','SG','TR','IL','IR','SA','AE','KZ','PK','BD','LK','NP','KH','MN']},
+  {id:'afrique', label:'Afrique',          pays:['ZA','NG','EG','MA','DZ','TN','SN',
+    'KE','GH','CI','CM','CD','ET','AO','MZ','BF','ML','RW','UG','TZ','LY']},
+  {id:'amsud',   label:'Amérique du Sud',  pays:['BR','AR','CL','CO','PE','VE','UY',
+    'EC','BO','PY','GY','SR']},
+  {id:'monde',   label:'Monde',            pays:null},   // pas de filtre
+];
+const regionActive = ()=> REGIONS.find(r => r.id === (ui.disc.origine || 'eurna')) || REGIONS[0];
+
 const genresTMDB = { movie:null, tv:null };
 let discSeq = 0;
 
@@ -118,6 +142,11 @@ function discParams(){
   }
   const ids = d.genres.map(n => genreParNom(type, n)).filter(x => x != null);
   if(ids.length) p.with_genres = ids.join(',');
+
+  /* Le filtre Origine, sur toutes les vues qui interrogent TMDB (la vue
+     Cinéflix triée localement a son équivalent dans catalogueFiltre). */
+  const reg = regionActive();
+  if(reg.pays) p.with_origin_country = reg.pays.join('|');
 
   const champDate = type === 'movie' ? 'primary_release_date' : 'first_air_date';
   const sens = d.sens === 'asc' ? 'asc' : 'desc';
@@ -203,6 +232,13 @@ function catalogueFiltre(){
     const de = d.decennie+'-01-01', a = (d.decennie+9)+'-12-31';
     l = l.filter(i => (i.sortie||'') >= de && (i.sortie||'') <= a);
   }
+  /* Origine : les pays viennent des fiches du NAS (métadonnées Jellyfin).
+     Un titre sans pays connu reste visible — mieux vaut montrer trop que
+     faire disparaître la moitié de la bibliothèque sur une lacune. */
+  const reg = regionActive();
+  if(reg.pays)
+    l = l.filter(i => !i.pays || !i.pays.length ||
+                      i.pays.some(c => reg.pays.indexOf(c) >= 0));
   return l;
 }
 
@@ -569,6 +605,10 @@ function setPerimetre(p){
   if(p === 'recent') ui.disc.decennie = 0;
   ouvrirFiltres(); chargerDecouverte();
 }
+function setOrigine(id){
+  ui.disc.origine = id;
+  ouvrirFiltres(); chargerDecouverte();
+}
 function setNote(n){ ui.disc.noteMin = n; ouvrirFiltres(); chargerDecouverte(); }
 function bascGenre(i){
   const g = (genresTMDB[ui.disc.type] || [])[i];
@@ -580,13 +620,14 @@ function bascGenre(i){
 function resetFiltres(){
   const d = ui.disc;
   d.genres = []; d.perimetre = 'tout'; d.tri = 'sortie'; d.sens = 'desc'; d.noteMin = 0;
-  d.plats = []; d.decennie = 0;
+  d.plats = []; d.decennie = 0; d.origine = 'eurna';
   ouvrirFiltres(); chargerDecouverte();
 }
 function filtresActifs(){
   const d = ui.disc;
   return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' ||
          d.tri !== 'sortie' || (d.sens||'desc') !== 'desc' || !!d.decennie ||
+         (d.origine||'eurna') !== 'eurna' ||
          (ui.presence === 'plats' && (d.plats||[]).length > 0);
 }
 function resumeFiltres(){
@@ -600,6 +641,7 @@ function resumeFiltres(){
   bouts.push(tri.court + (d.tri !== 'aleatoire' && d.sens === 'asc' ? ' croissant' : ''));
   if(d.perimetre === 'recent') bouts.push('sorties récentes');
   if(d.decennie) bouts.push('années '+(d.decennie < 2000 ? String(d.decennie).slice(2) : d.decennie));
+  if((d.origine||'eurna') !== 'eurna') bouts.push(regionActive().label.toLowerCase());
   if(d.noteMin) bouts.push('note '+d.noteMin+' et +');
   d.genres.forEach(n=> bouts.push(n.toLowerCase()));
   return bouts.filter(Boolean).join(' · ');
@@ -628,6 +670,11 @@ function ouvrirFiltres(){
     '<button class="chip '+(!d.decennie?'on':'')+'" onclick="setDecennie(0)">Toutes</button>'+
     DECENNIES.map(a=>'<button class="chip '+(d.decennie===a?'on':'')+
       '" onclick="setDecennie('+a+')">'+a+'</button>').join('')+'</div>';
+  /* L'origine des films — une seule région à la fois, « Monde » = tout. */
+  h += '<div class="fgrp">Origine — '+regionActive().label+'</div>'+
+    '<div class="fchips defil" id="forig">'+
+    REGIONS.map(r=>'<button class="chip '+(regionActive().id===r.id?'on':'')+
+      '" onclick="setOrigine(\''+r.id+'\')">'+r.label+'</button>').join('')+'</div>';
   const bibli = ui.presence === 'dispo' && (CAT.items||[]).length > 0;
   const tris = bibli ? TRIS.concat(TRIS_LOCAUX) : TRIS;
   h += '<div class="fgrp">Trier par</div><div class="fchips">'+
@@ -660,12 +707,13 @@ function ouvrirFiltres(){
   /* Chaque sélection redessine la feuille et la rangée des décennies repart
      à gauche — la décennie choisie sortait de l'écran et on croyait le geste
      raté. On recentre la rangée sur la puce active à chaque rendu. */
-  const rd = document.getElementById('fdec');
-  if(rd){
+  ['fdec','forig'].forEach(id => {
+    const rd = document.getElementById(id);
+    if(!rd) return;
     const on = rd.querySelector('.chip.on');
     if(on) rd.scrollLeft = Math.max(0,
       (on.offsetLeft - rd.offsetLeft) - (rd.clientWidth - on.offsetWidth) / 2);
-  }
+  });
 }
 
 function ouvrirChamp(){
