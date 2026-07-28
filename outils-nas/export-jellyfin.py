@@ -567,6 +567,11 @@ def collecter_sorties(base, key):
     except Exception as e:
         print("Sorties : table illisible (%s)" % e)
         return
+    # Le calendrier ne bouge pas toutes les cinq minutes : une relève par
+    # heure suffit. Exception, la première : tant que la table est vide, on
+    # remplit sans attendre l'heure pile.
+    if connues and time.localtime().tm_min >= 5:
+        return
     l = lire_sorties()
     if not l:
         return
@@ -855,14 +860,10 @@ def main():
             enrichir_telerama(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
         except Exception as e:
             print("Télérama sauté : %s" % e)
-        # Calendrier des sorties physiques : une fois par heure suffit, et
-        # c'est autant de requêtes en moins chez eux (le cron passe toutes
-        # les 5 minutes, seule celle de l'heure pile fait le travail).
-        if time.localtime().tm_min < 5:
-            try:
-                collecter_sorties(a.supabase_url, a.supabase_key)
-            except Exception as e:
-                print("Sorties physiques sautées : %s" % e)
+        try:
+            collecter_sorties(a.supabase_url, a.supabase_key)
+        except Exception as e:
+            print("Sorties physiques sautées : %s" % e)
 
     contenu = {
         "maj": date.today().isoformat(),
