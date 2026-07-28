@@ -212,8 +212,8 @@ def lire_supabase(base, key, chemin):
 # `telerama`) : la bibliothèque entière est couverte en quelques heures, puis
 # seuls les nouveaux titres coûtent une requête. Politesse : une pause entre
 # chaque appel, et jamais plus d'un lot par passage.
-TLR_LOT = 20        # budget de titres vérifiés à chaque passage du cron
-TLR_LOT_BIB = 12    # dont, au plus, pour la bibliothèque : le reste va au
+TLR_LOT = 40        # budget de titres vérifiés à chaque passage du cron
+TLR_LOT_BIB = 28    # dont, au plus, pour la bibliothèque : le reste va au
                     # semis, pour que Cinéma et Plateformes se remplissent
                     # sans attendre la fin de l'inventaire du NAS
 TLR_PAUSE = 0.8
