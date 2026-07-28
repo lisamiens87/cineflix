@@ -168,6 +168,18 @@ async function catalogueDepuisSupabase(){
   CAT.maj   = d.maj ? String(d.maj).slice(0,10) : null;
   CAT.charge = true; CAT.erreur = '';
   await notesTelerama();
+  await sortiesPhysiques();
+}
+
+/* Le calendrier des sorties physiques FR relevé par le NAS. Quelques
+   centaines de lignes au plus : on prend tout d'un coup. */
+async function sortiesPhysiques(){
+  try{
+    const l = await sbFetch('/rest/v1/sorties_phys?select=titre,vo,annee,date,'+
+      'edition,uhd,prix,tmdb_id,poster&order=date.asc&limit=2000', {});
+    if(!Array.isArray(l)) return;
+    SORTIES.l = l; SORTIES.charge = true;
+  }catch(e){ /* sans calendrier, l'onglet Sorties retombe sur TMDB */ }
 }
 
 /* Les notes Télérama : une table à part, indépendante de la bibliothèque —

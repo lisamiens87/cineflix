@@ -61,14 +61,31 @@ const MODES = [
     titre:'Sorties en salle',  avant:-10, apres:45 },
   { id:'numerique', label:'Numérique', type:TYPE_NUM,  icone:'nuage',
     titre:'Sorties numériques', avant:-21, apres:60 },
-  { id:'bluray',  label:'Blu-ray / DVD', type:TYPE_PHYS, icone:'disque',
-    titre:'Sorties physiques', avant:-21, apres:90 }
+  { id:'bluray',  label:'Blu-ray / 4K', type:TYPE_PHYS, icone:'disque',
+    titre:'Sorties physiques', avant:-21, apres:150 }
 ];
 const modeCourant = ()=> MODES.find(m=>m.id === ui.sorties.mode) || MODES[2];
 let sortiesSeq = 0;
 
 async function chargerSorties(){
   const s = ui.sorties, m = modeCourant();
+  /* Sorties physiques : le NAS relève le calendrier français (4K UHD /
+     Blu-ray, édition, prix) — bien plus complet et plus précis que le type 5
+     de TMDB, qui ignore le 4K et oublie la moitié des sorties françaises.
+     Aucune requête réseau ici : la liste arrive avec le catalogue. */
+  if(m.id === 'bluray' && SORTIES.charge && SORTIES.l.length){
+    const gte = isoDecale(m.avant), lte = isoDecale(m.apres);
+    s.res = SORTIES.l
+      .filter(x => x.date && x.date >= gte && x.date <= lte)
+      .map(x => ({ quand:x.date, source:'FR', disque:x,
+                   film:{ id:x.tmdb_id || null, title:x.titre || x.vo || '',
+                          poster_path:x.poster || '' } }))
+      .sort((a,b) => a.quand.localeCompare(b.quand) ||
+                     (a.film.title||'').localeCompare(b.film.title||'', 'fr'));
+    s.loading = false; s.charge = true; s.err = '';
+    render();
+    return;
+  }
   if(!db.apiKey){ toast('Ajoute ta clé TMDB dans les réglages'); return go('reglages', {from:'sorties'}); }
   const seq = ++sortiesSeq;
   s.loading = true; s.err = ''; s.res = [];
@@ -157,34 +174,51 @@ function viewSorties(){
     html += '<div class="sectitle">Déjà sorti<span class="cnt">'+passes.length+'</span></div>' +
             bloc(passes.slice().reverse(), true);
   }
-  return html + '<div class="credit">Dates fournies par TMDB, région '+
-    esc(db.region||'FR')+' (repli États-Unis quand la France n\'est pas renseignée).</div>'+
+  const source = (m.id === 'bluray' && s.res.length && s.res[0].disque)
+    ? 'Calendrier des sorties physiques françaises (4k-ultra-hd.fr), '+
+      'affiches et fiches TMDB.'
+    : 'Dates fournies par TMDB, région '+esc(db.region||'FR')+
+      ' (repli États-Unis quand la France n\'est pas renseignée).';
+  return html + '<div class="credit">'+source+'</div>'+
     '<div style="height:24px"></div>';
 }
 
 function ligneSortie(x, m){
-  const r = x.film;
-  const st = statut('movie', r.id);
-  const dispo = st === 'obtenu';
+  const r = x.film, d = x.disque;
+  const st = r.id ? statut('movie', r.id) : null;
   let marque = '';
-  if(dispo)                 marque = '<span class="pastille dispo">'+I.check+' Sur Cinéflix</span>';
+  if(st === 'obtenu')       marque = '<span class="pastille dispo">'+I.check+' Sur Cinéflix</span>';
   else if(st === 'demande') marque = '<span class="pastille demande">'+I.horloge+' Demandé</span>';
   else if(st === 'encours') marque = '<span class="pastille encours">'+I.horloge+' En cours</span>';
   else if(st === 'fav')     marque = '<span class="pastille encours">'+I.coeurPlein+' Favori</span>';
 
-  return '<button class="crow" onclick="ouvrirFiche('+r.id+',\'movie\',\'sorties\')">'+
+  /* Sur une sortie disque, la deuxième ligne dit ce qui compte pour décider :
+     quand, quelle édition, à quel prix. */
+  const sous = d
+    ? esc(relatif(x.quand)) + (d.edition ? ' · '+esc(d.edition) : '') +
+      (d.prix ? ' · '+esc(d.prix)+' €' : '')
+    : esc(relatif(x.quand)) +
+      (x.source && x.source !== (db.region||'FR') ? ' · date '+esc(x.source) : '');
+
+  const corps =
     (r.poster_path
       ? '<img class="cposter" loading="lazy" src="'+IMG(r.poster_path,'w154')+'" alt="">'
       : '<div class="cposter"></div>')+
     '<div class="cinfo">'+
       '<div class="cname2">'+esc(r.title||'')+
+        (d && d.uhd ? ' <span class="b4k">4K</span>' : '')+
         /* La coche verte suit le titre partout : ici aussi, on voit d'un
            coup d'œil ce qui est déjà sur le serveur. */
-        (surCineflix('movie', r.id) ? ' <span class="cfx" aria-label="Sur Cinéflix">'+I.check+'</span>' : '')+
+        (r.id && surCineflix('movie', r.id)
+          ? ' <span class="cfx" aria-label="Sur Cinéflix">'+I.check+'</span>' : '')+
       '</div>'+
-      '<div class="csub">'+esc(relatif(x.quand))+
-        (x.source && x.source !== (db.region||'FR') ? ' · date '+esc(x.source) : '')+'</div>'+
+      '<div class="csub">'+sous+'</div>'+
       marque+
-    '</div>'+
-  '</button>';
+    '</div>';
+
+  /* Une sortie que TMDB n'a pas su identifier reste au calendrier — elle ne
+     mène simplement nulle part. */
+  return r.id
+    ? '<button class="crow" onclick="ouvrirFiche('+r.id+',\'movie\',\'sorties\')">'+corps+'</button>'
+    : '<div class="crow inerte">'+corps+'</div>';
 }

@@ -215,6 +215,11 @@ function ficheDe(type, id){
    la bibliothèque, c'est-à-dire les vues Cinéma et Plateformes. */
 const TLR = { m:new Map(), charge:false };
 
+/* Le calendrier des sorties physiques françaises (4K UHD / Blu-ray), relevé
+   par le NAS. TMDB ne sait pas dire si une édition est 4K, et ses dates
+   françaises sont trouées : c'est cette table qui alimente l'onglet Sorties. */
+const SORTIES = { l:[], charge:false };
+
 /* Même normalisation que le script du NAS : minuscules, accents retirés,
    on ne garde que lettres et chiffres. */
 function tlrNorm(s){
