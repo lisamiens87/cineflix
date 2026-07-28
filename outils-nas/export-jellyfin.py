@@ -134,6 +134,93 @@ def recuperer(base, token, genre, user_id):
     return sorted(ids), fiches, sans_tmdb
 
 
+def lire_supabase(base, key, chemin):
+    req = urllib.request.Request(base.rstrip("/") + chemin, headers={
+        "apikey": key, "Authorization": "Bearer " + key, "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def notifier_arrivees(base, key, anciens_m, anciens_t, films, series):
+    """Prévenir ceux dont une demande vient d'arriver — notification push.
+
+    N'agit que si VAPID_PRIVATE est posée dans l'environnement de la tâche.
+    Toute panne ici est avalée : les notifications ne doivent jamais faire
+    échouer l'export du catalogue.
+    """
+    prive = os.environ.get("VAPID_PRIVATE", "").strip()
+    if not prive:
+        return
+    if not anciens_m and not anciens_t:
+        # Ancien état illisible (ou premier passage) : impossible de savoir ce
+        # qui est nouveau — mieux vaut se taire que noyer tout le monde.
+        return
+    nm = sorted(set(films) - set(anciens_m))
+    nt = sorted(set(series) - set(anciens_t))
+    if not nm and not nt:
+        return
+    try:
+        from pywebpush import webpush, WebPushException
+    except ImportError:
+        import subprocess
+        subprocess.run([sys.executable, "-m", "pip", "install", "--quiet",
+                        "--break-system-packages", "pywebpush"], check=False)
+        try:
+            from pywebpush import webpush, WebPushException
+        except ImportError:
+            print("pywebpush introuvable : notifications sautées")
+            return
+    ids = ",".join(str(i) for i in (nm + nt))
+    demandes = lire_supabase(base, key,
+        "/rest/v1/elements?select=user_id,titre,tmdb_id,type,poster"
+        "&demande=is.true&statut=in.(demande,encours)&tmdb_id=in.(%s)" % ids)
+    demandes = [d for d in demandes
+                if (d["type"] == "movie" and d["tmdb_id"] in nm)
+                or (d["type"] == "tv" and d["tmdb_id"] in nt)]
+    if not demandes:
+        return
+    users = sorted({d["user_id"] for d in demandes})
+    abos = lire_supabase(base, key,
+        "/rest/v1/push_abonnements?select=endpoint,p256dh,auth,user_id"
+        "&user_id=in.(%s)" % ",".join(users))
+    par_user = {}
+    for ab in abos:
+        par_user.setdefault(ab["user_id"], []).append(ab)
+    envoyees = 0
+    for d in demandes:
+        quoi = "film" if d["type"] == "movie" else "série"
+        # Une ligne + la jaquette, façon « Mes Séries » : le titre porte tout,
+        # l'affiche TMDB sert de vignette.
+        corps = json.dumps({
+            "titre": "%s est disponible !" % (d.get("titre") or "Votre demande"),
+            "corps": "Bonne nouvelle : votre %s est sur Cinéflix — regardez maintenant." % quoi,
+            "ic": ("https://image.tmdb.org/t/p/w185" + d["poster"])
+                  if d.get("poster") else "",
+            "url": "https://lisamiens87.github.io/cineflix/"})
+        for ab in par_user.get(d["user_id"], []):
+            try:
+                webpush(subscription_info={"endpoint": ab["endpoint"],
+                        "keys": {"p256dh": ab["p256dh"], "auth": ab["auth"]}},
+                        data=corps, vapid_private_key=prive,
+                        vapid_claims={"sub": "mailto:alexandre.mesnier@cabinet-ekinox.fr"})
+                envoyees += 1
+            except WebPushException as e:
+                code = getattr(getattr(e, "response", None), "status_code", None)
+                if code in (404, 410):
+                    # abonnement mort (app désinstallée…) : on le retire
+                    try:
+                        req = urllib.request.Request(
+                            base.rstrip("/") + "/rest/v1/push_abonnements?endpoint=eq."
+                            + urllib.parse.quote(ab["endpoint"], safe=""),
+                            method="DELETE",
+                            headers={"apikey": key, "Authorization": "Bearer " + key})
+                        urllib.request.urlopen(req, timeout=TIMEOUT)
+                    except Exception:
+                        pass
+    if envoyees:
+        print("%d notification(s) envoyée(s)" % envoyees)
+
+
 def pousser_supabase(base, key, contenu):
     """Écrase l'unique ligne de la table `catalogue`.
 
@@ -216,9 +303,24 @@ def main():
         print("%s écrit" % a.sortie)
 
     if a.supabase:
+        # L'état AVANT écrasement : c'est lui qui dit ce qui vient d'arriver.
+        anciens_m, anciens_t = [], []
+        try:
+            r = lire_supabase(a.supabase_url, a.supabase_key,
+                              "/rest/v1/catalogue?select=movies,tv&id=eq.1")
+            if r:
+                anciens_m = r[0].get("movies") or []
+                anciens_t = r[0].get("tv") or []
+        except Exception:
+            pass
         try:
             pousser_supabase(a.supabase_url, a.supabase_key, contenu)
             print("Supabase mis à jour")
+            try:
+                notifier_arrivees(a.supabase_url, a.supabase_key,
+                                  anciens_m, anciens_t, films, series)
+            except Exception as e:
+                print("Notifications sautées : %s" % e)
         except urllib.error.HTTPError as e:
             sys.exit("Supabase a répondu %s : %s" % (e.code, e.read().decode("utf-8", "ignore")[:300]))
         except urllib.error.URLError as e:
