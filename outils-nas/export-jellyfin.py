@@ -305,10 +305,113 @@ def telerama_note(nom, annee, type_):
     return (n, TLR_VERDICTS.get(n, ""))
 
 
+def _pousser_telerama(base, key, lignes):
+    if not lignes:
+        return
+    req = urllib.request.Request(
+        base.rstrip("/") + "/rest/v1/telerama",
+        data=json.dumps(lignes).encode("utf-8"), method="POST",
+        headers={"apikey": key, "Authorization": "Bearer " + key,
+                 "Content-Type": "application/json",
+                 "Prefer": "resolution=merge-duplicates,return=minimal"})
+    urllib.request.urlopen(req, timeout=TIMEOUT)
+
+
+# ---------- Semis : les titres HORS bibliothèque ----------
+# L'app affiche aussi les notes sur Cinéma et Plateformes, où les titres ne
+# sont pas sur le NAS. Quand la bibliothèque est couverte, le budget restant
+# sert donc à noter ce que ces vues montrent : les titres les plus populaires
+# et les plus récents d'Europe et d'Amérique du Nord. La progression est
+# gardée dans la table elle-même (ligne __semis__, t=0 : l'app l'ignore).
+TLR_SEMIS = "__semis__"
+TLR_PAYS = ("US|CA|MX|FR|GB|DE|IT|ES|PT|BE|NL|LU|IE|AT|CH|SE|NO|DK|FI|IS|"
+            "PL|CZ|SK|HU|RO|BG|GR|HR|SI|RS|UA|EE|LV|LT")
+TLR_PHASES = [
+    ("movie", "popularity.desc",           {"vote_count.gte": "100"}),
+    ("movie", "primary_release_date.desc", {"vote_count.gte": "20"}),
+    ("tv",    "popularity.desc",           {"vote_count.gte": "50"}),
+]
+
+_cle_tmdb = [None]
+
+
+def cle_tmdb():
+    """La clé TMDB publique de l'app, lue dans son config.js — rien à
+    configurer de plus sur le NAS."""
+    if _cle_tmdb[0] is None:
+        try:
+            src = _tlr_get("https://lisamiens87.github.io/cineflix/config.js")
+            m = re.search(r"tmdbKey\s*:\s*'([^']+)'", src)
+            _cle_tmdb[0] = m.group(1) if m else ""
+        except Exception:
+            _cle_tmdb[0] = ""
+    return _cle_tmdb[0]
+
+
+def semis_telerama(base, key, cache, budget):
+    ck = cle_tmdb()
+    if not ck or budget <= 0:
+        return 0
+    etat = {}
+    try:
+        r = lire_supabase(base, key,
+                          "/rest/v1/telerama?select=verdict&cle=eq." + TLR_SEMIS)
+        if r:
+            etat = json.loads(r[0].get("verdict") or "{}")
+    except Exception:
+        pass
+    ph = int(etat.get("ph", 0)) % len(TLR_PHASES)
+    page = max(1, int(etat.get("p", 1)))
+    type_, tri, extra = TLR_PHASES[ph]
+    params = {"api_key": ck, "language": "fr-FR", "sort_by": tri, "page": str(page),
+              "include_adult": "false", "with_origin_country": TLR_PAYS}
+    params.update(extra)
+    if tri.startswith("primary_release_date"):
+        params["primary_release_date.lte"] = date.today().isoformat()
+    try:
+        d = json.loads(_tlr_get("https://api.themoviedb.org/3/discover/" + type_
+                                + "?" + urllib.parse.urlencode(params)))
+    except Exception as e:
+        print("Semis : TMDB injoignable (%s)" % e)
+        return 0
+    faits, nouveaux = 0, []
+    for it in d.get("results") or []:
+        if faits >= budget:
+            break
+        nom = it.get("title") or it.get("name") or ""
+        annee = (it.get("release_date") or it.get("first_air_date") or "")[:4]
+        if not nom:
+            continue
+        c = _tlr_cle(type_, nom, annee)
+        if c in cache:
+            continue
+        faits += 1
+        try:
+            trouve = telerama_note(nom, annee, type_)
+        except Exception:
+            continue                     # réseau : on repassera par cette page
+        r = {"cle": c, "t": trouve[0] if trouve else 0,
+             "verdict": trouve[1] if trouve else ""}
+        cache[c] = r
+        nouveaux.append(dict(r, maj=date.today().isoformat()))
+        time.sleep(TLR_PAUSE)
+    # Page épuisée sans avoir consommé le budget : on passe à la suivante,
+    # et à la phase suivante quand TMDB n'a plus rien à donner.
+    if faits < budget:
+        page += 1
+        if page > min(500, int(d.get("total_pages") or 1)):
+            page, ph = 1, (ph + 1) % len(TLR_PHASES)
+    _pousser_telerama(base, key, nouveaux)
+    _pousser_telerama(base, key, [{"cle": TLR_SEMIS, "t": 0,
+                                   "verdict": json.dumps({"ph": ph, "p": page}),
+                                   "maj": date.today().isoformat()}])
+    return faits
+
+
 def enrichir_telerama(base, key, fiches):
     """Pose jt (nombre de T) et jv (verdict) sur les fiches, via le cache."""
     cache = {r["cle"]: r for r in lire_supabase(base, key,
-        "/rest/v1/telerama?select=cle,t,verdict&limit=10000")}
+        "/rest/v1/telerama?select=cle,t,verdict&limit=100000")}
     nouveaux, faits = [], 0
     for f in fiches:
         annee = (f.get("sortie") or "")[:4]
@@ -329,19 +432,17 @@ def enrichir_telerama(base, key, fiches):
         if r and r.get("t"):
             f["jt"] = r["t"]
             f["jv"] = r.get("verdict") or ""
+    _pousser_telerama(base, key, nouveaux)
+    reste = sum(1 for f in fiches
+                if _tlr_cle(f["t"], f["nom"], (f.get("sortie") or "")[:4]) not in cache)
     if nouveaux:
-        req = urllib.request.Request(
-            base.rstrip("/") + "/rest/v1/telerama",
-            data=json.dumps(nouveaux).encode("utf-8"), method="POST",
-            headers={"apikey": key, "Authorization": "Bearer " + key,
-                     "Content-Type": "application/json",
-                     "Prefer": "resolution=merge-duplicates,return=minimal"})
-        urllib.request.urlopen(req, timeout=TIMEOUT)
-        print("Télérama : %d titre(s) vérifié(s), reste %d à couvrir"
-              % (len(nouveaux),
-                 sum(1 for f in fiches
-                     if _tlr_cle(f["t"], f["nom"], (f.get("sortie") or "")[:4])
-                     not in cache)))
+        print("Télérama : %d titre(s) de la bibliothèque vérifié(s), reste %d"
+              % (len(nouveaux), reste))
+    # La bibliothèque est couverte : le budget qui reste sert aux autres vues.
+    if faits < TLR_LOT:
+        n = semis_telerama(base, key, cache, TLR_LOT - faits)
+        if n:
+            print("Télérama : %d titre(s) hors bibliothèque vérifié(s)" % n)
 
 
 def _b64u_dec(s):
