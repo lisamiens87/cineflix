@@ -491,8 +491,8 @@ function carteTitre(r, type){
     '</div>'+
     '<div class="gname">'+esc(titre)+'</div>'+
     '<div class="gyear">'+esc(year(date))+
-      (function(){ const f = ficheDe(type, r.id);
-        return f && f.jt ? ' '+tlrHtml(f, true) : ''; })()+'</div>'+ sous +
+      (function(){ const n = noteDe(type, r.id, titre, date);
+        return n && n.jt ? ' '+tlrHtml(n, true) : ''; })()+'</div>'+ sous +
   '</button>';
 }
 

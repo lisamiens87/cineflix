@@ -209,6 +209,52 @@ function ficheDe(type, id){
   return _fIdx.get(type+':'+Number(id)) || null;
 }
 
+/* ---------- Notes Télérama ----------
+   Le NAS tient une table de notes indexée par type + titre + année. L'app la
+   charge une fois et s'en sert PARTOUT — y compris sur les titres absents de
+   la bibliothèque, c'est-à-dire les vues Cinéma et Plateformes. */
+const TLR = { m:new Map(), charge:false };
+
+/* Même normalisation que le script du NAS : minuscules, accents retirés,
+   on ne garde que lettres et chiffres. */
+function tlrNorm(s){
+  /* NFD sépare l'accent de sa lettre, et le filtre suivant — qui ne garde
+     que lettres et chiffres — l'emporte avec la ponctuation et les espaces. */
+  return String(s||'').toLowerCase().normalize('NFD').replace(/[^\p{L}\p{N}]/gu,'');
+}
+/* « 3 hommes et un couffin » chez Jellyfin, « Trois hommes… » chez TMDB :
+   on cherche la note sous les deux orthographes. */
+const TLR_CHIFFRES = {1:'un',2:'deux',3:'trois',4:'quatre',5:'cinq',6:'six',7:'sept',
+                      8:'huit',9:'neuf',10:'dix',11:'onze',12:'douze',13:'treize',
+                      15:'quinze',20:'vingt'};
+function tlrVariantes(titre){
+  const l = String(titre||'').replace(/\b(\d+)\b/g, m => TLR_CHIFFRES[m] || m);
+  return l === titre ? [titre] : [titre, l];
+}
+function tlrCle(type, titre, annee){
+  return type+'|'+tlrNorm(titre).slice(0,80)+'|'+(annee||'');
+}
+/* L'année peut différer d'un an entre Jellyfin et TMDB (tournage / sortie) :
+   on regarde les années voisines plutôt que de perdre la note pour si peu. */
+function noteTlr(type, titre, date){
+  if(!TLR.m.size || !titre) return null;
+  const a = Number(String(date||'').slice(0,4)) || 0;
+  const annees = a ? [a, a-1, a+1] : [''];
+  for(const t of tlrVariantes(titre))
+    for(const an of annees){
+      const r = TLR.m.get(tlrCle(type, t, an));
+      if(r) return r;
+    }
+  return null;
+}
+/* La note d'un titre, d'où qu'il vienne : celle poussée par le NAS s'il est
+   dans la bibliothèque, sinon la table des notes. */
+function noteDe(type, id, titre, date){
+  const f = ficheDe(type, id);
+  if(f && f.jt) return f;
+  return noteTlr(type, titre, date);
+}
+
 /* La note Télérama d'une fiche (jt = nombre de T, jv = verdict), dans le
    style du journal : des carrés rouges frappés d'un T. */
 function tlrHtml(f, mini){

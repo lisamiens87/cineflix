@@ -167,6 +167,22 @@ async function catalogueDepuisSupabase(){
   CAT.items = Array.isArray(d.items) ? d.items : [];
   CAT.maj   = d.maj ? String(d.maj).slice(0,10) : null;
   CAT.charge = true; CAT.erreur = '';
+  await notesTelerama();
+}
+
+/* Les notes Télérama : une table à part, indépendante de la bibliothèque —
+   c'est elle qui permet d'afficher les T sur Cinéma et Plateformes. On ne
+   charge que les titres NOTÉS (les autres n'ont rien à montrer), ce qui tient
+   en quelques dizaines de kilo-octets. Une panne ici ne doit rien casser :
+   l'app marche exactement pareil, sans les T. */
+async function notesTelerama(){
+  try{
+    const l = await sbFetch('/rest/v1/telerama?select=cle,t,verdict&t=gt.0&limit=50000', {});
+    if(!Array.isArray(l)) return;
+    const m = new Map();
+    l.forEach(r => { if(r && r.cle) m.set(r.cle, { jt:r.t, jv:r.verdict||'' }); });
+    TLR.m = m; TLR.charge = true;
+  }catch(e){ /* sans notes, l'app fonctionne à l'identique */ }
 }
 
 /* ---------- Éléments : favoris et demandes ---------- */
