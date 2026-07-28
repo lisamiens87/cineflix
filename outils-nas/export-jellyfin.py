@@ -75,7 +75,63 @@ def utilisateur_principal(base, token):
 
 
 CHAMPS = ("ProviderIds,DateCreated,RunTimeTicks,OfficialRating,CriticRating,"
-          "CommunityRating,PremiereDate,Genres")
+          "CommunityRating,PremiereDate,Genres,ProductionLocations")
+
+# Jellyfin donne les pays de production en toutes lettres (souvent en
+# anglais) ; l'app filtre par codes ISO-2 — même langage que TMDB.
+PAYS_ISO = {
+    "united states of america": "US", "united states": "US", "usa": "US",
+    "états-unis": "US", "etats-unis": "US",
+    "canada": "CA", "mexico": "MX", "mexique": "MX",
+    "france": "FR", "united kingdom": "GB", "royaume-uni": "GB", "uk": "GB",
+    "germany": "DE", "allemagne": "DE", "italy": "IT", "italie": "IT",
+    "spain": "ES", "espagne": "ES", "portugal": "PT",
+    "belgium": "BE", "belgique": "BE", "netherlands": "NL", "pays-bas": "NL",
+    "luxembourg": "LU", "ireland": "IE", "irlande": "IE",
+    "austria": "AT", "autriche": "AT", "switzerland": "CH", "suisse": "CH",
+    "sweden": "SE", "suède": "SE", "norway": "NO", "norvège": "NO",
+    "denmark": "DK", "danemark": "DK", "finland": "FI", "finlande": "FI",
+    "iceland": "IS", "islande": "IS", "poland": "PL", "pologne": "PL",
+    "czech republic": "CZ", "czechia": "CZ", "slovakia": "SK",
+    "hungary": "HU", "hongrie": "HU", "romania": "RO", "roumanie": "RO",
+    "bulgaria": "BG", "greece": "GR", "grèce": "GR", "croatia": "HR",
+    "slovenia": "SI", "serbia": "RS", "ukraine": "UA",
+    "estonia": "EE", "latvia": "LV", "lithuania": "LT", "russia": "RU",
+    "japan": "JP", "japon": "JP", "south korea": "KR", "korea": "KR",
+    "corée du sud": "KR", "china": "CN", "chine": "CN", "hong kong": "HK",
+    "taiwan": "TW", "india": "IN", "inde": "IN", "thailand": "TH",
+    "thaïlande": "TH", "indonesia": "ID", "philippines": "PH",
+    "vietnam": "VN", "malaysia": "MY", "singapore": "SG", "singapour": "SG",
+    "turkey": "TR", "turquie": "TR", "israel": "IL", "israël": "IL",
+    "iran": "IR", "saudi arabia": "SA", "united arab emirates": "AE",
+    "kazakhstan": "KZ", "pakistan": "PK", "bangladesh": "BD",
+    "sri lanka": "LK", "nepal": "NP", "cambodia": "KH", "mongolia": "MN",
+    "south africa": "ZA", "afrique du sud": "ZA", "nigeria": "NG",
+    "egypt": "EG", "égypte": "EG", "morocco": "MA", "maroc": "MA",
+    "algeria": "DZ", "algérie": "DZ", "tunisia": "TN", "tunisie": "TN",
+    "senegal": "SN", "sénégal": "SN", "kenya": "KE", "ghana": "GH",
+    "ivory coast": "CI", "côte d'ivoire": "CI", "cameroon": "CM",
+    "ethiopia": "ET", "angola": "AO", "libya": "LY",
+    "brazil": "BR", "brésil": "BR", "argentina": "AR", "argentine": "AR",
+    "chile": "CL", "chili": "CL", "colombia": "CO", "colombie": "CO",
+    "peru": "PE", "pérou": "PE", "venezuela": "VE", "uruguay": "UY",
+    "ecuador": "EC", "équateur": "EC", "bolivia": "BO", "paraguay": "PY",
+    "australia": "AU", "australie": "AU", "new zealand": "NZ",
+    "nouvelle-zélande": "NZ",
+}
+
+
+def pays_codes(it):
+    """ProductionLocations → codes ISO-2 (liste vide si rien de connu)."""
+    codes = []
+    for nom in it.get("ProductionLocations") or []:
+        c = PAYS_ISO.get(str(nom).strip().lower())
+        # Certaines installations stockent déjà le code ISO — on le garde.
+        if not c and len(str(nom).strip()) == 2:
+            c = str(nom).strip().upper()
+        if c and c not in codes:
+            codes.append(c)
+    return codes
 
 
 def resume(it, genre, tmdb_id):
@@ -95,6 +151,7 @@ def resume(it, genre, tmdb_id):
         "vu": ud.get("PlayCount") or 0,
         "lu": (ud.get("LastPlayedDate") or "")[:10],
         "genres": it.get("Genres") or [],
+        "pays": pays_codes(it),
     }
 
 
