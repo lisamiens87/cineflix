@@ -623,7 +623,8 @@ function ouvrirFiltres(){
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
       '" onclick="setPerimetre(\''+p.id+'\')">'+p.label+'</button>').join('')+'</div>';
-  h += '<div class="fgrp">Décennie</div><div class="fchips defil">'+
+  h += '<div class="fgrp">Décennie'+(d.decennie?' — '+d.decennie:'')+'</div>'+
+    '<div class="fchips defil" id="fdec">'+
     '<button class="chip '+(!d.decennie?'on':'')+'" onclick="setDecennie(0)">Toutes</button>'+
     DECENNIES.map(a=>'<button class="chip '+(d.decennie===a?'on':'')+
       '" onclick="setDecennie('+a+')">'+a+'</button>').join('')+'</div>';
@@ -656,6 +657,15 @@ function ouvrirFiltres(){
   h += '<button class="btn block" style="margin-top:18px" onclick="closeSheet()">Voir les résultats</button>';
   if(filtresActifs()) h += '<button class="opt" onclick="resetFiltres()">Tout effacer</button>';
   openSheet(h);
+  /* Chaque sélection redessine la feuille et la rangée des décennies repart
+     à gauche — la décennie choisie sortait de l'écran et on croyait le geste
+     raté. On recentre la rangée sur la puce active à chaque rendu. */
+  const rd = document.getElementById('fdec');
+  if(rd){
+    const on = rd.querySelector('.chip.on');
+    if(on) rd.scrollLeft = Math.max(0,
+      (on.offsetLeft - rd.offsetLeft) - (rd.clientWidth - on.offsetWidth) / 2);
+  }
 }
 
 function ouvrirChamp(){

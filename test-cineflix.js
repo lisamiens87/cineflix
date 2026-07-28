@@ -216,6 +216,10 @@ let dernierRegion = null;          // le paramètre region du dernier /discover
   await page.waitForTimeout(900);
   ok('choisir 1990 borne la requête TMDB à la décennie',
      derniereBorne === '1990-01-01');
+  ok('la rangée des décennies se recentre sur la sélection',
+     await page.evaluate(() => document.getElementById('fdec').scrollLeft > 0));
+  ok('le titre du groupe affiche la décennie choisie',
+     /Décennie — 1990/i.test(await page.locator('#sheetin').innerText()));
   ok('la découverte n\'envoie plus region= (dates originales, pas françaises)',
      dernierRegion === null);
   await page.click('button:has-text("Voir les résultats")');
