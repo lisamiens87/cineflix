@@ -26,10 +26,15 @@ planifiées → Cron Jobs).
 """
 
 import argparse
+import base64
+import hashlib
+import hmac
 import json
 import os
+import struct
 import sys
 import tempfile
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -141,6 +146,75 @@ def lire_supabase(base, key, chemin):
         return json.loads(r.read().decode("utf-8"))
 
 
+def _b64u_dec(s):
+    s = s.strip()
+    return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
+
+
+def _b64u_enc(b):
+    return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
+
+
+def _hkdf(sel, ikm, info, longueur):
+    """HKDF-SHA256 (extract + expand), un seul bloc — suffit pour ≤ 32 octets."""
+    prk = hmac.new(sel, ikm, hashlib.sha256).digest()
+    return hmac.new(prk, info + b"\x01", hashlib.sha256).digest()[:longueur]
+
+
+def envoyer_push(endpoint, p256dh, auth, corps, prive, sub):
+    """Web Push sans dépendance : chiffrement aes128gcm (RFC 8291/8188) et
+    signature VAPID ES256 (RFC 8292), avec la bibliothèque `cryptography`
+    livrée avec TrueNAS. Le python du NAS n'a pas pip : rien à installer.
+
+    Lève urllib.error.HTTPError si le service de push refuse (404/410 =
+    abonnement mort, à purger côté appelant)."""
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
+    from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+    ua_pub = _b64u_dec(p256dh)      # clé publique du navigateur (point P-256)
+    secret_auth = _b64u_dec(auth)   # secret d'authentification (16 octets)
+
+    # Secret partagé : ECDH entre une clé éphémère et celle du navigateur.
+    eph = ec.generate_private_key(ec.SECP256R1())
+    eph_pub = eph.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    cle_nav = ec.EllipticCurvePublicKey.from_encoded_point(ec.SECP256R1(), ua_pub)
+    partage = eph.exchange(ec.ECDH(), cle_nav)
+
+    # Dérivations RFC 8291 puis RFC 8188.
+    sel = os.urandom(16)
+    ikm = _hkdf(secret_auth, partage, b"WebPush: info\x00" + ua_pub + eph_pub, 32)
+    cle = _hkdf(sel, ikm, b"Content-Encoding: aes128gcm\x00", 16)
+    nonce = _hkdf(sel, ikm, b"Content-Encoding: nonce\x00", 12)
+    chiffre = AESGCM(cle).encrypt(nonce, corps.encode("utf-8") + b"\x02", None)
+    corps_http = sel + struct.pack("!IB", 4096, len(eph_pub)) + eph_pub + chiffre
+
+    # Jeton VAPID : JWT ES256 signé avec la clé privée du serveur.
+    o = urllib.parse.urlparse(endpoint)
+    entete = _b64u_enc(json.dumps({"typ": "JWT", "alg": "ES256"}).encode())
+    revend = _b64u_enc(json.dumps({"aud": o.scheme + "://" + o.netloc,
+                                   "exp": int(time.time()) + 12 * 3600,
+                                   "sub": sub}).encode())
+    cle_vapid = ec.derive_private_key(
+        int.from_bytes(_b64u_dec(prive), "big"), ec.SECP256R1())
+    der = cle_vapid.sign((entete + "." + revend).encode(), ec.ECDSA(hashes.SHA256()))
+    r, s = decode_dss_signature(der)
+    jwt = "%s.%s.%s" % (entete, revend,
+                        _b64u_enc(r.to_bytes(32, "big") + s.to_bytes(32, "big")))
+    pub_vapid = _b64u_enc(cle_vapid.public_key().public_bytes(
+        serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint))
+
+    req = urllib.request.Request(endpoint, data=corps_http, method="POST", headers={
+        "Content-Encoding": "aes128gcm",
+        "Content-Type": "application/octet-stream",
+        "TTL": "86400",
+        "Urgency": "normal",
+        "Authorization": "vapid t=%s, k=%s" % (jwt, pub_vapid)})
+    urllib.request.urlopen(req, timeout=TIMEOUT).read()
+
+
 def notifier_arrivees(base, key, anciens_m, anciens_t, films, series):
     """Prévenir ceux dont une demande vient d'arriver — notification push.
 
@@ -160,16 +234,12 @@ def notifier_arrivees(base, key, anciens_m, anciens_t, films, series):
     if not nm and not nt:
         return
     try:
-        from pywebpush import webpush, WebPushException
+        # Web Push implémenté sur place (RFC 8291/8188/8292) : le python de
+        # TrueNAS n'a ni pip ni pywebpush, mais `cryptography` est déjà là.
+        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: F401
     except ImportError:
-        import subprocess
-        subprocess.run([sys.executable, "-m", "pip", "install", "--quiet",
-                        "--break-system-packages", "pywebpush"], check=False)
-        try:
-            from pywebpush import webpush, WebPushException
-        except ImportError:
-            print("pywebpush introuvable : notifications sautées")
-            return
+        print("module cryptography introuvable : notifications sautées")
+        return
     ids = ",".join(str(i) for i in (nm + nt))
     demandes = lire_supabase(base, key,
         "/rest/v1/elements?select=user_id,titre,tmdb_id,type,poster"
@@ -199,13 +269,11 @@ def notifier_arrivees(base, key, anciens_m, anciens_t, films, series):
             "url": "https://lisamiens87.github.io/cineflix/"})
         for ab in par_user.get(d["user_id"], []):
             try:
-                webpush(subscription_info={"endpoint": ab["endpoint"],
-                        "keys": {"p256dh": ab["p256dh"], "auth": ab["auth"]}},
-                        data=corps, vapid_private_key=prive,
-                        vapid_claims={"sub": "mailto:alexandre.mesnier@cabinet-ekinox.fr"})
+                envoyer_push(ab["endpoint"], ab["p256dh"], ab["auth"], corps,
+                             prive, "mailto:alexandre.mesnier@cabinet-ekinox.fr")
                 envoyees += 1
-            except WebPushException as e:
-                code = getattr(getattr(e, "response", None), "status_code", None)
+            except urllib.error.HTTPError as e:
+                code = e.code
                 if code in (404, 410):
                     # abonnement mort (app désinstallée…) : on le retire
                     try:
@@ -217,6 +285,11 @@ def notifier_arrivees(base, key, anciens_m, anciens_t, films, series):
                         urllib.request.urlopen(req, timeout=TIMEOUT)
                     except Exception:
                         pass
+                else:
+                    print("push refusé (%s) : %s" % (code, ab["endpoint"][:50]))
+            except Exception as e:
+                # un abonné en panne ne doit pas priver les autres
+                print("push en échec : %s" % e)
     if envoyees:
         print("%d notification(s) envoyée(s)" % envoyees)
 
