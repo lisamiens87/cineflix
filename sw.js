@@ -5,7 +5,7 @@
    afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
 
    VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
-const BUILD = '2807i';
+const BUILD = '2807j';
 const CACHE = 'cineflix-' + BUILD;
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
                './app.css', './config.js', './app-01-noyau.js', './app-02-outils.js',
@@ -67,7 +67,9 @@ self.addEventListener('push', e => {
   try{ d = e.data ? e.data.json() : {}; }catch(err){}
   e.waitUntil(self.registration.showNotification(d.titre || 'Cinéflix', {
     body: d.corps || '',
-    icon: './icon-192.png',
+    /* La jaquette du titre en vignette quand le NAS la fournit,
+       l'icône de l'app sinon. */
+    icon: d.ic || './icon-192.png',
     badge: './icon-192.png',
     data: { url: d.url || './' }
   }));
