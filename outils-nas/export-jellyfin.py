@@ -212,7 +212,10 @@ def lire_supabase(base, key, chemin):
 # `telerama`) : la bibliothèque entière est couverte en quelques heures, puis
 # seuls les nouveaux titres coûtent une requête. Politesse : une pause entre
 # chaque appel, et jamais plus d'un lot par passage.
-TLR_LOT = 20
+TLR_LOT = 20        # budget de titres vérifiés à chaque passage du cron
+TLR_LOT_BIB = 12    # dont, au plus, pour la bibliothèque : le reste va au
+                    # semis, pour que Cinéma et Plateformes se remplissent
+                    # sans attendre la fin de l'inventaire du NAS
 TLR_PAUSE = 0.8
 TLR_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
           "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -417,7 +420,7 @@ def enrichir_telerama(base, key, fiches):
         annee = (f.get("sortie") or "")[:4]
         cle = _tlr_cle(f["t"], f["nom"], annee)
         r = cache.get(cle)
-        if r is None and faits < TLR_LOT:
+        if r is None and faits < TLR_LOT_BIB:
             faits += 1
             try:
                 trouve = telerama_note(f["nom"], annee, f["t"])
