@@ -445,3 +445,78 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
   border-radius:4px;background:var(--accent);color:#fff;font-size:9.5px;
   font-weight:800;letter-spacing:.04em}
 .crow.inerte{cursor:default}
+
+/* ============================ Profils du foyer ============================ */
+/* L'avatar est un cercle, partout : sur l'accueil, dans le profil, dans la
+   file de demandes. Trois tailles, une seule mécanique. */
+.av{display:inline-flex;align-items:center;justify-content:center;flex:none;
+  border-radius:50%;overflow:hidden;color:#fff;font-weight:700;line-height:1;
+  width:44px;height:44px;font-size:19px;background:#3b82f6}
+.av img{width:100%;height:100%;object-fit:cover;display:block}
+.av.mini{width:18px;height:18px;font-size:10px;vertical-align:-3px}
+.av.moyen{width:56px;height:56px;font-size:24px}
+.av.grand{width:88px;height:88px;font-size:38px}
+.av.vide{background:transparent;border:2px dashed var(--line);color:var(--muted)}
+.av.vide svg{width:30px;height:30px}
+
+.acc.large{max-width:520px}
+.avgrid{display:flex;flex-wrap:wrap;justify-content:center;gap:20px 26px;margin-top:26px}
+.avcase{width:96px;text-align:center}
+.avbtn{position:relative;background:none;border:0;padding:0;cursor:pointer;
+  transition:transform .15s}
+.avbtn:active{transform:scale(.94)}
+.avnom{margin-top:8px;font-size:14px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.avx{position:absolute;right:-2px;top:-2px;width:26px;height:26px;border-radius:50%;
+  background:#ef4444;color:#fff;display:flex;align-items:center;justify-content:center}
+.avx svg{width:14px;height:14px}
+
+.avapercu{display:flex;justify-content:center;margin:18px 0 16px}
+.avcouls{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
+.avcoul{width:32px;height:32px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+.avcoul.on{border-color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.25)}
+.avemos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.avemo{width:38px;height:38px;border-radius:10px;font-size:19px;cursor:pointer;
+  background:var(--card);border:1px solid var(--line)}
+.avemo.on{border-color:#fff;background:rgba(255,255,255,.12)}
+
+/* ---------- Le pavé du code ---------- */
+.pts{display:flex;gap:14px;justify-content:center;margin:20px 0 8px}
+.pts i{width:13px;height:13px;border-radius:50%;background:transparent;
+  border:2px solid var(--line);transition:background .12s,border-color .12s}
+.pts i.on{background:#fff;border-color:#fff}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;max-width:280px;
+  margin:14px auto 0}
+.pad button{height:62px;border-radius:50%;font-size:24px;font-weight:600;
+  background:var(--card);border:1px solid var(--line);color:var(--txt);cursor:pointer}
+.pad button:active{background:rgba(255,255,255,.14)}
+.pad button.vide{background:none;border:0;pointer-events:none}
+.pad button.eff{background:none;border:0;font-size:20px}
+
+/* ---------- Le parcours de goûts ---------- */
+.gchips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.gchips .chip{height:auto;padding:9px 14px;white-space:nowrap}
+.chip.aime.on{background:var(--ok);border-color:var(--ok);color:#062b17}
+.chip.fuis.on{background:#ef4444;border-color:#ef4444;color:#fff}
+.chip.plat.on,.chip.humeur.on{background:#fff;border-color:#fff;color:#111}
+.rgbloc{margin-top:20px}
+.rglbl{font-size:14px;font-weight:660;text-align:center;color:var(--muted)}
+
+.totems{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-top:14px}
+.totems.res{opacity:.92}
+.totem{position:relative;width:92px;background:none;border:0;padding:0;cursor:pointer;
+  text-align:center}
+.totem img,.totem .ph{width:92px;height:138px;border-radius:10px;object-fit:cover;
+  display:block;background:var(--card)}
+.totemx{position:absolute;right:-4px;top:-4px;width:22px;height:22px;border-radius:50%;
+  background:#ef4444;color:#fff;display:flex;align-items:center;justify-content:center}
+.totemx svg{width:12px;height:12px}
+.totemn{display:block;margin-top:5px;font-size:11px;line-height:1.25;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+/* ---------- Guide ---------- */
+.guidebtn{border-color:rgba(255,255,255,.28)}
+.graison{font-size:11px;line-height:1.3;color:var(--muted);margin-top:2px;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.deuxbtn{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.deuxbtn .btn{width:100%}

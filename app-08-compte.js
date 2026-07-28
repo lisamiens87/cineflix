@@ -71,8 +71,9 @@ async function sbRefresh(){
 function sessionMorte(){
   db.auth = null; db.items = {};
   estAdmin = false; file.charge = false;
+  if(typeof GOUTS === 'object'){ GOUTS.d = null; GOUTS.charge = false; }
   saveDB();
-  ui.auth = { mode:'connexion', err:'Ta session a expiré — reconnecte-toi.', occupe:false };
+  ui.auth = { mode:'connexion', err:'Ta session a expiré — reconnecte-toi.', occupe:false, code:'' };
   if(typeof view !== 'undefined' && view !== 'auth'){
     view = 'auth'; params = {};
     try{ render(); }catch(e){}
@@ -89,9 +90,12 @@ function seDeconnecter(){
 function deconnexionConfirmee(){
   db.auth = null; db.items = {};
   estAdmin = false; file.charge = false;
+  if(typeof GOUTS === 'object'){ GOUTS.d = null; GOUTS.charge = false; }
   saveDB();
-  ui.auth = { mode:'connexion', err:'', occupe:false };
-  go('auth');
+  ui.auth = { mode:'connexion', err:'', occupe:false, code:'' };
+  /* On garde les têtes mémorisées : se déconnecter, dans une app familiale,
+     c'est presque toujours pour laisser la place à quelqu'un d'autre. */
+  go((typeof foyerListe === 'function' && foyerListe().length) ? 'accueil' : 'auth');
 }
 
 /* ---------- Notifications push ---------- */
@@ -147,14 +151,43 @@ async function couperNotifs(){
 }
 
 /* ---------- Profil public ---------- */
+/* Ce qui est ici est lisible par tout le foyer : le prénom et l'avatar, parce
+   que la file de demandes en a besoin pour dire qui a demandé quoi. Ce qu'on
+   AIME vit ailleurs, dans la table `gouts`, lisible par son seul propriétaire. */
 async function majProfil(){
   if(!connecte()) return;
   const pseudo = (db.pseudo||'').trim() || (db.auth.email||'').split('@')[0];
   db.pseudo = pseudo; saveDB();
+  const mp = ui.monProfil || {};
+  const corps = { user_id: db.auth.uid, pseudo: pseudo, maj: new Date().toISOString() };
+  if(mp.avatar) corps.avatar = mp.avatar;
+  if(mp.jellyfin !== undefined) corps.jellyfin = mp.jellyfin || null;
+  if(db.onboarde) corps.onboarde = true;
   try{
     await sbFetch('/rest/v1/profils', {method:'POST',
       headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ user_id: db.auth.uid, pseudo: pseudo, maj: new Date().toISOString() })});
+      body: JSON.stringify(corps)});
+  }catch(e){}
+  /* L'appareil retient la tête : c'est elle qui fera la grille d'accueil. */
+  if(typeof foyerNoter === 'function')
+    foyerNoter({ email: db.auth.email, uid: db.auth.uid, pseudo: pseudo,
+                 avatar: mp.avatar || null });
+}
+
+async function chargerMonProfil(){
+  if(!connecte()) return;
+  try{
+    const l = await sbFetch('/rest/v1/profils?select=pseudo,avatar,jellyfin,onboarde&user_id=eq.'+
+                            encodeURIComponent(db.auth.uid), {});
+    const p = (Array.isArray(l) && l[0]) || null;
+    if(!p) return;
+    ui.monProfil = { avatar: (p.avatar && p.avatar.type) ? p.avatar : null,
+                     jellyfin: p.jellyfin || '', onboarde: !!p.onboarde };
+    if(p.pseudo && p.pseudo !== 'Sans nom' && !(db.pseudo||'').trim()) db.pseudo = p.pseudo;
+    /* Le serveur fait foi sur « a-t-il déjà fait le parcours » : un nouvel
+       appareil ne doit pas le redemander à quelqu'un qui l'a déjà fait. */
+    if(p.onboarde) db.onboarde = true;
+    saveDB();
   }catch(e){}
 }
 
@@ -260,75 +293,244 @@ async function pousserEnAttente(){
 }
 
 /* ============================ Écran : connexion ============================ */
-function setAuthMode(m){ ui.auth = Object.assign(ui.auth||{}, {mode:m, err:''}); render(); }
+/* Trois modes, volontairement distincts :
+     code        — une tête a été choisie sur l'accueil : pavé à six chiffres ;
+     connexion   — appareil neuf ou « ce n'est pas moi » : e-mail + code ;
+     inscription — code d'invitation du foyer, puis création, puis parcours.
+   Le code À SIX CHIFFRES est le mot de passe Supabase : rien de nouveau côté
+   serveur, et donc aucune baisse de sécurité du protocole. Les comptes plus
+   anciens ont un mot de passe alphanumérique — d'où la bascule « j'ai un mot
+   de passe », sans laquelle cette refonte les verrouillerait dehors. */
+function setAuthMode(m){
+  ui.auth = Object.assign({}, ui.auth||{}, {mode:m, err:'', occupe:false, code:''});
+  render();
+}
+function setAuthErr(t){ ui.auth = Object.assign(ui.auth||{}, {err:t, occupe:false}); render(); }
+function authMotDePasse(){
+  ui.auth.motdepasse = !ui.auth.motdepasse;
+  ui.auth.code = ''; ui.auth.err = '';
+  render();
+}
+
+function ptsHtml(){
+  const c = (ui.auth.code||'');
+  let h = '';
+  for(let i=0;i<6;i++) h += '<i class="'+(i < c.length ? 'on' : '')+'"></i>';
+  return h;
+}
+function peindrePts(){
+  const el = document.getElementById('pts');
+  if(!el) return render();
+  el.innerHTML = ptsHtml();
+}
+function authTape(n){
+  const a = ui.auth;
+  if(a.occupe || (a.code||'').length >= 6) return;
+  a.code = (a.code||'') + n;
+  peindrePts();
+  if(a.code.length === 6) setTimeout(()=>envoyerAuth(), 80);
+}
+function authEfface(){
+  const a = ui.auth;
+  if(a.occupe) return;
+  a.code = (a.code||'').slice(0,-1);
+  peindrePts();
+}
+function padHtml(){
+  let h = '<div class="pts" id="pts">'+ptsHtml()+'</div><div class="pad">';
+  for(let n=1;n<=9;n++) h += '<button onclick="authTape(\''+n+'\')">'+n+'</button>';
+  h += '<button class="vide" tabindex="-1"></button>'+
+       '<button onclick="authTape(\'0\')">0</button>'+
+       '<button class="eff" onclick="authEfface()" aria-label="Effacer">⌫</button>';
+  return h+'</div>';
+}
 
 async function envoyerAuth(){
-  const email = (document.getElementById('acmail')||{}).value || '';
-  const mdp   = (document.getElementById('acpass')||{}).value || '';
-  const mode  = (ui.auth||{}).mode || 'connexion';
-  if(!email.trim() || !mdp) return setAuthErr('Renseigne ton e-mail et ton mot de passe.');
-  if(mode === 'creation' && mdp.length < 6)
-    return setAuthErr('Le mot de passe doit faire au moins 6 caractères.');
+  const a = ui.auth || {};
+  const mode = a.mode || 'connexion';
+  const champ = id => (document.getElementById(id)||{}).value || '';
+  const email = (mode === 'code') ? (a.email||'') : champ('acmail');
+  const secret = a.motdepasse ? champ('acpass') : (a.code||'');
+
+  if(!String(email).trim()) return setAuthErr('Renseigne ton adresse e-mail.');
+  if(!secret) return setAuthErr(a.motdepasse ? 'Renseigne ton mot de passe.'
+                                             : 'Compose ton code à six chiffres.');
 
   ui.auth.occupe = true; ui.auth.err = ''; render();
   try{
-    if(mode === 'creation') await sbSignUp(email.trim(), mdp);
-    else                    await sbSignIn(email.trim(), mdp);
+    await sbSignIn(String(email).trim(), secret);
     ui.auth.occupe = false;
     await apresConnexion();
+  }catch(e){
+    ui.auth.code = '';
+    const m = String(e.message||'');
+    if(/invalid login/i.test(m))
+      setAuthErr(a.motdepasse ? 'E-mail ou mot de passe incorrect.'
+                              : 'Ce code ne correspond pas. Réessaie.');
+    else setAuthErr(m || 'Échec de la connexion.');
+  }
+}
+
+/* ---------- Inscription ---------- */
+function verifierInvitation(){
+  const v = ((document.getElementById('acinv')||{}).value || '').trim();
+  const attendu = String(CFG.invitation || '').trim();
+  if(attendu && v.toUpperCase() !== attendu.toUpperCase())
+    return setAuthErr('Ce code d\'invitation n\'est pas le bon. Demande-le à l\'administrateur.');
+  ui.auth = Object.assign({}, ui.auth, {pas:'compte', err:''});
+  render();
+}
+async function creerCompte(){
+  const champ = id => ((document.getElementById(id)||{}).value || '').trim();
+  const prenom = champ('acnom'), email = champ('acmail');
+  const c1 = champ('accode'), c2 = champ('accode2');
+  if(!prenom) return setAuthErr('Dis-nous ton prénom.');
+  if(!email)  return setAuthErr('Renseigne ton adresse e-mail.');
+  if(!/^\d{6}$/.test(c1)) return setAuthErr('Le code doit faire exactement six chiffres.');
+  if(c1 !== c2) return setAuthErr('Les deux codes ne sont pas identiques.');
+
+  ui.auth.occupe = true; ui.auth.err = ''; render();
+  try{
+    await sbSignUp(email, c1);
+    db.pseudo = prenom; db.onboarde = false; saveDB();
+    ui.auth.occupe = false;
+    /* On ne passe pas par apresConnexion : un nouveau venu doit d'abord
+       traverser le parcours de goûts, c'est tout son intérêt. */
+    await majProfil();
+    await Promise.all([ catalogueDepuisSupabase().catch(()=>{}),
+                        verifierAdmin() ]);
+    choisirJellyfin();
+    demarrerBienvenue();
   }catch(e){
     ui.auth.occupe = false;
     const m = String(e.message||'');
     if(m === 'CONFIRM')
       setAuthErr('Compte créé. Confirme l\'e-mail que tu viens de recevoir, puis connecte-toi.');
-    else if(/invalid login/i.test(m))
-      setAuthErr('E-mail ou mot de passe incorrect.');
     else if(/already registered|already been registered/i.test(m))
       setAuthErr('Un compte existe déjà avec cet e-mail. Connecte-toi plutôt.');
-    else setAuthErr(m || 'Échec de la connexion.');
+    else if(/password/i.test(m))
+      setAuthErr('Code refusé par le serveur : il doit faire au moins six caractères.');
+    else setAuthErr(m || 'Création impossible.');
   }
 }
-function setAuthErr(t){ ui.auth = Object.assign(ui.auth||{}, {err:t, occupe:false}); render(); }
 
 async function apresConnexion(){
+  await chargerMonProfil();
   await majProfil();
   await Promise.all([ catalogueDepuisSupabase().catch(e=>{ CAT.erreur = e.message; }),
                       chargerElements().catch(()=>{}),
+                      chargerGouts().catch(()=>{}),
                       verifierAdmin() ]);
   await pousserEnAttente();
-  db.onboarde = true; saveDB();
   choisirJellyfin();
+  /* Quelqu'un qui n'a jamais fait le parcours y va maintenant : c'est lui qui
+     donne au guide de quoi travailler. */
+  if(!db.onboarde) return demarrerBienvenue();
   go('decouvrir');
 }
 
+/* ---------- Le rendu ---------- */
 function viewAuth(){
-  const a = ui.auth || (ui.auth = {mode:'connexion', err:'', occupe:false});
-  const creation = a.mode === 'creation';
-  let h = '<div class="acc">'+
-    '<div class="acclogo">'+I.film+'</div>'+
-    '<h1>'+esc(CFG.nom||'Cinéflix')+'</h1>'+
-    '<p class="accsub">'+(creation
-      ? 'Crée ton compte : tes favoris et tes demandes te suivront sur tous tes appareils.'
-      : 'Connecte-toi pour retrouver tes favoris et tes demandes.')+'</p>'+
-    '<label class="fld" style="margin-top:24px"><span>Adresse e-mail</span>'+
-      '<input type="text" id="acmail" inputmode="email" autocapitalize="off" autocorrect="off" '+
-      'spellcheck="false" placeholder="toi@exemple.fr" '+
-      'value="'+esc((db.auth&&db.auth.email)||'')+'"></label>'+
-    '<label class="fld"><span>Mot de passe</span>'+
-      '<input type="password" id="acpass" placeholder="'+
-      (creation?'au moins 6 caractères':'ton mot de passe')+'" '+
-      'onkeydown="if(event.key===\'Enter\'){this.blur();envoyerAuth()}">'+
-      (creation ? '<em>Choisis un mot de passe dédié à cette app.</em>' : '')+'</label>'+
+  const a = ui.auth || (ui.auth = {mode:'connexion', err:'', occupe:false, code:''});
+
+  if(a.mode === 'inscription') return viewInscription(a);
+
+  const parTete = a.mode === 'code' && a.email;
+  let h = '<div class="acc">';
+
+  if(parTete){
+    h += '<div class="avapercu">'+avatarHtml(a.avatar, 'grand', a.pseudo)+'</div>'+
+      '<h1>'+esc(a.pseudo || String(a.email).split('@')[0])+'</h1>'+
+      '<p class="accsub">'+(a.motdepasse ? 'Ton mot de passe' : 'Compose ton code')+'</p>';
+  }else{
+    h += '<div class="acclogo">'+I.film+'</div>'+
+      '<h1>'+esc(CFG.nom||'Cinéflix')+'</h1>'+
+      '<p class="accsub">Connecte-toi pour retrouver ta liste et tes demandes.</p>'+
+      '<label class="fld" style="margin-top:22px"><span>Adresse e-mail</span>'+
+        '<input type="text" id="acmail" inputmode="email" autocapitalize="off" '+
+        'autocorrect="off" spellcheck="false" placeholder="toi@exemple.fr" '+
+        'value="'+esc(a.email || (db.auth&&db.auth.email) || '')+'"></label>';
+  }
+
+  if(a.motdepasse){
+    h += '<label class="fld"><span>Mot de passe</span>'+
+      '<input type="password" id="acpass" placeholder="ton mot de passe" '+
+      'onkeydown="if(event.key===\'Enter\'){this.blur();envoyerAuth()}"></label>';
+  }else if(parTete){
+    h += padHtml();
+  }else{
+    h += '<label class="fld"><span>Ton code</span>'+
+      '<input type="password" id="acpass" inputmode="numeric" maxlength="6" '+
+      'placeholder="six chiffres" '+
+      'onkeydown="if(event.key===\'Enter\'){this.blur();ui.auth.motdepasse=true;envoyerAuth()}"></label>';
+  }
+
+  if(a.err) h += '<div class="accerr">'+esc(a.err)+'</div>';
+
+  if(a.occupe)
+    h += '<div class="center" style="margin-top:14px"><span class="spin"></span></div>';
+  else if(!parTete || a.motdepasse)
+    h += '<button class="btn block" style="margin-top:14px" onclick="'+
+      (a.motdepasse ? 'envoyerAuth()' : 'ui.auth.motdepasse=true;envoyerAuth()')+
+      '">Se connecter</button>';
+
+  h += '<div class="accliens">'+
+    (parTete ? '<button onclick="go(\'accueil\')">Ce n\'est pas moi</button>' : '')+
+    '<button onclick="authMotDePasse()">'+
+      (a.motdepasse ? 'J\'ai un code à six chiffres' : 'J\'ai un mot de passe')+'</button>'+
+    '<button onclick="nouveauProfil()">Créer un profil</button>'+
+  '</div>'+
+  '<div class="tiny muted center" style="margin-top:14px">'+
+    'Code oublié ? Demande à l\'administrateur de le réinitialiser.</div>';
+
+  return h + '</div>';
+}
+
+function viewInscription(a){
+  let h = '<div class="acc">';
+
+  if(a.pas !== 'compte'){
+    h += '<div class="acclogo">'+I.user+'</div>'+
+      '<h1>Créer un profil</h1>'+
+      '<p class="accsub">Cinéflix est privé. Demande son code d\'invitation à '+
+      'l\'administrateur du foyer.</p>'+
+      '<label class="fld" style="margin-top:22px"><span>Code d\'invitation</span>'+
+        '<input type="text" id="acinv" autocapitalize="characters" autocorrect="off" '+
+        'spellcheck="false" placeholder="ex. CINEFLIX87" '+
+        'onkeydown="if(event.key===\'Enter\'){this.blur();verifierInvitation()}"></label>'+
+      (a.err ? '<div class="accerr">'+esc(a.err)+'</div>' : '')+
+      '<button class="btn block" style="margin-top:14px" onclick="verifierInvitation()">'+
+        'Continuer</button>'+
+      '<div class="accliens"><button onclick="setAuthMode(\'connexion\')">'+
+        'J\'ai déjà un profil</button></div>';
+    return h + '</div>';
+  }
+
+  h += '<h1>Ton profil</h1>'+
+    '<p class="accsub">Le code à six chiffres remplace le mot de passe : '+
+    'plus simple à retenir, plus rapide à taper sur un canapé.</p>'+
+    '<label class="fld" style="margin-top:20px"><span>Ton prénom</span>'+
+      '<input type="text" id="acnom" placeholder="Ton prénom" autocomplete="given-name" '+
+      'value="'+esc(db.pseudo||'')+'"></label>'+
+    '<label class="fld"><span>Adresse e-mail</span>'+
+      '<input type="text" id="acmail" inputmode="email" autocapitalize="off" '+
+      'autocorrect="off" spellcheck="false" placeholder="toi@exemple.fr"></label>'+
+    '<label class="fld"><span>Ton code</span>'+
+      '<input type="password" id="accode" inputmode="numeric" maxlength="6" '+
+      'placeholder="six chiffres"></label>'+
+    '<label class="fld"><span>Confirme ton code</span>'+
+      '<input type="password" id="accode2" inputmode="numeric" maxlength="6" '+
+      'placeholder="les mêmes six chiffres" '+
+      'onkeydown="if(event.key===\'Enter\'){this.blur();creerCompte()}"></label>'+
     (a.err ? '<div class="accerr">'+esc(a.err)+'</div>' : '')+
-    '<button class="btn block" style="margin-top:16px" '+(a.occupe?'disabled':'')+
-      ' onclick="envoyerAuth()">'+
-      (a.occupe ? '<span class="spin"></span> Un instant…'
-                : (creation ? 'Créer mon compte' : 'Se connecter'))+'</button>'+
+    '<button class="btn block" style="margin-top:14px" '+(a.occupe?'disabled':'')+
+      ' onclick="creerCompte()">'+
+      (a.occupe ? '<span class="spin"></span> Un instant…' : 'Créer mon profil')+'</button>'+
     '<div class="accliens">'+
-      (creation
-        ? '<button onclick="setAuthMode(\'connexion\')">J\'ai déjà un compte</button>'
-        : '<button onclick="setAuthMode(\'creation\')">Créer un compte</button>')+
+      '<button onclick="ui.auth.pas=\'invit\';ui.auth.err=\'\';render()">Retour</button>'+
+      '<button onclick="setAuthMode(\'connexion\')">J\'ai déjà un profil</button>'+
     '</div>';
+
   return h + '</div>';
 }
 
@@ -430,7 +632,8 @@ function ligneFile(l){
               : '<div class="lposter"></div>')+
     '<div class="cinfo" onclick="ouvrirFiche('+l.tmdb_id+',\''+l.type+'\',\'file\')">'+
       '<div class="cname2">'+esc(l.titre||'')+'</div>'+
-      '<div class="csub">'+esc(l.pseudo||'?')+' · '+
+      '<div class="csub">'+avatarHtml(l.avatar, 'mini', l.pseudo)+' '+
+        esc(l.pseudo||'?')+' · '+
         esc(relatif(String(l.cree_le||'').slice(0,10)))+
         (l.type === 'tv' ? ' · série' : '')+'</div>'+
       '<span class="pastille '+cls+'">'+lib+'</span>'+

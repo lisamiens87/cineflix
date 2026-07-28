@@ -146,9 +146,44 @@ create or replace view public.file_demandes
 with (security_invoker = true) as
   select e.user_id, e.type, e.tmdb_id, e.titre, e.poster, e.sortie,
          e.statut, e.note, e.cree_le, e.maj_le,
-         coalesce(p.pseudo, 'Sans nom') as pseudo
+         coalesce(p.pseudo, 'Sans nom') as pseudo,
+         p.avatar as avatar
   from public.elements e
   left join public.profils p on p.user_id = e.user_id
   where e.demande;
 
 grant select on public.file_demandes to authenticated;
+
+
+-- ============================================================
+-- v2807r — profils du foyer et gouts
+-- ============================================================
+-- 1. Le profil s'enrichit : une tête, un compte serveur, un drapeau
+--    « a déjà fait le parcours ». Rien de personnel ici : cette table
+--    est lisible par tout le foyer, la file de demandes en a besoin.
+alter table public.profils
+  add column if not exists avatar   jsonb   not null default '{}'::jsonb,
+  add column if not exists jellyfin text,
+  add column if not exists onboarde boolean not null default false;
+
+-- 2. Les goûts, à part et bien fermés : ce que quelqu'un aime ne
+--    regarde que lui, même à l'intérieur du foyer.
+create table if not exists public.gouts (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  data    jsonb not null default '{}'::jsonb,
+  maj     timestamptz not null default now()
+);
+alter table public.gouts enable row level security;
+
+drop policy if exists "je lis mes gouts"     on public.gouts;
+drop policy if exists "je cree mes gouts"    on public.gouts;
+drop policy if exists "je modifie mes gouts" on public.gouts;
+
+create policy "je lis mes gouts"
+  on public.gouts for select to authenticated using (auth.uid() = user_id);
+create policy "je cree mes gouts"
+  on public.gouts for insert to authenticated with check (auth.uid() = user_id);
+create policy "je modifie mes gouts"
+  on public.gouts for update to authenticated
+  using (auth.uid() = user_id) with check (auth.uid() = user_id);
+

@@ -4,15 +4,27 @@
 function viewProfil(){
   const L = lots();
   const nom = (db.pseudo||'').trim();
-  const ini = (nom || '?').charAt(0).toUpperCase();
+  const mp = ui.monProfil || {};
   const tailleCat = CAT.movie.size + CAT.tv.size;
 
   let html = header('Profil', {
     right:'<button class="iconbtn" onclick="go(\'reglages\',{from:\'profil\'})">'+I.dots+'</button>'});
 
-  html += '<div class="phead"><div class="avatar">'+esc(ini)+'</div>'+
+  html += '<div class="phead">'+avatarHtml(mp.avatar, 'moyen', nom)+
     '<div><div style="font-size:18px;font-weight:700">'+esc(nom || 'Sans nom')+'</div>'+
-    '<div class="small muted">Cinéflix</div></div></div>';
+    '<div class="small muted">'+
+      (mp.jellyfin ? 'Compte serveur : '+esc(mp.jellyfin) : 'Cinéflix')+'</div></div></div>';
+
+  /* Deux gestes qu'on cherche là, et nulle part ailleurs : refaire le tour de
+     ses goûts, et rendre l'app à quelqu'un d'autre. */
+  html += '<div class="wrap" style="padding-top:0">'+
+    '<button class="btn ghost block" style="margin-bottom:8px" onclick="ouvrirGuide()">'+
+      '✨ Laisse-moi te guider</button>'+
+    '<div class="deuxbtn">'+
+      '<button class="btn ghost" onclick="demarrerBienvenue()">Mes goûts</button>'+
+      '<button class="btn ghost" onclick="changerDeProfil()">Changer de profil</button>'+
+    '</div>'+
+  '</div>';
 
   html += '<div class="stats">'+
     '<div class="stat"><b>'+L.favoris.length+'</b><span>favori'+(L.favoris.length>1?'s':'')+'</span></div>'+
@@ -224,26 +236,9 @@ function toutEffacer(){
 }
 
 /* ============================ Mise en route ============================ */
-/* Quand la clé vient du serveur, l'écran qui l'explique n'a plus lieu d'être :
-   on passe de trois étapes à deux, et l'arrivant n'entend jamais parler de TMDB. */
-const ETAPES = ()=> cleFournie() ? ['nom','fin'] : ['nom','cle','fin'];
-function demarrerAccueil(){ ui.pas = 0; ui.cleErr = ''; go('accueil'); }
-function finirAccueil(dest){
-  db.onboarde = true; saveDB();
-  document.body.classList.remove('accueil');
-  go(dest || 'decouvrir');
-}
-function pasSuivant(){
-  if(ETAPES()[ui.pas||0] === 'nom'){
-    const el = document.getElementById('prenom');
-    const v = el ? el.value.trim() : '';
-    if(v){ db.pseudo = v; saveDB(); }
-  }
-  ui.pas = Math.min(ETAPES().length-1, (ui.pas||0)+1);
-  ui.cleErr = '';
-  render();
-}
-function pasPrecedent(){ ui.pas = Math.max(0, (ui.pas||0)-1); ui.cleErr = ''; render(); }
+/* Le parcours d'accueil vit désormais dans app-09 (viewBienvenue) : il ne
+   demande plus seulement un prénom, il recueille les goûts. Ne restent ici
+   que la validation de la clé TMDB, qui en est une étape possible. */
 
 /* La clé est vérifiée auprès de TMDB avant de laisser passer : mieux vaut
    une erreur ici qu'un catalogue vide sans explication. */
@@ -257,7 +252,7 @@ async function validerCle(){
   db.apiKey = v;
   try{
     await tmdb('/configuration');
-    saveDB(); ui.cleErr = ''; pasSuivant();
+    saveDB(); ui.cleErr = ''; bienvSuivant();
   }catch(e){
     db.apiKey = avant;
     ui.cleErr = (e.message === 'BADKEY')
@@ -266,65 +261,6 @@ async function validerCle(){
     render();
   }
 }
-function puces(n){
-  let h = '<div class="puces">';
-  const total = ETAPES().length;
-  for(let i=0;i<total;i++) h += '<i class="'+(i===n?'on':'')+'"></i>';
-  return h+'</div>';
-}
-function viewAccueil(){
-  const n = ui.pas || 0;
-  const etape = ETAPES()[n] || 'fin';
-  let h = '<div class="acc">';
-  if(etape === 'nom'){
-    h += '<div class="acclogo">'+I.film+'</div>'+
-      '<h1>Cinéflix</h1>'+
-      '<p class="accsub">Tu parcours les films et les séries, tu vois d\'un coup d\'œil '+
-      'ce qui est déjà sur le serveur, et tu demandes le reste.</p>'+
-      '<label class="fld" style="margin-top:26px"><span>Comment tu t\'appelles ?</span>'+
-        '<input type="text" id="prenom" value="'+esc(db.pseudo||'')+'" placeholder="Ton prénom" '+
-        'autocomplete="given-name" onkeydown="if(event.key===\'Enter\'){this.blur();pasSuivant()}">'+
-        '<em>Sert à signer tes demandes.</em></label>'+
-      '<button class="btn block" style="margin-top:20px" onclick="pasSuivant()">Commencer</button>';
-  }
-  else if(etape === 'cle'){
-    h += '<h1>Une clé, une seule fois</h1>'+
-      '<p class="accsub">Les affiches, les résumés et les dates de sortie viennent de '+
-      '<b>TMDB</b>. C\'est gratuit, mais il faut une clé personnelle. Trois minutes, '+
-      'une fois pour toutes.</p>'+
-      '<ol class="etapes">'+
-        '<li>Crée un compte sur <a href="https://www.themoviedb.org/signup" target="_blank" rel="noopener">themoviedb.org</a></li>'+
-        '<li>Ouvre <a href="https://www.themoviedb.org/settings/api" target="_blank" rel="noopener">Paramètres → API</a>'+
-          ' et demande une clé pour un <i>usage personnel</i></li>'+
-        '<li>Copie la ligne <b>Clé de l\'API (v3)</b> et colle-la ici</li>'+
-      '</ol>'+
-      '<label class="fld"><span>Ta clé TMDB</span>'+
-        '<input type="text" id="cle" value="'+esc(db.apiKey||'')+'" placeholder="Colle ta clé ici" '+
-        'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" '+
-        'onkeydown="if(event.key===\'Enter\'){this.blur();validerCle()}"></label>'+
-      (ui.cleErr ? '<div class="accerr">'+esc(ui.cleErr)+'</div>' : '')+
-      '<button class="btn block" id="btncle" style="margin-top:16px" onclick="validerCle()">'+
-        'Vérifier et continuer</button>'+
-      '<div class="accliens"><button onclick="pasPrecedent()">Retour</button>'+
-        '<button onclick="pasSuivant()">Plus tard</button></div>';
-  }
-  else{
-    const qui = (db.pseudo||'').trim();
-    const n2 = CAT.movie.size + CAT.tv.size;
-    h += '<div class="acclogo ok">'+I.check+'</div>'+
-      '<h1>'+(qui ? 'Tout est prêt, '+esc(qui) : 'Tout est prêt')+'</h1>'+
-      '<p class="accsub">'+
-        (n2 ? 'Cinéflix contient '+n2+' titres. Les puces <b>Tout · Sur Cinéflix · Pas encore</b> '+
-              'en haut de l\'écran filtrent le catalogue selon ce que tu peux déjà regarder.'
-            : 'Le catalogue du serveur n\'est pas encore accessible : tu pourras quand même '+
-              'parcourir et mettre en favori, mais sans savoir ce qui est déjà là.')+
-      '</p>'+
-      '<button class="btn block" style="margin-top:22px" onclick="finirAccueil(\'decouvrir\')">'+
-        'Explorer le catalogue</button>';
-  }
-  return h + puces(n) + '</div>';
-}
-
 /* ============================ Démarrage ============================ */
 async function boot(){
   await loadDB();
@@ -335,14 +271,20 @@ async function boot(){
      a rien à afficher — on va droit à l'écran de connexion. */
   if(sbPret() && !connecte()){
     document.body.classList.remove('booting');
-    view = 'auth'; render();
+    /* Des têtes déjà connues sur cet appareil ? On montre la grille plutôt
+       qu'un formulaire : c'est tout le principe de l'écran d'accueil. */
+    view = foyerListe().length ? 'accueil' : 'auth';
+    ui.accueil = { gere:false };
+    render();
     return;
   }
 
   // Le catalogue passe avant le premier rendu : les pastilles doivent être justes d'emblée.
   await chargerCatalogue();
   if(sbPret() && connecte()){
-    await Promise.all([ chargerElements().catch(()=>{}), verifierAdmin() ]);
+    await chargerMonProfil();
+    await Promise.all([ chargerElements().catch(()=>{}), chargerGouts().catch(()=>{}),
+                        verifierAdmin() ]);
     pousserEnAttente();
     majProfil();
   }
@@ -354,7 +296,7 @@ async function boot(){
   /* La mise en route se déroule au premier lancement même quand la clé vient
      du serveur : elle sert aussi à demander le prénom et à expliquer les
      puces de présence. Seule l'étape de la clé disparaît. */
-  if(!db.onboarde) demarrerAccueil();
+  if(!db.onboarde) demarrerBienvenue();
   else if(!db.apiKey) go('reglages', {from:'decouvrir'});
   if(memoryOnly) toast('Stockage indisponible sur cet appareil');
 }
@@ -364,7 +306,8 @@ async function boot(){
 boot().catch(()=>{
   document.body.classList.remove('booting');
   try{
-    view = (sbPret() && !connecte()) ? 'auth' : 'decouvrir';
+    view = (sbPret() && !connecte())
+      ? ((db.foyer||[]).length ? 'accueil' : 'auth') : 'decouvrir';
     render();
     toast('Démarrage incomplet — recharge la page');
   }catch(e){}

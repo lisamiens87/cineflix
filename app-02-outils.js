@@ -101,11 +101,16 @@ let ui = {
   listeTab:'favoris',
   fiche:null,
   saison:null,
-  auth:{ mode:'connexion', err:'', occupe:false }
+  auth:{ mode:'connexion', err:'', occupe:false },
+  accueil:{ gere:false },                // l'écran « qui regarde ce soir ? »
+  monProfil:null,                        // avatar + compte Jellyfin, lus au démarrage
+  bienv:{ pas:0, err:'', occupe:false, q:'', res:[], cherche:false },
+  guide:{ txt:'', recette:null, res:[], loading:false, err:'', charge:false,
+          vus:{}, repli:false, source:'' }
 };
 
-const DEPTH = { auth:0, accueil:0, decouvrir:0, sorties:0, liste:0, profil:0,
-                fiche:1, reglages:1, file:1, personne:2, saison:2 };
+const DEPTH = { auth:0, accueil:0, bienvenue:0, decouvrir:0, sorties:0, liste:0, profil:0,
+                fiche:1, reglages:1, file:1, guide:1, personne:2, saison:2 };
 let navDir = 'none';
 /* Les vues dont on mémorise le défilement : ouvrir un titre puis revenir
    doit ramener exactement où on en était. La filmographie d'une personne
@@ -133,6 +138,7 @@ function currentBack(){
   if(view === 'fiche') return params.from || 'decouvrir';
   if(view === 'reglages') return params.from || 'profil';
   if(view === 'file') return 'profil';
+  if(view === 'guide') return params.from || 'decouvrir';
   return null;
 }
 function goBack(){
@@ -197,6 +203,8 @@ function render(){
   let html = '';
   if(view === 'auth')           html = viewAuth();
   else if(view === 'accueil')   html = viewAccueil();
+  else if(view === 'bienvenue') html = viewBienvenue();
+  else if(view === 'guide')     html = viewGuide();
   else if(view === 'file')      html = viewFile();
   else if(view === 'decouvrir') html = viewDecouvrir();
   else if(view === 'sorties')   html = viewSorties();
@@ -210,7 +218,8 @@ function render(){
 
   /* La barre du bas disparaît sur les écrans qui n'ont qu'une chose à faire :
      la mise en route, et la connexion. */
-  document.body.classList.toggle('accueil', view === 'accueil' || view === 'auth');
+  document.body.classList.toggle('accueil',
+    view === 'accueil' || view === 'auth' || view === 'bienvenue');
   app.classList.remove('enter','back');
   if(navDir === 'enter' || navDir === 'back'){
     void app.offsetWidth;
@@ -241,9 +250,11 @@ function renderNav(){
     ['profil','Profil',       I.user,     0]
   ];
   const depuis = params.from === 'file' ? 'profil'
+    : params.from === 'guide' ? 'decouvrir'
     : (params.from || (view === 'personne' ? ((ui.personne||{}).nav||{}).ffrom : ''));
   const cur = (view === 'fiche' || view === 'personne') ? (depuis || 'decouvrir')
             : (view === 'reglages' || view === 'file') ? 'profil'
+            : view === 'guide' ? 'decouvrir'
             : view;
   document.getElementById('nav').innerHTML = tabs.map(([id,label,icon,badge])=>
     '<button class="tab '+(cur===id?'on':'')+'" onclick="go(\''+id+'\')">'+icon+

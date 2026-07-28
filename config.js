@@ -65,6 +65,24 @@ window.CINEFLIX = {
      Détermine les dates cinéma, numérique et Blu-ray affichées.          */
   region: 'FR',
 
+  /* --- Code d'invitation du foyer ---------------------------------------
+     Exigé pour créer un profil. À dire franchement : ce code est vérifié
+     DANS LE NAVIGATEUR, donc lisible par qui ouvre le code source de la
+     page. C'est un dissuasif contre le passant, pas un verrou.
+
+     Le vrai verrou, si tu le veux : Supabase → Authentication → Providers →
+     Email → désactiver l'inscription, et créer les comptes toi-même depuis
+     le tableau de bord. Les deux se cumulent très bien.
+
+     Laisser vide rouvre l'inscription à tout le monde.                     */
+  invitation: 'CINEFLIX87',
+
+  /* --- Comptes Jellyfin du serveur --------------------------------------
+     Proposés à l'inscription pour relier un profil Cinéflix à son compte
+     sur le NAS. Sert à retrouver où chacun en était dans un film — la
+     collecte des points de reprise viendra dans un second temps.          */
+  jellyfinUsers: ['Dad', 'lisamiens87', 'Lolo'],
+
   /* --- Nom affiché ------------------------------------------------------ */
   nom: 'Cinéflix'
 };

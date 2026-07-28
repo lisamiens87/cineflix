@@ -51,6 +51,11 @@ let db = {
   catalogueUrl:'',
   cleServeur:'', catServeur:'',   // dernières valeurs vues dans config.js — voir appliquerConfig()
   items:{},                 // « movie:603 » → {type,id,titre,poster,date,fav,req}
+  /* Les profils déjà connectés SUR CET APPAREIL : prénom, avatar, e-mail.
+     Jamais de code. C'est cette liste — et elle seule — qui alimente la
+     grille d'avatars, pour ne pas avoir à exposer les prénoms du foyer
+     à qui trouverait l'adresse de l'app. */
+  foyer:[],
   onboarde:false, v:1
 };
 

@@ -760,7 +760,16 @@ function viewDecouvrir(){
   const bouton = '<button class="iconbtn '+(filtresActifs()?'actif ':'')+(cherche?'masque':'')+
     '" id="fbtn" onclick="ouvrirFiltres()">'+I.filtre+'</button>';
 
+  /* Une seule ligne, discrète, mais à l'endroit où l'on hésite : juste avant
+     de se mettre à faire défiler des milliers d'affiches. Elle disparaît
+     pendant une recherche, où l'intention est déjà connue. */
+  const guide = cherche ? '' :
+    '<div class="wrap" style="padding:10px 16px 0">'+
+      '<button class="btn ghost block guidebtn" onclick="ouvrirGuide()">'+
+        '✨ Laisse-moi te guider</button></div>';
+
   return header('Découvrir', {right:bouton, sub:sub}) + banniereCle() + banniereCatalogue() +
+    guide +
     '<div id="dres">'+(cherche ? corpsRecherche() : corpsDecouverte())+'</div>'+
     '<div style="height:20px"></div>';
 }
