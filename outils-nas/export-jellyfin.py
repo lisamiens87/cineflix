@@ -212,7 +212,7 @@ def lire_supabase(base, key, chemin):
 # `telerama`) : la bibliothèque entière est couverte en quelques heures, puis
 # seuls les nouveaux titres coûtent une requête. Politesse : une pause entre
 # chaque appel, et jamais plus d'un lot par passage.
-TLR_LOT = 25
+TLR_LOT = 20
 TLR_PAUSE = 0.8
 TLR_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
           "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
@@ -223,41 +223,86 @@ def _tlr_norm(s):
     return "".join(c for c in s if c.isalnum())
 
 
+# « 3 hommes et un couffin » chez Jellyfin, « Trois hommes et un couffin »
+# chez Télérama : on compare aussi les titres avec leurs nombres en lettres.
+_TLR_CHIFFRES = {"1": "un", "2": "deux", "3": "trois", "4": "quatre",
+                 "5": "cinq", "6": "six", "7": "sept", "8": "huit",
+                 "9": "neuf", "10": "dix", "11": "onze", "12": "douze",
+                 "13": "treize", "15": "quinze", "20": "vingt"}
+
+
+def _tlr_lettres(s):
+    return re.sub(r'\b(\d+)\b',
+                  lambda m: _TLR_CHIFFRES.get(m.group(1), m.group(1)), str(s or ""))
+
+
+def _tlr_egal(a, b):
+    return (_tlr_norm(a) == _tlr_norm(b)
+            or _tlr_norm(_tlr_lettres(a)) == _tlr_norm(_tlr_lettres(b)))
+
+
 def _tlr_cle(t, nom, annee):
     return "%s|%s|%s" % (t, _tlr_norm(nom)[:80], annee or "")
 
 
+TLR_VERDICTS = {1: "Bof", 2: "Bien", 3: "Très Bien", 4: "Bravo"}
+
+
+def _tlr_get(url):
+    req = urllib.request.Request(url, headers={
+        "User-Agent": TLR_UA, "Accept-Language": "fr"})
+    return urllib.request.urlopen(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
+
+
 def telerama_note(nom, annee, type_):
     """Cherche la critique Télérama d'un titre. Renvoie (nb_de_T, verdict)
-    ou None si le titre n'y est pas (ou pas identifiable sans ambiguïté)."""
-    req = urllib.request.Request(
-        "https://www.telerama.fr/recherche/critiques?q="
-        + urllib.parse.quote(str(nom)),
-        headers={"User-Agent": TLR_UA, "Accept-Language": "fr"})
-    html = urllib.request.urlopen(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
+    ou None si le titre n'y est pas (ou pas identifiable sans ambiguïté).
+
+    Deux temps : la recherche publique donne les titres et l'adresse de
+    l'article ; la note elle-même n'apparaît qu'aux abonnés SAUF dans les
+    données de mesure de l'article (data-note-t="TTT") et son JSON-LD
+    (reviewRating.ratingValue, où 4/5 = TTT) — publics, eux.
+    """
+    html = _tlr_get("https://www.telerama.fr/recherche/critiques?q="
+                    + urllib.parse.quote(str(nom)))
     voulu = "movie" if type_ == "movie" else "series"
-    repli = None
-    for bloc in html.split("search__card-content")[1:]:
-        bloc = bloc[:5000]
-        m = re.search(r'img-link\s+([a-z]+)', bloc)
-        genre = m.group(1) if m else ""
+    cartes = [(m.start(), m.group(1), m.group(2)) for m in re.finditer(
+        r'href="([^"]+)"\s+class="search__card-content-img-link\s*([a-z]*)"', html)]
+    lien, repli = None, None
+    for k, (pos, href, genre) in enumerate(cartes):
         if genre in ("book", "album", "show"):
             continue
         if genre and genre != voulu:
             continue
-        if not genre and voulu == "movie" and "/cinema/" not in bloc:
+        if not genre and voulu == "movie" and "/cinema/" not in href:
             continue
-        n = re.search(r'notation-(\d)\.svg"\s*alt="([^"]*)"', bloc)
-        t = re.search(r'card-subtitle[^>]*>\s*<a[^>]*>([^<]+)</a>', bloc)
-        if not n or not t or _tlr_norm(t.group(1)) != _tlr_norm(nom):
+        fin = cartes[k+1][0] if k+1 < len(cartes) else pos + 6000
+        bloc = html[pos:fin]
+        t = re.search(r'title-link[^>]*>\s*([^<]+?)\s*</a>', bloc)
+        if not t or not _tlr_egal(t.group(1), nom):
             continue
-        # notation-4 = TTT « Très Bien » : le nombre de T vaut N-1.
-        note = (max(0, min(4, int(n.group(1)) - 1)), n.group(2).strip())
-        if annee and re.search(r'>\s*%s\s*<' % annee, bloc):
-            return note                      # titre ET année : certitude
+        if annee and re.search(r'[ >(]%s[ <)]' % annee, bloc):
+            lien = href
+            break                            # titre ET année : certitude
         if repli is None:
-            repli = note                     # titre seul : faute de mieux
-    return repli
+            repli = href                     # titre seul : faute de mieux
+    lien = lien or repli
+    if not lien:
+        return None
+    if lien.startswith("/"):
+        lien = "https://www.telerama.fr" + lien
+    time.sleep(TLR_PAUSE)
+    art = _tlr_get(lien)
+    m = re.search(r'data-note-t="(T+)"', art)
+    n = len(m.group(1)) if m else None
+    if n is None:
+        # Repli : le JSON-LD public de la critique (ratingValue 2..5 = T..TTTT)
+        m = re.search(r'"@type"\s*:\s*"Review"[\s\S]{0,600}?"ratingValue"\s*:\s*(\d)', art)
+        n = (int(m.group(1)) - 1) if m else None
+    if not n or n < 1:
+        return None
+    n = min(4, n)
+    return (n, TLR_VERDICTS.get(n, ""))
 
 
 def enrichir_telerama(base, key, fiches):
