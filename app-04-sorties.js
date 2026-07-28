@@ -62,7 +62,7 @@ const MODES = [
   { id:'numerique', label:'Numérique', type:TYPE_NUM,  icone:'nuage',
     titre:'Sorties numériques', avant:-21, apres:60 },
   { id:'bluray',  label:'Blu-ray / 4K', type:TYPE_PHYS, icone:'disque',
-    titre:'Sorties physiques', avant:-21, apres:150 }
+    titre:'Sorties physiques', avant:-21, apres:260 }
 ];
 const modeCourant = ()=> MODES.find(m=>m.id === ui.sorties.mode) || MODES[2];
 let sortiesSeq = 0;
