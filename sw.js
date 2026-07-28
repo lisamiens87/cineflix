@@ -5,7 +5,7 @@
    afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
 
    VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
-const BUILD = '2807h';
+const BUILD = '2807i';
 const CACHE = 'cineflix-' + BUILD;
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
                './app.css', './config.js', './app-01-noyau.js', './app-02-outils.js',
@@ -58,3 +58,25 @@ self.addEventListener('fetch', e => {
 });
 
 self.addEventListener('message', e => { if(e.data === 'skipWaiting') self.skipWaiting(); });
+
+/* ---------- Notifications push ----------
+   Le NAS envoie la notification à l'export horaire quand un titre demandé
+   vient d'arriver ; ici on ne fait que l'afficher, app ouverte ou non. */
+self.addEventListener('push', e => {
+  let d = {};
+  try{ d = e.data ? e.data.json() : {}; }catch(err){}
+  e.waitUntil(self.registration.showNotification(d.titre || 'Cinéflix', {
+    body: d.corps || '',
+    icon: './icon-192.png',
+    badge: './icon-192.png',
+    data: { url: d.url || './' }
+  }));
+});
+
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(clients.matchAll({ type:'window', includeUncontrolled:true }).then(l => {
+    for(const c of l){ if('focus' in c) return c.focus(); }
+    return clients.openWindow((e.notification.data || {}).url || './');
+  }));
+});

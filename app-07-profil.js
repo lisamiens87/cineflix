@@ -43,6 +43,14 @@ function viewProfil(){
           (jellyBase ? 'joignable' : 'hors de portée')+'</span></div>'+
       '<button class="btn ghost block" style="margin-top:12px" onclick="rafraichirCatalogue()">'+
         'Actualiser le catalogue</button>'+
+      /* Prévenu quand une demande arrive — même app fermée. Le bouton
+         n'apparaît que si l'appareil et la configuration le permettent. */
+      (typeof notifsPossibles === 'function' && notifsPossibles() && connecte()
+        ? '<button class="btn ghost block" style="margin-top:8px" onclick="'+
+            (db.notifs ? 'couperNotifs()' : 'activerNotifs()')+'">'+
+            (db.notifs ? '🔕 Couper les notifications' : '🔔 Être prévenu quand une demande arrive')+
+          '</button>'
+        : '')+
     '</div></div>';
 
   /* La file n'apparaît que pour qui la traite : les autres n'ont pas à savoir

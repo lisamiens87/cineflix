@@ -46,6 +46,7 @@ const CFG = Object.assign(
 let db = {
   pseudo:'', apiKey:'', lang:'fr-FR', region:'',
   vue:'',                   // affichage : '' grille normale, 'compacte', 'liste'
+  notifs:false,             // notifications push activées sur cet appareil
   jellyfin:'',              // adresse choisie à la main ; sinon on prend celle qui répond
   catalogueUrl:'',
   cleServeur:'', catServeur:'',   // dernières valeurs vues dans config.js — voir appliquerConfig()
@@ -197,12 +198,31 @@ const CAT = { movie:new Set(), tv:new Set(), items:[], maj:null, charge:false, e
 const cle = (type,id) => type+':'+id;
 const surCineflix = (type,id) => CAT[type === 'movie' ? 'movie' : 'tv'].has(Number(id));
 
+/* Une demande dont le titre vient d'entrer au catalogue : on le dit tout de
+   suite, en plus de la notification push envoyée par le NAS — comme ça la
+   bonne nouvelle arrive aussi à ceux qui n'ont pas activé les notifications. */
+function signalerArrivees(){
+  let venus = [];
+  try{
+    venus = Object.values(db.items).filter(it =>
+      it && it.req && !it.notifie && surCineflix(it.type, it.id));
+  }catch(e){ return; }
+  if(!venus.length) return;
+  venus.forEach(it => { it.notifie = 1; });
+  saveDB();
+  try{
+    toast(venus.length === 1
+      ? 'Bonne nouvelle : « '+(venus[0].titre || 'votre demande')+' » est disponible !'
+      : 'Bonne nouvelle : '+venus.length+' de vos demandes sont arrivées !');
+  }catch(e){}
+}
+
 async function chargerCatalogue(){
   /* Supabase d'abord quand il est configuré : c'est là que le NAS pousse le
      catalogue, et l'app servie en HTTPS ne pourrait de toute façon pas lire un
      fichier sur le NAS en HTTP. Le fichier local reste le mode de secours. */
   if(typeof sbPret === 'function' && sbPret() && connecte()){
-    try{ await catalogueDepuisSupabase(); return; }
+    try{ await catalogueDepuisSupabase(); signalerArrivees(); return; }
     catch(e){ CAT.charge = true; CAT.erreur = e.message || 'lecture impossible'; return; }
   }
   const url = db.catalogueUrl || './cineflix.json';
@@ -215,6 +235,7 @@ async function chargerCatalogue(){
     CAT.items = Array.isArray(d.items) ? d.items : [];
     CAT.maj   = d.maj || d.updated || null;
     CAT.charge = true; CAT.erreur = '';
+    signalerArrivees();
   }catch(e){
     CAT.charge = true;
     CAT.erreur = e.message || 'illisible';

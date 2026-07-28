@@ -109,7 +109,11 @@ let dernierRegion = null;          // le paramètre region du dernier /discover
 
   await page.addInitScript(() => {
     localStorage.setItem('cineflix.v1', JSON.stringify({
-      apiKey:'cle-de-test', pseudo:'Alexandre', onboarde:true, region:'FR', items:{}
+      apiKey:'cle-de-test', pseudo:'Alexandre', onboarde:true, region:'FR',
+      /* Une demande dont le titre est au catalogue (550) : au démarrage,
+         l'app doit annoncer la bonne nouvelle. */
+      items:{ 'movie:550': { type:'movie', id:550, titre:'Fight Club',
+                             fav:false, req:{ statut:'demande', le: 1 } } }
     }));
   });
 
@@ -124,6 +128,9 @@ let dernierRegion = null;          // le paramètre region du dernier /discover
   ok('grille remplie', await page.locator('.gcard').count() >= 20);
   ok('le tri par défaut est la date de sortie',
      dernierTri === 'primary_release_date.desc');
+  ok('une demande arrivée est annoncée au démarrage',
+     (await page.locator('.toast').textContent()).includes('disponible') &&
+     await page.evaluate(() => db.items['movie:550'].notifie === 1));
   ok('pastille « Cinéflix » sur les titres du catalogue',
      await page.locator('.tag.dispo').count() === 5);
 

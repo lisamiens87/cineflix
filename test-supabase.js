@@ -90,7 +90,7 @@ const appels = [];                       // trace des écritures vers Supabase
   // config.js branché sur le faux Supabase
   await page.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
     body: "window.CINEFLIX={tmdbKey:'cle',jellyfinHosts:[],catalogue:'./cineflix.json',"+
-          "region:'FR',nom:'Cinéflix',supabase:{url:'"+SB+"',key:'anon'}};"}));
+          "region:'FR',nom:'Cinéflix',pushCle:'BCleDeTest',supabase:{url:'"+SB+"',key:'anon'}};"}));
 
   const ok = (nom, cond) => { if(!cond) echecs.push('ÉCHEC — '+nom); else console.log('  ok  '+nom); };
   const url = 'http://localhost:8123/index.html';
@@ -184,6 +184,8 @@ const appels = [];                       // trace des écritures vers Supabase
      (await page.locator('.btn:has-text("File de demandes")').count()) === 1);
   ok('le profil affiche le compte connecté',
      (await page.locator('.card').last().innerText()).includes('alex@exemple.fr'));
+  ok('le profil propose d\'activer les notifications',
+     await page.locator('.btn:has-text("prévenu quand une demande arrive")').count() === 1);
   await page.click('.btn:has-text("File de demandes")');
   await page.waitForSelector('.lrow', {timeout:6000});
   /* Deux demandes remontent, mais « Fight Club » est déjà au catalogue :

@@ -50,6 +50,12 @@ window.CINEFLIX = {
     key: 'sb_publishable_1zhd_WaREneIP9F4SqaCtg__wDfIdSZ'
   },
 
+  /* --- Notifications push -----------------------------------------------
+     La clé PUBLIQUE d'envoi (VAPID) : elle identifie le serveur autorisé à
+     notifier — sa jumelle PRIVÉE vit sur le NAS, dans la tâche d'export,
+     et nulle part ailleurs. Vider ce champ masque le bouton dans le profil. */
+  pushCle: 'BMRT0ZZ05smuTw641GZGQi_bo5kKP6G86j_d-qcLCs_hjc1BiTBYWGW5D5zTgqt1VzyegmCQNS17M_UPWmYHTMs',
+
   /* --- Catalogue --------------------------------------------------------
      Le fichier produit par outils-nas/export-jellyfin.py. Une adresse
      relative suffit s'il est déposé à côté de l'app.                     */

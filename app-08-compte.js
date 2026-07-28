@@ -94,6 +94,58 @@ function deconnexionConfirmee(){
   go('auth');
 }
 
+/* ---------- Notifications push ---------- */
+/* L'appareil s'abonne auprès de son navigateur (clé publique VAPID de
+   config.js) et dépose l'abonnement dans Supabase ; c'est le NAS qui s'en
+   sert pour prévenir quand un titre demandé arrive. */
+function b64versUint8(s){
+  const pad = '='.repeat((4 - s.length % 4) % 4);
+  const raw = atob((s + pad).replace(/-/g,'+').replace(/_/g,'/'));
+  const t = new Uint8Array(raw.length);
+  for(let i = 0; i < raw.length; i++) t[i] = raw.charCodeAt(i);
+  return t;
+}
+const notifsPossibles = ()=> !!(CFG.pushCle && sbPret() &&
+  'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window);
+
+async function activerNotifs(){
+  if(!notifsPossibles() || !connecte()) return;
+  try{
+    const perm = await Notification.requestPermission();
+    if(perm !== 'granted') return toast('Notifications refusées par l\'appareil');
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if(!sub) sub = await reg.pushManager.subscribe({
+      userVisibleOnly:true, applicationServerKey: b64versUint8(CFG.pushCle) });
+    const j = sub.toJSON();
+    await sbFetch('/rest/v1/push_abonnements', {method:'POST',
+      headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ endpoint: sub.endpoint, user_id: db.auth.uid,
+        p256dh: j.keys.p256dh, auth: j.keys.auth })});
+    db.notifs = true; saveDB();
+    toast('Notifications activées ✓');
+  }catch(e){
+    toast('Activation impossible — '+(e.message || 'réessaie'));
+  }
+  if(view === 'profil') render();
+}
+
+async function couperNotifs(){
+  try{
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    if(sub){
+      await sbFetch('/rest/v1/push_abonnements?endpoint=eq.'+
+        encodeURIComponent(sub.endpoint),
+        {method:'DELETE', headers:{ Prefer:'return=minimal' }}).catch(()=>{});
+      await sub.unsubscribe();
+    }
+  }catch(e){}
+  db.notifs = false; saveDB();
+  toast('Notifications coupées');
+  if(view === 'profil') render();
+}
+
 /* ---------- Profil public ---------- */
 async function majProfil(){
   if(!connecte()) return;
