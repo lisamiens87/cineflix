@@ -109,8 +109,11 @@ const regionActive = ()=> REGIONS.find(r => r.id === (ui.disc.origine || 'eurna'
 const genresTMDB = { movie:null, tv:null };
 let discSeq = 0;
 
-const CIBLE_GRILLE = 24;             // combien de vignettes on vise par chargement
-const MAX_PAGES_PAR_TOUR = 6;        // garde-fou quand le filtre laisse peu de résultats
+/* 250 vignettes par chargement (demande d'Alexandre) : les images sont en
+   loading="lazy", seules celles à l'écran se chargent vraiment. TMDB livre
+   par pages de 20 → un chargement enchaîne ~13 pages. */
+const CIBLE_GRILLE = 250;            // combien de vignettes on vise par chargement
+const MAX_PAGES_PAR_TOUR = 30;       // garde-fou quand le filtre laisse peu de résultats
 
 function genreParNom(type, nom){
   const l = genresTMDB[type] || [];
