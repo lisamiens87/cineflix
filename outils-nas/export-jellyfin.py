@@ -31,8 +31,10 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import struct
 import sys
+import unicodedata
 import tempfile
 import time
 import urllib.error
@@ -201,6 +203,100 @@ def lire_supabase(base, key, chemin):
         "apikey": key, "Authorization": "Bearer " + key, "Accept": "application/json"})
     with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
         return json.loads(r.read().decode("utf-8"))
+
+
+# ---------- Notes Télérama ----------
+# La recherche publique de telerama.fr donne, pour chaque œuvre critiquée,
+# une note (notation-N.svg) et son verdict (« Bof », « Bien », « Très Bien »,
+# « Bravo »). On interroge un LOT de titres par passage (cache dans la table
+# `telerama`) : la bibliothèque entière est couverte en quelques heures, puis
+# seuls les nouveaux titres coûtent une requête. Politesse : une pause entre
+# chaque appel, et jamais plus d'un lot par passage.
+TLR_LOT = 25
+TLR_PAUSE = 0.8
+TLR_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+          "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
+
+
+def _tlr_norm(s):
+    s = unicodedata.normalize("NFD", str(s or "").lower())
+    return "".join(c for c in s if c.isalnum())
+
+
+def _tlr_cle(t, nom, annee):
+    return "%s|%s|%s" % (t, _tlr_norm(nom)[:80], annee or "")
+
+
+def telerama_note(nom, annee, type_):
+    """Cherche la critique Télérama d'un titre. Renvoie (nb_de_T, verdict)
+    ou None si le titre n'y est pas (ou pas identifiable sans ambiguïté)."""
+    req = urllib.request.Request(
+        "https://www.telerama.fr/recherche/critiques?q="
+        + urllib.parse.quote(str(nom)),
+        headers={"User-Agent": TLR_UA, "Accept-Language": "fr"})
+    html = urllib.request.urlopen(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
+    voulu = "movie" if type_ == "movie" else "series"
+    repli = None
+    for bloc in html.split("search__card-content")[1:]:
+        bloc = bloc[:5000]
+        m = re.search(r'img-link\s+([a-z]+)', bloc)
+        genre = m.group(1) if m else ""
+        if genre in ("book", "album", "show"):
+            continue
+        if genre and genre != voulu:
+            continue
+        if not genre and voulu == "movie" and "/cinema/" not in bloc:
+            continue
+        n = re.search(r'notation-(\d)\.svg"\s*alt="([^"]*)"', bloc)
+        t = re.search(r'card-subtitle[^>]*>\s*<a[^>]*>([^<]+)</a>', bloc)
+        if not n or not t or _tlr_norm(t.group(1)) != _tlr_norm(nom):
+            continue
+        # notation-4 = TTT « Très Bien » : le nombre de T vaut N-1.
+        note = (max(0, min(4, int(n.group(1)) - 1)), n.group(2).strip())
+        if annee and re.search(r'>\s*%s\s*<' % annee, bloc):
+            return note                      # titre ET année : certitude
+        if repli is None:
+            repli = note                     # titre seul : faute de mieux
+    return repli
+
+
+def enrichir_telerama(base, key, fiches):
+    """Pose jt (nombre de T) et jv (verdict) sur les fiches, via le cache."""
+    cache = {r["cle"]: r for r in lire_supabase(base, key,
+        "/rest/v1/telerama?select=cle,t,verdict&limit=10000")}
+    nouveaux, faits = [], 0
+    for f in fiches:
+        annee = (f.get("sortie") or "")[:4]
+        cle = _tlr_cle(f["t"], f["nom"], annee)
+        r = cache.get(cle)
+        if r is None and faits < TLR_LOT:
+            faits += 1
+            try:
+                trouve = telerama_note(f["nom"], annee, f["t"])
+            except Exception:
+                trouve = None                # réseau : on retentera plus tard
+            else:
+                r = {"cle": cle, "t": trouve[0] if trouve else 0,
+                     "verdict": trouve[1] if trouve else ""}
+                cache[cle] = r
+                nouveaux.append(dict(r, maj=date.today().isoformat()))
+            time.sleep(TLR_PAUSE)
+        if r and r.get("t"):
+            f["jt"] = r["t"]
+            f["jv"] = r.get("verdict") or ""
+    if nouveaux:
+        req = urllib.request.Request(
+            base.rstrip("/") + "/rest/v1/telerama",
+            data=json.dumps(nouveaux).encode("utf-8"), method="POST",
+            headers={"apikey": key, "Authorization": "Bearer " + key,
+                     "Content-Type": "application/json",
+                     "Prefer": "resolution=merge-duplicates,return=minimal"})
+        urllib.request.urlopen(req, timeout=TIMEOUT)
+        print("Télérama : %d titre(s) vérifié(s), reste %d à couvrir"
+              % (len(nouveaux),
+                 sum(1 for f in fiches
+                     if _tlr_cle(f["t"], f["nom"], (f.get("sortie") or "")[:4])
+                     not in cache)))
 
 
 def _b64u_dec(s):
@@ -409,6 +505,14 @@ def main():
         # Écraser un catalogue valide par un fichier vide ferait disparaître
         # toute la bibliothèque de l'app : mieux vaut ne rien écrire.
         sys.exit("Aucun titre trouvé — le fichier existant n'a pas été touché.")
+
+    if a.supabase:
+        # Notes Télérama (cache en base, un petit lot de recherches par
+        # passage) : une panne ici ne doit pas empêcher l'export.
+        try:
+            enrichir_telerama(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
+        except Exception as e:
+            print("Télérama sauté : %s" % e)
 
     contenu = {
         "maj": date.today().isoformat(),
