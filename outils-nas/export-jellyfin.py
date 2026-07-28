@@ -458,7 +458,7 @@ def enrichir_telerama(base, key, fiches):
 # Trois pages suffisent à couvrir les prochains mois. Une fois par heure : le
 # calendrier ne bouge pas toutes les cinq minutes.
 SORTIES_URL = "https://4k-ultra-hd.fr/prochaines-sorties-blu-ray-4k-ultra-hd"
-SORTIES_PAGES = 3
+SORTIES_PAGES = 8
 MOIS_FR = {"janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4,
            "mai": 5, "juin": 6, "juillet": 7, "août": 8, "aout": 8,
            "septembre": 9, "octobre": 10, "novembre": 11,
