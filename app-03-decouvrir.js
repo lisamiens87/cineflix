@@ -74,6 +74,12 @@ const PERIMETRES = [
   { id:'recent', label:'Sortis récemment',  court:'sorties récentes' }
 ];
 const NOTES = [ {v:0,label:'Toutes'}, {v:6,label:'6 et +'}, {v:7,label:'7 et +'}, {v:8,label:'8 et +'} ];
+/* Les décennies, de 1920 à la décennie en cours — la liste s'allonge
+   toute seule au passage de 2030. Une seule active à la fois : TMDB ne
+   sait filtrer que sur une plage de dates continue. */
+const DECENNIES = (()=>{ const l = [];
+  for(let a = 1920; a <= Math.floor(new Date().getFullYear()/10)*10; a += 10) l.push(a);
+  return l; })();
 const FENETRE = 120;                 // « récemment » = les 120 derniers jours
 
 const genresTMDB = { movie:null, tv:null };
@@ -138,6 +144,16 @@ function discParams(){
     p['vote_average.gte'] = String(d.noteMin);
     if(!p['vote_count.gte']) p['vote_count.gte'] = '100';
   }
+  /* La décennie borne la plage de dates — elle prime sur les bornes posées
+     plus haut. Seule exception : en tri « date de sortie » décroissant, la
+     décennie en cours reste plafonnée à aujourd'hui, sinon les films
+     annoncés pour dans deux ans squattent le haut de la grille. */
+  if(d.decennie){
+    p[champDate+'.gte'] = d.decennie+'-01-01';
+    let fin = (d.decennie+9)+'-12-31';
+    if(d.tri === 'sortie' && sens === 'desc' && fin > todayISO()) fin = todayISO();
+    p[champDate+'.lte'] = fin;
+  }
   return p;
 }
 
@@ -177,6 +193,10 @@ function catalogueFiltre(){
     });
   if(d.noteMin) l = l.filter(i => (i.note||0) >= d.noteMin);
   if(d.perimetre === 'recent') l = l.filter(i => (i.sortie||'') >= isoDecale(-FENETRE));
+  if(d.decennie){
+    const de = d.decennie+'-01-01', a = (d.decennie+9)+'-12-31';
+    l = l.filter(i => (i.sortie||'') >= de && (i.sortie||'') <= a);
+  }
   return l;
 }
 
@@ -500,7 +520,19 @@ function setVue(v){
 }
 function setTri(t){ ui.disc.tri = t; ouvrirFiltres(); chargerDecouverte(); }
 function setSens(s){ ui.disc.sens = s; ouvrirFiltres(); chargerDecouverte(); }
-function setPerimetre(p){ ui.disc.perimetre = p; ouvrirFiltres(); chargerDecouverte(); }
+/* Décennie et « sortis récemment » se contredisent : activer l'un éteint
+   l'autre. Réappuyer sur la décennie active la désactive. */
+function setDecennie(a){
+  const d = ui.disc;
+  d.decennie = (d.decennie === a) ? 0 : a;
+  if(d.decennie) d.perimetre = 'tout';
+  ouvrirFiltres(); chargerDecouverte();
+}
+function setPerimetre(p){
+  ui.disc.perimetre = p;
+  if(p === 'recent') ui.disc.decennie = 0;
+  ouvrirFiltres(); chargerDecouverte();
+}
 function setNote(n){ ui.disc.noteMin = n; ouvrirFiltres(); chargerDecouverte(); }
 function bascGenre(i){
   const g = (genresTMDB[ui.disc.type] || [])[i];
@@ -512,13 +544,13 @@ function bascGenre(i){
 function resetFiltres(){
   const d = ui.disc;
   d.genres = []; d.perimetre = 'tout'; d.tri = 'sortie'; d.sens = 'desc'; d.noteMin = 0;
-  d.plats = [];
+  d.plats = []; d.decennie = 0;
   ouvrirFiltres(); chargerDecouverte();
 }
 function filtresActifs(){
   const d = ui.disc;
   return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' ||
-         d.tri !== 'sortie' || (d.sens||'desc') !== 'desc' ||
+         d.tri !== 'sortie' || (d.sens||'desc') !== 'desc' || !!d.decennie ||
          (ui.presence === 'plats' && (d.plats||[]).length > 0);
 }
 function resumeFiltres(){
@@ -531,6 +563,7 @@ function resumeFiltres(){
   const tri = TRIS.concat(TRIS_LOCAUX).find(t=>t.id===d.tri) || {};
   bouts.push(tri.court + (d.tri !== 'aleatoire' && d.sens === 'asc' ? ' croissant' : ''));
   if(d.perimetre === 'recent') bouts.push('sorties récentes');
+  if(d.decennie) bouts.push('années '+(d.decennie < 2000 ? String(d.decennie).slice(2) : d.decennie));
   if(d.noteMin) bouts.push('note '+d.noteMin+' et +');
   d.genres.forEach(n=> bouts.push(n.toLowerCase()));
   return bouts.filter(Boolean).join(' · ');
@@ -554,6 +587,10 @@ function ouvrirFiltres(){
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
       '" onclick="setPerimetre(\''+p.id+'\')">'+p.label+'</button>').join('')+'</div>';
+  h += '<div class="fgrp">Décennie</div><div class="fchips defil">'+
+    '<button class="chip '+(!d.decennie?'on':'')+'" onclick="setDecennie(0)">Toutes</button>'+
+    DECENNIES.map(a=>'<button class="chip '+(d.decennie===a?'on':'')+
+      '" onclick="setDecennie('+a+')">'+a+'</button>').join('')+'</div>';
   const bibli = ui.presence === 'dispo' && (CAT.items||[]).length > 0;
   const tris = bibli ? TRIS.concat(TRIS_LOCAUX) : TRIS;
   h += '<div class="fgrp">Trier par</div><div class="fchips">'+

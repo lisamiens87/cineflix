@@ -15,6 +15,7 @@ function film(id, titre){
 const echecs = [];
 let dernierFournisseurs = null;    // le paramètre with_watch_providers du dernier /discover
 let dernierTri = null;             // le sort_by du dernier /discover
+let derniereBorne = null;          // le primary_release_date.gte du dernier /discover
 
 (async () => {
   const browser = await chromium.launch();
@@ -39,6 +40,7 @@ let dernierTri = null;             // le sort_by du dernier /discover
     else if(p.startsWith('/discover/')){
       dernierFournisseurs = u.searchParams.get('with_watch_providers');
       dernierTri = u.searchParams.get('sort_by');
+      derniereBorne = u.searchParams.get('primary_release_date.gte');
       const page_ = Number(u.searchParams.get('page')||1);
       // 20 résultats par page ; seuls les 5 premiers ids de la page 1 sont au catalogue
       const res = [];
@@ -183,6 +185,27 @@ let dernierTri = null;             // le sort_by du dernier /discover
   ok('cocher Netflix ne demande que Netflix à TMDB', dernierFournisseurs === '8');
   await page.click('.chip:text-is("Netflix")');          // on décoche
   await page.waitForTimeout(900);
+
+  // 2 d. Décennies, façon Infuse — et le filtre SUIT le changement de catégorie
+  ok('les décennies vont de 1920 à 2020',
+     await page.locator('.chip:text-is("1920")').count() === 1 &&
+     await page.locator('.chip:text-is("2020")').count() === 1);
+  await page.click('.chip:text-is("1990")');
+  await page.waitForTimeout(900);
+  ok('choisir 1990 borne la requête TMDB à la décennie',
+     derniereBorne === '1990-01-01');
+  await page.click('button:has-text("Voir les résultats")');
+  await page.waitForTimeout(400);
+  await page.click('.souschips .chip:has-text("Cinéma")');   // changement de catégorie
+  await page.waitForTimeout(900);
+  ok('le filtre années 90 survit au passage Plateformes → Cinéma',
+     derniereBorne === '1990-01-01');
+  ok('le résumé l\'affiche', /années 90/.test(await page.locator('.resume').innerText()));
+  await page.click('#fbtn');
+  await page.waitForTimeout(400);
+  await page.click('.chip:text-is("1990")');               // on désactive
+  await page.waitForTimeout(900);
+  ok('réappuyer sur la décennie la désactive', derniereBorne === null);
   await page.click('button:has-text("Voir les résultats")');
   await page.waitForTimeout(400);
 
