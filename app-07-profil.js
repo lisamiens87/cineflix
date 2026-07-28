@@ -303,15 +303,38 @@ async function boot(){
 /* Un démarrage qui échoue ne doit jamais laisser un écran noir : le voile
    « booting » est retiré quoi qu'il arrive, on affiche ce qu'on peut et on le
    dit. C'est arrivé en vrai avec une session dont le compte n'existait plus. */
-boot().catch(()=>{
+function secours(e){
+  /* On GARDE la trace : un démarrage muet a coûté une soirée de recherche.
+     Elle est lisible dans la console et dans window.__bootErr. */
+  window.__bootErr = (e && (e.stack || e.message)) || String(e);
+  try{ console.error('Cinéflix — démarrage interrompu :', e); }catch(x){}
   document.body.classList.remove('booting');
+  /* Chaque étape à part : si l'une échoue, les suivantes doivent quand même
+     s'exécuter — sinon l'écran reste noir, exactement ce qu'on veut éviter. */
   try{
-    view = (sbPret() && !connecte())
-      ? ((db.foyer||[]).length ? 'accueil' : 'auth') : 'decouvrir';
-    render();
-    toast('Démarrage incomplet — recharge la page');
-  }catch(e){}
-});
+    const hs = (typeof sbPret === 'function') && sbPret();
+    const co = (typeof connecte === 'function') && connecte();
+    view = (hs && !co) ? ((db.foyer||[]).length ? 'accueil' : 'auth') : 'decouvrir';
+  }catch(x){ view = 'decouvrir'; }
+  try{ render(); }catch(x){
+    try{ document.getElementById('app').innerHTML =
+      '<div class="empty"><h3>Démarrage impossible</h3>'+
+      '<p>Recharge la page. Si ça persiste, préviens l\'administrateur.</p>'+
+      '<button class="btn ghost" onclick="location.reload()">Recharger</button></div>';
+    }catch(y){}
+  }
+  try{ toast('Démarrage incomplet — recharge la page'); }catch(x){}
+}
+
+/* Le démarrage attend que TOUS les fichiers de l'app soient exécutés.
+   Sans cette attente, boot() partait à la fin de app-07 et pouvait reprendre
+   — dès la première microtâche, quand le stockage répond instantanément —
+   avant que app-08 à app-10 aient posé leurs fonctions. */
+function lancer(){ try{ boot().catch(secours); }catch(e){ secours(e); } }
+if(document.readyState === 'loading')
+  document.addEventListener('DOMContentLoaded', lancer, {once:true});
+else
+  lancer();
 
 if('serviceWorker' in navigator && location.protocol.startsWith('http')){
   window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); });
