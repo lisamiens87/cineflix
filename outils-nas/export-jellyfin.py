@@ -459,6 +459,10 @@ def enrichir_telerama(base, key, fiches):
 # calendrier ne bouge pas toutes les cinq minutes.
 SORTIES_URL = "https://4k-ultra-hd.fr/prochaines-sorties-blu-ray-4k-ultra-hd"
 SORTIES_PAGES = 8
+# Appariements TMDB par passage : la première relève compte ~330 titres, et
+# tout apparier d'un coup ferait déborder le cron (5 min). Les lignes sans
+# correspondance restent au calendrier et sont retentées au passage suivant.
+SORTIES_LOT = 80
 MOIS_FR = {"janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4,
            "mai": 5, "juin": 6, "juillet": 7, "août": 8, "aout": 8,
            "septembre": 9, "octobre": 10, "novembre": 11,
@@ -552,7 +556,7 @@ def apparier_tmdb(ck, s):
             if an and ra and abs(ra - an) > 1:
                 continue
             return r.get("id"), r.get("poster_path") or ""
-        time.sleep(0.2)
+        time.sleep(0.05)
     return None, ""
 
 
@@ -576,7 +580,7 @@ def collecter_sorties(base, key):
     if not l:
         return
     ck = cle_tmdb()
-    lignes, neuves = [], []
+    lignes, neuves, apparies = [], [], 0
     for s in l:
         ancienne = connues.get(s["cle"])
         if ancienne and ancienne.get("tmdb_id"):
@@ -584,9 +588,11 @@ def collecter_sorties(base, key):
             if ancienne.get("date") == s["date"]:
                 continue
             s["tmdb_id"], s["poster"] = ancienne["tmdb_id"], ""
-        else:
+        elif apparies < SORTIES_LOT:
+            apparies += 1
             s["tmdb_id"], s["poster"] = apparier_tmdb(ck, s)
-            time.sleep(0.2)
+        else:
+            s["tmdb_id"], s["poster"] = None, ""
         lignes.append(dict(s, maj=date.today().isoformat()))
         if not ancienne:
             neuves.append(s)
