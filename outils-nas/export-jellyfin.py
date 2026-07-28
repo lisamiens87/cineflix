@@ -41,6 +41,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import date
+from html import unescape
 
 TIMEOUT = 30
 PAGE = 500
@@ -448,6 +449,198 @@ def enrichir_telerama(base, key, fiches):
             print("Télérama : %d titre(s) hors bibliothèque vérifié(s)" % n)
 
 
+# ---------- Sorties physiques France (4K UHD / Blu-ray) ----------
+# TMDB range mal les dates de sortie physique françaises (type 5) : elles sont
+# renseignées par la communauté, donc trouées, et ne disent jamais si l'édition
+# est 4K. 4k-ultra-hd.fr tient le calendrier FR à jour au jour près, avec
+# l'édition (Steelbook, Collector…), le prix, et souvent le titre original —
+# ce dernier permet de retrouver le film sur TMDB sans ambiguïté.
+# Trois pages suffisent à couvrir les prochains mois. Une fois par heure : le
+# calendrier ne bouge pas toutes les cinq minutes.
+SORTIES_URL = "https://4k-ultra-hd.fr/prochaines-sorties-blu-ray-4k-ultra-hd"
+SORTIES_PAGES = 3
+MOIS_FR = {"janvier": 1, "février": 2, "fevrier": 2, "mars": 3, "avril": 4,
+           "mai": 5, "juin": 6, "juillet": 7, "août": 8, "aout": 8,
+           "septembre": 9, "octobre": 10, "novembre": 11,
+           "décembre": 12, "decembre": 12}
+RE_SORTIE = re.compile(
+    r"Sortie\s+(\d{1,2})\s+([A-Za-zéèûàî]+)\s+(\d{4})\s*:\s*(.*?)\s*"
+    r"\(\s*(?:(.+?)\s*[-–]\s*)?(\d{4})\s*\)")
+RE_TITRE = re.compile(r'product-title[^>]*>\s*<a[^>]*>\s*([^<]+?)\s*</a>')
+RE_SLUG = re.compile(r'href="https://4k-ultra-hd\.fr/film/([^"/]+)')
+# Les mots qui décrivent l'édition, pas le film : ils gênent la recherche TMDB.
+RE_EDITION = re.compile(
+    r"\b(4k|uhd|blu-?ray|steelbook|collector|coffret|fourreau|standard|"
+    r"[ée]dition|limit[ée]e|digibook|combo|dvd|ultra\s*hd|m[ée]diabook|"
+    r"int[ée]grale|trilogie|pack)\b", re.I)
+
+
+def _denude(s):
+    """HTML → texte nu. Les entités sont DÉCODÉES et non supprimées : sur ce
+    site les mois peuvent s'écrire « ao&ucirc;t », et les remplacer par une
+    espace ferait perdre la date."""
+    s = re.sub(r"<[^>]+>", " ", s)
+    s = unescape(s).replace(" ", " ")
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def _titre_nu(t):
+    """« Peur bleue 4K Steelbook » → « Peur bleue »."""
+    t = RE_EDITION.sub(" ", t or "")
+    t = re.sub(r"\s+", " ", t).strip(" -–—:·")
+    return t
+
+
+def lire_sorties():
+    """Le calendrier des sorties physiques FR, page par page."""
+    vues, l = set(), []
+    for p in range(1, SORTIES_PAGES + 1):
+        url = SORTIES_URL if p == 1 else SORTIES_URL + "/page/%d" % p
+        try:
+            html = _tlr_get(url)
+        except Exception as e:
+            print("Sorties : page %d illisible (%s)" % (p, e))
+            break
+        blocs = html.split('class="product-small box')[1:]
+        if not blocs:
+            break
+        for b in blocs:
+            m = RE_SORTIE.search(_denude(b))
+            if not m:
+                continue
+            mois = MOIS_FR.get(m.group(2).lower())
+            if not mois:
+                continue
+            slug = RE_SLUG.search(b)
+            titre = RE_TITRE.search(b)
+            edition = m.group(4) or ""
+            cle = slug.group(1) if slug else _tlr_norm(m.group(4) + m.group(6))[:60]
+            if cle in vues:
+                continue
+            vues.add(cle)
+            l.append({
+                "cle": cle,
+                "titre": _denude(titre.group(1)) if titre else "",
+                "vo": m.group(5) or "",
+                "annee": m.group(6),
+                "date": "%s-%02d-%02d" % (m.group(3), mois, int(m.group(1))),
+                "edition": edition,
+                "uhd": bool(re.search(r"4k|uhd", edition, re.I)),
+            })
+        time.sleep(TLR_PAUSE)
+    return l
+
+
+def apparier_tmdb(ck, s):
+    """Retrouve le film sur TMDB. Le titre original, quand le site le donne,
+    lève toute ambiguïté ; sinon on cherche le titre français débarrassé des
+    mots d'édition. L'année sert de garde-fou (±1 an : une sortie salle de
+    décembre est souvent datée de l'année suivante chez TMDB)."""
+    if not ck:
+        return None, ""
+    for requete in [x for x in (s.get("vo"), _titre_nu(s.get("titre"))) if x]:
+        params = {"api_key": ck, "language": "fr-FR", "include_adult": "false",
+                  "query": requete}
+        try:
+            d = json.loads(_tlr_get("https://api.themoviedb.org/3/search/movie?"
+                                    + urllib.parse.urlencode(params)))
+        except Exception:
+            continue
+        an = int(s.get("annee") or 0)
+        for r in (d.get("results") or [])[:6]:
+            ra = int((r.get("release_date") or "0")[:4] or 0)
+            if an and ra and abs(ra - an) > 1:
+                continue
+            return r.get("id"), r.get("poster_path") or ""
+        time.sleep(0.2)
+    return None, ""
+
+
+def collecter_sorties(base, key):
+    """Met à jour la table des sorties physiques et prévient ceux dont une
+    demande vient d'être datée."""
+    connues = {}
+    try:
+        for r in lire_supabase(base, key,
+                               "/rest/v1/sorties_phys?select=cle,tmdb_id,date&limit=5000"):
+            connues[r["cle"]] = r
+    except Exception as e:
+        print("Sorties : table illisible (%s)" % e)
+        return
+    l = lire_sorties()
+    if not l:
+        return
+    ck = cle_tmdb()
+    lignes, neuves = [], []
+    for s in l:
+        ancienne = connues.get(s["cle"])
+        if ancienne and ancienne.get("tmdb_id"):
+            # Déjà appariée : on ne réécrit que si la date a bougé.
+            if ancienne.get("date") == s["date"]:
+                continue
+            s["tmdb_id"], s["poster"] = ancienne["tmdb_id"], ""
+        else:
+            s["tmdb_id"], s["poster"] = apparier_tmdb(ck, s)
+            time.sleep(0.2)
+        lignes.append(dict(s, maj=date.today().isoformat()))
+        if not ancienne:
+            neuves.append(s)
+    if lignes:
+        req = urllib.request.Request(
+            base.rstrip("/") + "/rest/v1/sorties_phys",
+            data=json.dumps(lignes).encode("utf-8"), method="POST",
+            headers={"apikey": key, "Authorization": "Bearer " + key,
+                     "Content-Type": "application/json",
+                     "Prefer": "resolution=merge-duplicates,return=minimal"})
+        urllib.request.urlopen(req, timeout=TIMEOUT)
+        print("Sorties physiques : %d ligne(s) à jour, %d nouvelle(s)"
+              % (len(lignes), len(neuves)))
+    try:
+        notifier_sorties(base, key, neuves)
+    except Exception as e:
+        print("Sorties : notification sautée (%s)" % e)
+
+
+def notifier_sorties(base, key, neuves):
+    """« Le Comte de Monte-Cristo sort en 4K le 1er août » — seulement pour
+    les titres que quelqu'un a demandés, et une seule fois."""
+    prive = os.environ.get("VAPID_PRIVATE", "").strip()
+    ids = [str(s["tmdb_id"]) for s in neuves if s.get("tmdb_id")]
+    if not prive or not ids:
+        return
+    demandes = lire_supabase(base, key,
+        "/rest/v1/elements?select=user_id,titre,tmdb_id,poster"
+        "&demande=is.true&type=eq.movie&tmdb_id=in.(%s)" % ",".join(ids))
+    if not demandes:
+        return
+    par_id = {s["tmdb_id"]: s for s in neuves}
+    users = sorted({d["user_id"] for d in demandes})
+    abos = lire_supabase(base, key,
+        "/rest/v1/push_abonnements?select=endpoint,p256dh,auth,user_id"
+        "&user_id=in.(%s)" % ",".join(users))
+    par_user = {}
+    for ab in abos:
+        par_user.setdefault(ab["user_id"], []).append(ab)
+    for d in demandes:
+        s = par_id.get(d["tmdb_id"])
+        if not s:
+            continue
+        j, m, a = s["date"][8:10], int(s["date"][5:7]), s["date"][:4]
+        mois = [k for k, v in MOIS_FR.items() if v == m and len(k) > 3][0]
+        corps = json.dumps({
+            "titre": "%s sort en %s" % (d.get("titre") or s["titre"],
+                                        "4K" if s.get("uhd") else "Blu-ray"),
+            "corps": "Le %s %s %s — %s" % (int(j), mois, a, s.get("edition") or "édition physique"),
+            "ic": ("https://image.tmdb.org/t/p/w185" + d["poster"]) if d.get("poster") else "",
+            "url": "https://lisamiens87.github.io/cineflix/"})
+        for ab in par_user.get(d["user_id"], []):
+            try:
+                envoyer_push(ab["endpoint"], ab["p256dh"], ab["auth"], corps,
+                             prive, "mailto:alexandre.mesnier@cabinet-ekinox.fr")
+            except Exception:
+                pass
+
+
 def _b64u_dec(s):
     s = s.strip()
     return base64.urlsafe_b64decode(s + "=" * (-len(s) % 4))
@@ -662,6 +855,14 @@ def main():
             enrichir_telerama(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
         except Exception as e:
             print("Télérama sauté : %s" % e)
+        # Calendrier des sorties physiques : une fois par heure suffit, et
+        # c'est autant de requêtes en moins chez eux (le cron passe toutes
+        # les 5 minutes, seule celle de l'heure pile fait le travail).
+        if time.localtime().tm_min < 5:
+            try:
+                collecter_sorties(a.supabase_url, a.supabase_key)
+            except Exception as e:
+                print("Sorties physiques sautées : %s" % e)
 
     contenu = {
         "maj": date.today().isoformat(),
