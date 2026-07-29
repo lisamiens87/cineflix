@@ -263,10 +263,26 @@ function renderNav(){
   /* Le logo vit DANS la barre : invisible sur téléphone (la barre du bas
      n'a pas de place), il devient l'ancre gauche de la barre horizontale
      du bureau. CINÉ blanc, FLIX rouge — la signature de la maquette. */
+  /* Sur le bureau, la barre ne liste plus les écrans : Alexandre n'aime pas
+     les deux bandeaux superposés. Elle porte le CONTEXTE de l'écran en cours —
+     loupe, Films, Séries quand on découvre — et le logo ramène à l'accueil.
+     Sorties et Ma liste survivent en icônes discrètes à droite ; sur
+     téléphone, rien ne change : la barre du bas garde ses quatre onglets. */
+  const ctx = cur === 'decouvrir'
+    ? '<div class="navctx">'+
+        '<button class="iconbtn" onclick="ouvrirChamp()" aria-label="Chercher">'+
+          (ui.champOuvert ? I.close : I.search)+'</button>'+
+        '<button class="nchip'+(ui.disc.type==='movie'?' on':'')+
+          '" onclick="setType(\'movie\')">Films</button>'+
+        '<button class="nchip'+(ui.disc.type==='tv'?' on':'')+
+          '" onclick="setType(\'tv\')">Séries</button>'+
+      '</div>'
+    : '';
   document.getElementById('nav').innerHTML =
-    '<div class="navlogo">CINÉ<i>FLIX</i></div>' +
+    '<button class="navlogo" onclick="go(\'decouvrir\')">CINÉ<i>FLIX</i></button>' +
+    ctx +
     tabs.map(([id,label,icon,badge])=>
-    '<button class="tab '+(cur===id?'on':'')+'" onclick="go(\''+id+'\')">'+icon+
+    '<button class="tab t-'+id+' '+(cur===id?'on':'')+'" onclick="go(\''+id+'\')">'+icon+
     (badge ? '<span class="pastille-nav">'+badge+'</span>' : '')+
     '<span>'+label+'</span></button>'
   ).join('');
