@@ -208,21 +208,40 @@ async function catalogueDepuisSupabase(){
    centaines de lignes au plus : on prend tout d'un coup. */
 async function sortiesPhysiques(){
   try{
-    const l = await sbFetch('/rest/v1/sorties_phys?select=titre,vo,annee,date,'+
-      'edition,uhd,prix,tmdb_id,poster&order=date.asc&limit=2000', {});
+    const l = await lireTout('/rest/v1/sorties_phys?select=titre,vo,annee,date,'+
+      'edition,uhd,prix,tmdb_id,poster&order=date.asc');
     if(!Array.isArray(l)) return;
     SORTIES.l = l; SORTIES.charge = true;
   }catch(e){ /* sans calendrier, l'onglet Sorties retombe sur TMDB */ }
 }
 
+/* Lit une table ENTIÈRE, par pages.
+
+   PIÈGE : PostgREST plafonne ses réponses à 1000 lignes, en silence. Un
+   `limit=50000` ne provoque aucune erreur — il renvoie une liste tronquée.
+   Passé les 1000 notes Télérama, l'app n'en aurait affiché qu'une partie,
+   sans que rien ne le signale. */
+async function lireTout(chemin, taille){
+  taille = taille || 1000;
+  const sep = chemin.indexOf('?') >= 0 ? '&' : '?';
+  let out = [], debut = 0;
+  for(;;){
+    const lot = await sbFetch(chemin + sep + 'limit='+taille+'&offset='+debut, {});
+    if(!Array.isArray(lot) || !lot.length) return out;
+    out = out.concat(lot);
+    if(lot.length < taille) return out;
+    debut += taille;
+    if(debut > 100000) return out;          // garde-fou
+  }
+}
+
 /* Les notes Télérama : une table à part, indépendante de la bibliothèque —
    c'est elle qui permet d'afficher les T sur Cinéma et Plateformes. On ne
-   charge que les titres NOTÉS (les autres n'ont rien à montrer), ce qui tient
-   en quelques dizaines de kilo-octets. Une panne ici ne doit rien casser :
-   l'app marche exactement pareil, sans les T. */
+   charge que les titres NOTÉS (les autres n'ont rien à montrer). Une panne
+   ici ne doit rien casser : l'app marche exactement pareil, sans les T. */
 async function notesTelerama(){
   try{
-    const l = await sbFetch('/rest/v1/telerama?select=cle,t,verdict&t=gt.0&limit=50000', {});
+    const l = await lireTout('/rest/v1/telerama?select=cle,t,verdict&t=gt.0');
     if(!Array.isArray(l)) return;
     const m = new Map();
     l.forEach(r => { if(r && r.cle) m.set(r.cle, { jt:r.t, jv:r.verdict||'' }); });
