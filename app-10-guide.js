@@ -1,8 +1,11 @@
 "use strict";
 /* ============================ Laisse-moi te guider ============================
-   Un moteur entièrement local : aucune clé nouvelle, aucun coût, aucune
-   dépendance. Deux entrées — les goûts déclarés à l'inscription, et l'humeur
-   du moment — mais un seul périmètre, qui est la règle d'or de cet écran :
+   Trois entrées, toutes explicites : une HUMEUR (dix puces), une CATÉGORIE
+   (les 20 genres et 43 sous-catégories de la taxonomie, app-11), ou les GOÛTS
+   déclarés. Le champ de texte libre a été retiré — il prétendait comprendre
+   une phrase et ne faisait que repérer des mots.
+
+   Un seul périmètre, qui reste la règle d'or de cet écran :
 
      on ne propose que ce que cette personne peut regarder CE SOIR,
      c'est-à-dire la bibliothèque du serveur et les plateformes
@@ -11,71 +14,35 @@
    Proposer un chef-d'œuvre qu'on ne peut pas lancer, c'est une frustration,
    pas une suggestion. */
 
-const gNorm = s => String(s||'').toLowerCase().normalize('NFD')
-  .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
 const gLettres = s => String(s||'').toLowerCase().normalize('NFD').replace(/[^a-z]/g,'');
 
 /* ---------- Les dix humeurs ----------
-   Chacune porte ses genres, ses exclusions, ses seuils ET ses mots
-   déclencheurs : c'est la même table qui sert aux puces et à la
-   compréhension du texte libre. Les mots sont écrits sans accent, puisque
-   c'est sous cette forme que le texte de l'utilisateur arrive. */
+   Elles ne portent plus de mots déclencheurs : le champ de texte libre a été
+   retiré. Ce qui restait était du repérage de mots-clés déguisé en
+   compréhension — « un film d'action simple et détendu » rendait Casino
+   Royale. Une puce dit exactement ce qu'elle fait ; une phrase promettait ce
+   qu'elle ne tenait pas. */
 const HUMEURS = [
   { id:'rire', label:'Rire un bon coup', emo:'😄',
-    mots:['rire','rigoler','marrer','marrant','comedie','comique','drole','leger',
-          'detendre','decompresser','prise de tete','prendre la tete','fun','bonne humeur'],
     genres:[35], sans:[27,10752], duree:115, note:6.2 },
   { id:'action', label:'Action, sans réfléchir', emo:'💥',
-    mots:['action','castagne','explosion','bagarre','sans reflechir','sans se poser',
-          'poser de questions','adrenaline','spectaculaire','baston','pop corn'],
     genres:[28,12], sans:[99], apres:2000, note:6 },
   { id:'peur', label:'Me faire peur', emo:'😱',
-    mots:['peur','horreur','flipper','angoisse','effrayant','frissons','epouvante',
-          'terrifiant','cauchemar'],
     genres:[27,53], sans:[35,10751], note:6 },
   { id:'pleurer', label:'Pleurer un bon coup', emo:'😢',
-    mots:['pleurer','emouvoir','emouvant','triste','larmes','bouleversant','melo',
-          'toucher','emotion'],
     genres:[18,10749], sans:[27], note:7.2 },
   { id:'reflechir', label:'Réfléchir', emo:'🧠',
-    mots:['reflechir','intelligent','cerveau','complexe','intello','philosophique',
-          'profond','tordu','qui fait penser','prise de tete positive'],
     genres:[18,878,9648], sans:[10751], note:7.3 },
   { id:'famille', label:'En famille', emo:'👨‍👩‍👧',
-    mots:['famille','enfants','gamins','petits','tous ensemble','avec les enfants',
-          'dessin anime','animation'],
     genres:[16,10751,12], sans:[27,53,80], note:6.5 },
   { id:'beau', label:'Beau et lent', emo:'🎞️',
-    mots:['contemplatif','lent','esthetique','magnifique','poetique','beau film',
-          'grand film','du grand cinema'],
     genres:[18,36], sans:[27,28], note:7.4 },
   { id:'suspense', label:'Suspense', emo:'🔎',
-    mots:['suspense','enquete','polar','thriller','mystere','intrigue','tension',
-          'policier','crime','haletant'],
     genres:[53,80,9648], sans:[10751], note:6.8 },
   { id:'voyager', label:'Voyager', emo:'🌍',
-    mots:['voyager','voyage','depaysement','ailleurs','decouvrir','aventure','nature',
-          'evasion','documentaire'],
     genres:[12,99,36], sans:[27], note:6.5 },
   { id:'sure', label:'Une valeur sûre', emo:'⭐',
-    mots:['valeur sure','incontournable','le meilleur','chef d oeuvre',
-          'reference','culte','pas me tromper'],
     genres:[], sans:[], note:7.8, votes:2000 }
-];
-
-/* Des nuances qui s'appliquent PAR-DESSUS n'importe quelle humeur : elles ne
-   changent pas le genre, elles resserrent la sélection. */
-const MODIFS = [
-  { id:'court',  mots:['court','pas long','pas trop long','moins de deux heures','moins de 2h','rapide'],
-    dit:'court', appli:r=>{ r.duree = Math.min(r.duree || 999, 110); } },
-  { id:'recent', mots:['recent','nouveau','nouveaute','cette annee','qui vient de sortir'],
-    dit:'récent', appli:r=>{ r.apres = Math.max(r.apres || 0, 2018); } },
-  { id:'vieux',  mots:['vieux','ancien','a l ancienne','annees 80','annees 70','vieux film'],
-    dit:'ancien', appli:r=>{ r.avant = 1995; r.apres = 0; } },
-  { id:'fr',     mots:['francais','france','french','de chez nous'],
-    dit:'français', appli:r=>{ r.pays = 'FR'; } },
-  { id:'serie',  mots:['serie','series','saison','episode','a binger'],
-    dit:'série', appli:r=>{ r.type = 'tv'; } }
 ];
 
 /* ---------- Le lexique des SUJETS ----------
@@ -161,14 +128,6 @@ function couvertureMC(){
   return _couvMC;
 }
 
-function lireSujets(t){
-  const out = [];
-  SUJETS.forEach(s=>{
-    if(s.mots.some(m => t.indexOf(' '+m) >= 0 || t.indexOf(m+' ') >= 0)) out.push(s);
-  });
-  return out;
-}
-
 /* ---------- Le périmètre ---------- */
 /* Le guide n'était braqué que sur la bibliothèque. Les trois sources de
    Découvrir s'appliquent tout aussi bien ici — avec une conséquence assumée :
@@ -237,39 +196,6 @@ function recetteGouts(){
   r.titre = 'D\'après tes goûts';
   return r;
 }
-/* Le texte libre est ramené aux dix recettes : on compte les mots
-   déclencheurs de chacune, la mieux servie l'emporte. Si aucune ne répond,
-   on ne bluffe pas — on le dit et on retombe sur les goûts. */
-function lireHumeur(txt){
-  const t = ' '+gNorm(txt)+' ';
-  if(!t.trim()) return null;
-  let best = null, score = 0;
-  HUMEURS.forEach(h=>{
-    let n = 0;
-    h.mots.forEach(m => { if(t.indexOf(' '+m) >= 0 || t.indexOf(m+' ') >= 0) n++; });
-    if(n > score){ score = n; best = h; }
-  });
-  const mods = MODIFS.filter(m => m.mots.some(x => t.indexOf(x) >= 0));
-  const sujets = lireSujets(t);
-  if(!best && !mods.length && !sujets.length) return null;
-  const r = best ? recetteHumeur(best) : recetteGouts();
-  mods.forEach(m => { m.appli(r); r.dits.push(m.dit); });
-  /* Un sujet reconnu vaut mieux qu'une humeur devinée : quand il n'y a pas
-     d'humeur, c'est lui qui donne son titre à la sélection, et on laisse les
-     genres ouverts — « un film de braquage » n'est pas un genre. */
-  sujets.forEach(x=>{
-    x.mc.forEach(id => { if(r.mc.indexOf(id) < 0) r.mc.push(id); });
-    r.dits.push(x.dit);
-  });
-  if(!best){
-    r.titre = sujets.length
-      ? sujets.map(x=>x.dit).join(' · ').replace(/^./, c=>c.toUpperCase())
-      : 'D\'après tes goûts';
-    if(sujets.length){ r.genres = []; r.note = 0; r.votes = 0; }
-  }
-  return r;
-}
-
 /* ---------- Les viviers ---------- */
 /* 1. La bibliothèque : aucune requête, tout est déjà en mémoire — et le NAS
    y met bien plus que des titres. Le pays, la note des critiques, la note
@@ -355,7 +281,14 @@ async function vivierTmdb(r, pages, mode){
   const champ = r.type === 'movie' ? 'primary_release_date' : 'first_air_date';
   const dem = r.genres.concat(r.g, r.gUn);
   const veutAnim = dem.indexOf(16) >= 0 || dem.indexOf(10751) >= 0;
-  const base = { include_adult:'false', sort_by:'popularity.desc' };
+  /* Le tri fait plus de dégâts qu'on ne croit. « popularity.desc » remonte ce
+     qui sort CETTE SEMAINE : « Action d'auteur » rendait L'Odyssée, Supergirl
+     et Les Maîtres de l'univers. Pour une catégorie, ce qu'on veut ce sont les
+     films qui la DÉFINISSENT — donc les plus vus. Le même essai en
+     « vote_count.desc » rend Inception, The Dark Knight, Le Parrain.
+     Les humeurs gardent la popularité : là, la nouveauté est un plus. */
+  const base = { include_adult:'false',
+                 sort_by: r.taxo ? 'vote_count.desc' : 'popularity.desc' };
   if(plats.length){
     base.watch_region = db.region || 'FR';
     base.with_watch_providers = plats.join('|');
@@ -545,12 +478,9 @@ let guideSeq = 0;
 
 async function guider(source, txt){
   const g = ui.guide;
-  let r = null, repli = false;
+  let r = null;
 
-  if(source === 'texte'){
-    r = lireHumeur(txt);
-    if(!r){ r = recetteGouts(); repli = true; }
-  }else if(source === 'gouts'){
+  if(source === 'gouts'){
     r = recetteGouts();
   }else if(source.indexOf('taxo:') === 0){
     r = taxoRecette(source.slice(5)) || recetteGouts();
@@ -569,21 +499,21 @@ async function guider(source, txt){
     if(r.sans.indexOf(id) < 0 && voulus.indexOf(id) < 0) r.sans.push(id);
   });
 
-  if(repli && !aGouts()){
-    g.err = 'Je n\'ai pas saisi, et je ne connais pas encore tes goûts. '+
-            'Essaie une des propositions ci-dessus.';
+  if(source === 'gouts' && !aGouts()){
+    g.err = 'Je ne connais pas encore tes goûts. Renseigne-les dans '+
+            'Profil → Mes goûts, ou choisis une catégorie ci-dessus.';
     g.res = []; g.loading = false; g.charge = true; return render();
   }
 
   const seq = ++guideSeq;
-  g.loading = true; g.err = ''; g.recette = r; g.repli = repli; g.source = source;
+  g.loading = true; g.err = ''; g.recette = r; g.source = source;
   render();
 
   try{
     const perim = perimGuide();
     const [externes, totems] = await Promise.all([
       perim === 'flix' ? Promise.resolve([]) : vivierTmdb(r, 3, perim).catch(()=>[]),
-      (source === 'gouts' || repli) ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
+      source === 'gouts' ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
     ]);
     if(seq !== guideSeq) return;
 
@@ -668,7 +598,7 @@ async function guider(source, txt){
 
 function ouvrirGuide(){
   ui.guide = { txt:'', recette:null, res:[], loading:false, err:'', charge:false,
-               vus:{}, repli:false, source:'', taxoG:'', taxoSel:'',
+               vus:{}, source:'', taxoG:'', taxoSel:'',
                perim:(ui.guide||{}).perim || 'flix' };
   go('guide');
 }
@@ -680,12 +610,6 @@ function setPerimGuide(id){
   ui.guide.vus = {};
   if(ui.guide.source) return guider(ui.guide.source, ui.guide.txt || '');
   render();
-}
-function guiderTexte(){
-  const v = (document.getElementById('gtxt')||{}).value || '';
-  ui.guide.txt = v;
-  if(!v.trim()) return toast('Dis-moi ce dont tu as envie');
-  guider('texte', v);
 }
 function guiderHumeur(id){
   ui.guide.txt = '';
@@ -727,14 +651,11 @@ function viewGuide(){
   const g = ui.guide || (ui.guide = { txt:'', res:[], vus:{} });
   let h = header('Laisse-moi te guider', {back:'goBack()'});
 
-  h += '<div class="wrap">'+
-    '<label class="fld"><span>Qu\'est-ce qui te ferait plaisir&nbsp;?</span>'+
-      '<input type="text" id="gtxt" value="'+esc(g.txt||'')+'" '+
-      'placeholder="j\'ai envie de rire sans me prendre la tête…" autocomplete="off" '+
-      'onkeydown="if(event.key===\'Enter\'){this.blur();guiderTexte()}"></label>'+
-    '<button class="btn block" style="margin-top:10px" onclick="guiderTexte()">'+
-      'Trouve-moi quelque chose</button>'+
-  '</div>';
+  /* Plus de champ libre. Il promettait de comprendre une phrase et ne faisait
+     que chercher des mots : « un film d'action simple et détendu » rendait
+     Casino Royale. Vingt genres, quarante-trois sous-catégories et dix humeurs
+     disent exactement ce qu'ils font — c'est moins flatteur et bien plus
+     honnête. */
 
   /* Les trois sources, aux mêmes couleurs que dans Découvrir : Cinéflix en
      vert, Plateformes en rouge, Cinéma en orange. */
@@ -760,18 +681,13 @@ function viewGuide(){
     return h + '<div class="empty"><span class="spin"></span>'+
       '<p style="margin-top:12px">Je cherche…</p></div>';
 
-  if(g.repli && g.charge && !g.err)
-    h += '<div class="banner">Je n\'ai pas bien saisi ta demande — voilà ce que '+
-         'je te propose d\'après tes goûts.</div>';
-
   if(g.err)
     return h + '<div class="empty">'+I.boussole+'<h3>Rien à proposer</h3>'+
       '<p>'+esc(g.err)+'</p></div>';
 
   if(!g.charge)
-    return h + '<div class="empty">'+I.boussole+'<h3>Dis-moi ton envie</h3>'+
-      '<p>Écris ce dont tu as envie, choisis une humeur, ou passe par les '+
-      'catégories. '+esc(portee())+'</p></div>';
+    return h + '<div class="empty">'+I.boussole+'<h3>Choisis une entrée</h3>'+
+      '<p>Une humeur, ou une catégorie. '+esc(portee())+'</p></div>';
 
   if(!g.res.length)
     return h + '<div class="empty">'+I.boussole+'<h3>Rien trouvé</h3>'+
