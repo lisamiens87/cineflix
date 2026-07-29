@@ -245,14 +245,26 @@ function render(){
   if(view === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
 }
 
+/* La page principale est une COUVERTURE (le grand visuel, rien d'autre) ;
+   le catalogue — les trois sources, les filtres, la grille — vit derrière
+   l'onglet Films ou Séries. C'est le découpage demandé par Alexandre :
+   « je veux qu'on laisse le grand visuel en page principale ». */
+function go2Decouvrir(){
+  ui.exploration = false;
+  if(view === 'decouvrir') render(); else go('decouvrir');
+}
+function ouvrirCatalogue(t){
+  ui.exploration = true;
+  if(ui.disc.type !== t){
+    ui.disc.type = t;
+    ui.disc.page = 1; ui.disc.charge = false; ui.disc.res = [];
+  }
+  if(view === 'decouvrir') render(); else go('decouvrir');
+  if(!ui.disc.charge && !ui.disc.loading && db.apiKey) chargerDecouverte();
+}
+
 function renderNav(){
   const n = nbDemandes();
-  const tabs = [
-    ['decouvrir','Découvrir', I.boussole, 0],
-    ['sorties','Sorties',     I.cal,      0],
-    ['liste','Ma liste',      I.coeur,    n],
-    ['profil','Profil',       I.user,     0]
-  ];
   const depuis = params.from === 'file' ? 'profil'
     : params.from === 'guide' ? 'decouvrir'
     : (params.from || (view === 'personne' ? ((ui.personne||{}).nav||{}).ffrom : ''));
@@ -260,33 +272,36 @@ function renderNav(){
             : (view === 'reglages' || view === 'file' || view === 'acces') ? 'profil'
             : view === 'guide' ? 'decouvrir'
             : view;
-  /* Le logo vit DANS la barre : invisible sur téléphone (la barre du bas
-     n'a pas de place), il devient l'ancre gauche de la barre horizontale
-     du bureau. CINÉ blanc, FLIX rouge — la signature de la maquette. */
-  /* Sur le bureau, la barre ne liste plus les écrans : Alexandre n'aime pas
-     les deux bandeaux superposés. Elle porte le CONTEXTE de l'écran en cours —
-     loupe, Films, Séries quand on découvre — et le logo ramène à l'accueil.
-     Sorties et Ma liste survivent en icônes discrètes à droite ; sur
-     téléphone, rien ne change : la barre du bas garde ses quatre onglets. */
-  const ctx = cur === 'decouvrir'
-    ? '<div class="navctx">'+
-        '<button class="iconbtn" onclick="ouvrirChamp()" aria-label="Chercher">'+
-          (ui.champOuvert ? I.close : I.search)+'</button>'+
-        '<button class="nchip'+(ui.disc.type==='movie'?' on':'')+
-          '" onclick="setType(\'movie\')">Films</button>'+
-        '<button class="nchip'+(ui.disc.type==='tv'?' on':'')+
-          '" onclick="setType(\'tv\')">Séries</button>'+
-      '</div>'
-    : '';
+  const exp = !!ui.exploration;
+
+  /* Films et Séries n'existent que sur le bureau (classe dsk) : la barre du
+     bas d'un téléphone n'a que quatre places, et la couverture y propose ses
+     propres entrées. La typo des liens est celle de la maquette — pas de
+     majuscules forcées, pas de soulignement. */
+  const items = [
+    { cl:'t-decouvrir', on: cur === 'decouvrir' && !exp, act:'go2Decouvrir()',
+      ic:I.boussole, lab:'Découvrir' },
+    { cl:'t-films dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'movie',
+      act:"ouvrirCatalogue('movie')", ic:'', lab:'Films' },
+    { cl:'t-series dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'tv',
+      act:"ouvrirCatalogue('tv')", ic:'', lab:'Séries' },
+    { cl:'t-sorties', on: cur === 'sorties', act:"go('sorties')", ic:I.cal, lab:'Sorties' },
+    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, lab:'Ma liste', badge:n },
+    { cl:'t-profil', on: cur === 'profil', act:"go('profil')", ic:I.user, lab:'Profil' }
+  ];
   document.getElementById('nav').innerHTML =
-    '<button class="navlogo" onclick="go(\'decouvrir\')">CINÉ<i>FLIX</i></button>' +
-    ctx +
-    tabs.map(([id,label,icon,badge])=>
-    '<button class="tab t-'+id+' '+(cur===id?'on':'')+'" onclick="go(\''+id+'\')">'+icon+
-    (badge ? '<span class="pastille-nav">'+badge+'</span>' : '')+
-    '<span>'+label+'</span></button>'
-  ).join('');
+    '<button class="navlogo" onclick="go2Decouvrir()">CINÉ<i>FLIX</i></button>' +
+    items.map(t=>'<button class="tab '+t.cl+(t.on ? ' on' : '')+'" onclick="'+t.act+'">'+t.ic+
+      (t.badge ? '<span class="pastille-nav">'+t.badge+'</span>' : '')+
+      '<span>'+t.lab+'</span></button>').join('');
+
+  /* La couverture veut une barre transparente : l'image file jusqu'en haut. */
+  try{
+    document.body.classList.toggle('couverture',
+      view === 'decouvrir' && !exp && !ui.champOuvert && !enRecherche());
+  }catch(e){}
 }
+
 
 function banniereCle(){
   if(db.apiKey) return '';
