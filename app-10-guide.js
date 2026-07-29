@@ -25,8 +25,16 @@ const gLettres = s => String(s||'').toLowerCase().normalize('NFD').replace(/[^a-
 const HUMEURS = [
   { id:'rire', label:'Rire un bon coup', emo:'😄',
     genres:[35], sans:[27,10752], duree:115, note:6.2 },
+  /* Cette humeur a été refaite après un verdict d'Alexandre : elle rendait
+     Casino Royale, Inception, Le Seigneur des anneaux et Seul au monde.
+     Trois fautes, aucune subtile. « genres:[28,12] » est un OU, donc une
+     aventure sans une once d'action passait (Seul au monde). Le drame n'était
+     pas écarté. Et surtout le CLASSEMENT primait les films acclamés — Casino
+     Royale sortait à 12 points, Fast & Furious 4 à 7 : l'inverse exact de ce
+     que la puce promet. « simple » corrige le troisième point. */
   { id:'action', label:'Action, sans réfléchir', emo:'💥',
-    genres:[28,12], sans:[99], apres:2000, note:6 },
+    g:[28], sans:[99,36,10752,18,9648], apres:1995, note:5.6, noteMax:7.2,
+    simple:true },
   { id:'peur', label:'Me faire peur', emo:'😱',
     genres:[27,53], sans:[35,10751], note:6 },
   { id:'pleurer', label:'Pleurer un bon coup', emo:'😢',
@@ -175,13 +183,17 @@ function idsDepuisNoms(noms){
 function recetteVide(){
   return { genres:[], sans:[], note:0, votes:0, duree:0, apres:0, avant:0,
            pays:'', type:'movie', titre:'', dits:[], mc:[],
-           g:[], gUn:[], sansMc:[], dureeMin:0, noteMax:0, locNoms:[], taxo:'' };
+           g:[], gUn:[], sansMc:[], dureeMin:0, noteMax:0, locNoms:[], taxo:'',
+           simple:false };
 }
 function recetteHumeur(h){
   const r = recetteVide();
   r.genres = (h.genres||[]).slice(); r.sans = (h.sans||[]).slice();
+  r.g = (h.g||[]).slice(); r.gUn = (h.gUn||[]).slice();
   r.note = h.note || 0; r.votes = h.votes || 0;
+  r.noteMax = h.noteMax || 0;
   r.duree = h.duree || 0; r.apres = h.apres || 0;
+  r.simple = !!h.simple;
   r.titre = h.label;
   return r;
 }
@@ -260,7 +272,11 @@ function vivierCineflix(r, revoir){
       if(r.note && c.note && c.note < r.note - 0.6) return false;
       /* Le plafond de note sert « action decomplexee » : un film que les
          critiques ont adore n'est plus, par definition, de la serie B. */
-      if(r.noteMax && c.note && c.note > r.noteMax + 0.4) return false;
+         PAS de tolérance ici, contrairement au plancher : la marge de +0,4
+         existait parce que le NAS note plus sévèrement que TMDB — argument qui
+         vaut pour un minimum, pas pour un maximum. Avec elle, Casino Royale
+         (7,57) passait sous un plafond de 7,2. */
+      if(r.noteMax && c.note && c.note > r.noteMax) return false;
       if(r.duree && c.duree && c.duree > r.duree + 10) return false;
       if(r.dureeMin && c.duree && c.duree < r.dureeMin - 10) return false;
       if(r.apres && c.annee && c.annee < r.apres) return false;
@@ -417,6 +433,17 @@ function scorerCandidat(c, r){
   if(c.noteCrit >= 85) s += 2; else if(c.noteCrit >= 70) s += 1;
   if(c.jt >= 3) s += 2; else if(c.jt) s += 1;
   if(c.note >= 7.5) s += 1;
+
+  /* Quand la demande est « sans réfléchir » ou « décomplexé », les primes à la
+     reconnaissance ci-dessus jouent CONTRE la demande : elles remontaient
+     Inception et The Dark Knight en tête d'une puce qui promet le contraire.
+     On les annule — on ne les inverse pas : « sans réfléchir » ne veut pas
+     dire « mauvais », et récompenser la médiocrité serait une autre faute. */
+  if(r.simple){
+    if(c.noteCrit >= 85) s -= 2; else if(c.noteCrit >= 70) s -= 1;
+    if(c.jt >= 3) s -= 2; else if(c.jt) s -= 1;
+    if(c.note >= 7.5) s -= 1;
+  }
 
   if(g.duree && c.duree && c.duree > g.duree) s -= 3;
   if(g.vieux === false && c.annee && c.annee < 1990) s -= 2;
