@@ -679,27 +679,70 @@ async function chargerFile(){
   if(view === 'file') render();
 }
 
-async function changerStatut(uid, type, id, statut){
-  closeSheet();
-  try{
-    await sbFetch('/rest/v1/elements?user_id=eq.'+encodeURIComponent(uid)+
-                  '&type=eq.'+type+'&tmdb_id=eq.'+id,
-                  {method:'PATCH', headers:{ Prefer:'return=minimal' },
-                   body: JSON.stringify({ statut: statut })});
-    const l = file.lignes.find(x => x.user_id === uid && x.type === type && x.tmdb_id === id);
-    if(l) l.statut = statut;
-    render();
-    toast('Marqué « '+LIB_FILE[statut]+' »');
-  }catch(e){ toast('Échec : '+e.message); }
+/* Deux personnes qui réclament le même film, ce n'est pas deux lignes : c'est
+   UNE ligne et une information de plus — ce titre est attendu par plusieurs.
+   On regroupe par titre, et les demandeurs s'affichent côte à côte. */
+function groupesFile(lignes){
+  const par = new Map();
+  (lignes||[]).forEach(l=>{
+    const k = l.type+':'+l.tmdb_id;
+    let g = par.get(k);
+    if(!g){
+      g = { type:l.type, tmdb_id:l.tmdb_id, titre:l.titre, poster:l.poster,
+            qui:[], statuts:{}, le:l.cree_le };
+      par.set(k, g);
+    }
+    if(!g.poster && l.poster) g.poster = l.poster;
+    if(l.cree_le && String(l.cree_le) < String(g.le)) g.le = l.cree_le;
+    g.statuts[l.statut || 'demande'] = 1;
+    g.qui.push({ user_id:l.user_id, pseudo:l.pseudo || '?', avatar:l.avatar || null });
+  });
+  const out = Array.from(par.values());
+  /* Le statut du groupe est le MOINS avancé : tant qu'une personne attend,
+     le titre attend. */
+  out.forEach(g=>{
+    g.statut = g.statuts.demande ? 'demande'
+             : g.statuts.encours ? 'encours' : 'refuse';
+  });
+  return out.sort((a,b)=> String(b.le||'').localeCompare(String(a.le||'')));
 }
 
-function menuFile(uid, type, id){
-  const l = file.lignes.find(x => x.user_id === uid && x.type === type && x.tmdb_id === id) || {};
-  const b = (s, lib)=> l.statut === s ? '' :
-    '<button class="opt" onclick="changerStatut(\''+uid+'\',\''+type+'\','+id+',\''+s+'\')">'+lib+'</button>';
-  openSheet('<h3>'+esc(l.titre||'')+'</h3>'+
-    '<p class="small muted" style="margin:0 0 8px">Demandé par '+esc(l.pseudo||'?')+
-    ' · '+esc(relatif(String(l.cree_le||'').slice(0,10)))+'</p>'+
+function nomsDemandeurs(qui){
+  const n = (qui||[]).map(q=>q.pseudo);
+  if(!n.length) return '?';
+  if(n.length === 1) return esc(n[0]);
+  if(n.length === 2) return esc(n[0])+' et '+esc(n[1]);
+  return esc(n[0])+', '+esc(n[1])+' et '+(n.length-2)+' autre'+(n.length-2>1?'s':'');
+}
+
+/* Une décision porte sur le TITRE, pas sur une personne : marquer « en cours »
+   vaut pour tous ceux qui l'ont demandé. Une seule requête — la règle RLS
+   autorise l'administrateur à écrire sur les lignes de chacun. */
+async function changerStatut(type, id, statut){
+  closeSheet();
+  try{
+    const r = await sbFetch('/rest/v1/elements?type=eq.'+type+'&tmdb_id=eq.'+id+
+                            '&demande=is.true',
+                  {method:'PATCH', headers:{ Prefer:'return=representation' },
+                   body: JSON.stringify({ statut: statut })});
+    /* On COMPTE les lignes : une écriture bloquée par une règle de sécurité
+       répond 200 avec une liste vide, sans la moindre erreur. */
+    if(!Array.isArray(r) || !r.length)
+      return toast('Refusé par le serveur — rien n\'a changé.');
+    file.lignes.forEach(l => { if(l.type === type && l.tmdb_id === id) l.statut = statut; });
+    render();
+    toast('Marqué « '+LIB_FILE[statut]+' » pour '+r.length+' demandeur'+(r.length>1?'s':''));
+  }catch(e){ toast('Échec : '+(e.message||'réessaie')); }
+}
+
+function menuFile(type, id){
+  const g = groupesFile(file.lignes).find(x => x.type === type && x.tmdb_id === id) || {qui:[]};
+  const b = (s, lib)=> g.statut === s ? '' :
+    '<button class="opt" onclick="changerStatut(\''+type+'\','+id+',\''+s+'\')">'+lib+'</button>';
+  openSheet('<h3>'+esc(g.titre||'')+'</h3>'+
+    '<p class="small muted" style="margin:0 0 8px">Demandé par '+nomsDemandeurs(g.qui)+
+    ' · '+esc(relatif(String(g.le||'').slice(0,10)))+
+    (g.qui.length > 1 ? ' — la décision vaut pour tout le monde.' : '')+'</p>'+
     b('encours','Marquer « en cours d\'ajout »')+
     b('demande','Remettre en attente')+
     b('refuse','Refuser la demande')+
@@ -715,13 +758,13 @@ function viewFile(){
                     {id:'refuse',label:'Refusées'},    {id:'tout',label:'Tout'} ];
   /* Les demandes déjà présentes sur le serveur n'ont plus rien à faire dans
      une file de traitement : le catalogue les a résolues. */
-  const actives = file.lignes.filter(l => !surCineflix(l.type, l.tmdb_id));
-  const arrivees = file.lignes.filter(l => surCineflix(l.type, l.tmdb_id));
+  const actifs  = groupesFile(file.lignes.filter(l => !surCineflix(l.type, l.tmdb_id)));
+  const arrives = groupesFile(file.lignes.filter(l =>  surCineflix(l.type, l.tmdb_id)));
   const compte = {
-    demande: actives.filter(l=>l.statut==='demande').length,
-    encours: actives.filter(l=>l.statut==='encours').length,
-    refuse:  actives.filter(l=>l.statut==='refuse').length,
-    tout:    actives.length
+    demande: actifs.filter(g=>g.statut==='demande').length,
+    encours: actifs.filter(g=>g.statut==='encours').length,
+    refuse:  actifs.filter(g=>g.statut==='refuse').length,
+    tout:    actifs.length
   };
   const sub = '<div class="chips">'+FILTRES.map(f=>
     '<button class="chip '+(file.filtre===f.id?'on':'')+'" onclick="setFiltreFile(\''+f.id+'\')">'+
@@ -737,37 +780,40 @@ function viewFile(){
     return html + '<div class="empty"><h3>Lecture impossible</h3><p>'+esc(file.err)+'</p>'+
       '<button class="btn ghost" onclick="chargerFile()">Réessayer</button></div>';
 
-  const liste = file.filtre === 'tout' ? actives : actives.filter(l => l.statut === file.filtre);
+  const liste = file.filtre === 'tout' ? actifs : actifs.filter(g => g.statut === file.filtre);
   if(!liste.length)
     html += '<div class="empty">'+I.envoi+'<h3>Rien ici</h3>'+
       '<p>Aucune demande dans cette catégorie.</p></div>';
   else
     html += '<div class="list">'+liste.map(ligneFile).join('')+'</div>';
 
-  if(arrivees.length)
-    html += '<div class="sectitle">Résolues<span class="cnt">'+arrivees.length+'</span></div>'+
-      '<div class="list">'+arrivees.slice(0,20).map(ligneFile).join('')+'</div>';
+  if(arrives.length)
+    html += '<div class="sectitle">Résolues<span class="cnt">'+arrives.length+'</span></div>'+
+      '<div class="list">'+arrives.slice(0,20).map(ligneFile).join('')+'</div>';
 
   return html + '<div style="height:26px"></div>';
 }
 
-function ligneFile(l){
-  const dispo = surCineflix(l.type, l.tmdb_id);
-  const cls = dispo ? 'dispo' : l.statut === 'refuse' ? 'refuse'
-            : l.statut === 'encours' ? 'encours' : 'demande';
-  const lib = dispo ? 'Sur Cinéflix' : LIB_FILE[l.statut] || 'En attente';
+function ligneFile(g){
+  const dispo = surCineflix(g.type, g.tmdb_id);
+  const cls = dispo ? 'dispo' : g.statut === 'refuse' ? 'refuse'
+            : g.statut === 'encours' ? 'encours' : 'demande';
+  const lib = dispo ? 'Sur Cinéflix' : LIB_FILE[g.statut] || 'En attente';
+  /* Les têtes côte à côte : on voit d'un coup d'œil qu'un titre est réclamé
+     par plusieurs — c'est une information, pas une répétition. */
+  const tetes = g.qui.slice(0,4).map(q => avatarHtml(q.avatar, 'mini', q.pseudo)).join('');
   return '<div class="lrow">'+
-    (l.poster ? '<img class="lposter" loading="lazy" src="'+IMG(l.poster,'w154')+'" alt="">'
+    (g.poster ? '<img class="lposter" loading="lazy" src="'+IMG(g.poster,'w154')+'" alt="">'
               : '<div class="lposter"></div>')+
-    '<div class="cinfo" onclick="ouvrirFiche('+l.tmdb_id+',\''+l.type+'\',\'file\')">'+
-      '<div class="cname2">'+esc(l.titre||'')+'</div>'+
-      '<div class="csub">'+avatarHtml(l.avatar, 'mini', l.pseudo)+' '+
-        esc(l.pseudo||'?')+' · '+
-        esc(relatif(String(l.cree_le||'').slice(0,10)))+
-        (l.type === 'tv' ? ' · série' : '')+'</div>'+
+    '<div class="cinfo" onclick="ouvrirFiche('+g.tmdb_id+',\''+g.type+'\',\'file\')">'+
+      '<div class="cname2">'+esc(g.titre||'')+
+        (g.qui.length > 1 ? ' <span class="cnt">'+g.qui.length+'</span>' : '')+'</div>'+
+      '<div class="csub">'+tetes+' '+nomsDemandeurs(g.qui)+' · '+
+        esc(relatif(String(g.le||'').slice(0,10)))+
+        (g.type === 'tv' ? ' · série' : '')+'</div>'+
       '<span class="pastille '+cls+'">'+lib+'</span>'+
     '</div>'+
-    '<button class="iconbtn" onclick="menuFile(\''+l.user_id+'\',\''+l.type+'\','+l.tmdb_id+')">'+
+    '<button class="iconbtn" onclick="menuFile(\''+g.type+'\','+g.tmdb_id+')">'+
       I.dots+'</button>'+
   '</div>';
 }

@@ -996,6 +996,34 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      return appels === 0;
   }));
 
+
+  // 16. La file : un titre = une ligne, quel que soit le nombre de demandeurs
+  ok('deux demandeurs du même film ne font qu’une seule ligne', await page.evaluate(()=>{
+     const l = [
+       {user_id:'a', pseudo:'Lolotte', type:'movie', tmdb_id:77, titre:'Spider-Man',
+        poster:'/p.jpg', statut:'demande', cree_le:'2026-07-29T09:00:00Z'},
+       {user_id:'b', pseudo:'Admin', type:'movie', tmdb_id:77, titre:'Spider-Man',
+        poster:'/p.jpg', statut:'demande', cree_le:'2026-07-29T10:00:00Z'},
+       {user_id:'b', pseudo:'Admin', type:'movie', tmdb_id:88, titre:'Leur vérité',
+        poster:'', statut:'encours', cree_le:'2026-07-29T10:00:00Z'}
+     ];
+     const g = groupesFile(l);
+     const sp = g.find(x=>x.tmdb_id===77);
+     return g.length === 2 && sp.qui.length === 2 &&
+            nomsDemandeurs(sp.qui) === 'Lolotte et Admin' &&
+            sp.le === '2026-07-29T09:00:00Z';       // la plus ancienne demande
+  }));
+  ok('le groupe prend le statut le MOINS avancé', await page.evaluate(()=>{
+     const g = groupesFile([
+       {user_id:'a', pseudo:'A', type:'movie', tmdb_id:5, statut:'encours', cree_le:'2026-01-01'},
+       {user_id:'b', pseudo:'B', type:'movie', tmdb_id:5, statut:'demande', cree_le:'2026-01-01'}
+     ]);
+     return g[0].statut === 'demande';
+  }));
+  ok('au-delà de deux, on résume', await page.evaluate(()=>
+     nomsDemandeurs([{pseudo:'A'},{pseudo:'B'},{pseudo:'C'},{pseudo:'D'}])
+       === 'A, B et 2 autres'));
+
   await browser.close();
 
   console.log('');
