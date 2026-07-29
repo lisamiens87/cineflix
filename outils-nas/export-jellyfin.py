@@ -206,6 +206,31 @@ def lire_supabase(base, key, chemin):
         return json.loads(r.read().decode("utf-8"))
 
 
+def lire_tout(base, key, chemin, taille=1000):
+    """Lit une table ENTIÈRE, par pages.
+
+    PIÈGE COÛTEUX : PostgREST plafonne ses réponses à 1000 lignes, et il le
+    fait SANS RIEN DIRE. Un `limit=100000` ne lève donc aucune erreur — il
+    renvoie simplement une liste tronquée. Conséquence vécue : passé les 1000
+    notes, le cache Télérama relu était incomplet, les mêmes titres étaient
+    revérifiés à chaque passage puis réécrits par-dessus eux-mêmes, et la
+    collecte a tourné à vide une journée entière sans qu'aucun compteur ne
+    bouge. Toute lecture de table qui peut dépasser 1000 lignes passe ici."""
+    out, debut = [], 0
+    sep = "&" if "?" in chemin else "?"
+    while True:
+        req = urllib.request.Request(
+            base.rstrip("/") + chemin + sep + "limit=%d&offset=%d" % (taille, debut),
+            headers={"apikey": key, "Authorization": "Bearer " + key,
+                     "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+            lot = json.loads(r.read().decode("utf-8"))
+        out.extend(lot or [])
+        if not lot or len(lot) < taille:
+            return out
+        debut += taille
+
+
 # ---------- Notes Télérama ----------
 # La recherche publique de telerama.fr donne, pour chaque œuvre critiquée,
 # une note (notation-N.svg) et son verdict (« Bof », « Bien », « Très Bien »,
@@ -414,8 +439,8 @@ def semis_telerama(base, key, cache, budget):
 
 def enrichir_telerama(base, key, fiches):
     """Pose jt (nombre de T) et jv (verdict) sur les fiches, via le cache."""
-    cache = {r["cle"]: r for r in lire_supabase(base, key,
-        "/rest/v1/telerama?select=cle,t,verdict&limit=100000")}
+    cache = {r["cle"]: r for r in
+             lire_tout(base, key, "/rest/v1/telerama?select=cle,t,verdict")}
     nouveaux, faits = [], 0
     echecs, dernier_echec, suite = 0, "", 0
     for f in fiches:
@@ -524,8 +549,8 @@ def lire_motscles(base, key):
     """Le cache complet, en une requête : { 'movie:603': [818, 9748], … }"""
     out = {}
     try:
-        lignes = lire_supabase(base, key,
-            "/rest/v1/motscles_films?select=type,tmdb_id,mc&limit=20000")
+        lignes = lire_tout(base, key,
+            "/rest/v1/motscles_films?select=type,tmdb_id,mc")
     except Exception:
         return out
     for l in lignes or []:
