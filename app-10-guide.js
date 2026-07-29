@@ -215,7 +215,8 @@ function idsDepuisNoms(noms){
 /* ---------- Construire la recette ---------- */
 function recetteVide(){
   return { genres:[], sans:[], note:0, votes:0, duree:0, apres:0, avant:0,
-           pays:'', type:'movie', titre:'', dits:[], mc:[] };
+           pays:'', type:'movie', titre:'', dits:[], mc:[],
+           g:[], gUn:[], sansMc:[], dureeMin:0, noteMax:0, locNoms:[], taxo:'' };
 }
 function recetteHumeur(h){
   const r = recetteVide();
@@ -284,6 +285,9 @@ function fiche2candidat(i, t){
            /* Jellyfin liste le genre PRINCIPAL en premier : c'est lui qui
               sépare une comédie d'un dessin animé qui fait rire. */
            principal: idsDepuisNoms(noms.slice(0,1))[0] || 0,
+           /* Les NOMS de genres, tels que Jellyfin les ecrit : Concert et
+              Theatre n'existent pas chez TMDB et ne se retrouvent que la. */
+           nomsG: noms.map(x => gLettres(x)),
            pays: i.pays || [], vu: i.vu || 0, ajout: i.ajout || '',
            mc: i.mc || null,
            noteCrit: i.noteCrit || 0, cert: i.cert || '',
@@ -292,12 +296,17 @@ function fiche2candidat(i, t){
 
 function vivierCineflix(r, revoir){
   const t = r.type;
+  const dem0 = r.genres.concat(r.g, r.gUn);
   /* L'animation n'entre que si on l'a demandée : sans cette garde, « je veux
      rire » remonte Toy Story, qui porte bien le genre Comédie. */
-  const veutAnim = r.genres.indexOf(16) >= 0 || r.genres.indexOf(10751) >= 0;
+  const veutAnim = dem0.indexOf(16) >= 0 || dem0.indexOf(10751) >= 0;
   return (CAT.items||[]).filter(i => i && i.t === t).map(i => fiche2candidat(i, t))
     .filter(c=>{
       if(r.pays && (c.pays||[]).indexOf(r.pays) < 0) return false;
+      /* Un rayon propre au serveur (Concert, Théâtre) : il se lit sur le nom
+         du genre, pas sur un identifiant TMDB qui n'existe pas. */
+      if(r.locNoms.length && !r.locNoms.some(n => (c.nomsG||[]).indexOf(n) >= 0))
+        return false;
       /* Le sujet demandé. Tant que le NAS n'a pas couvert la bibliothèque, un
          film sans mots-clés connus reste dans la course : l'écarter reviendrait
          à punir un titre pour une collecte en retard. */
@@ -305,7 +314,11 @@ function vivierCineflix(r, revoir){
         if(c.mc){ if(!r.mc.some(id => c.mc.indexOf(id) >= 0)) return false; }
         else if(couvertureMC() > 0.6) return false;
       }
+      if(r.sansMc.length && c.mc && r.sansMc.some(id => c.mc.indexOf(id) >= 0)) return false;
       if(r.genres.length && !r.genres.some(g => c.genres.indexOf(g) >= 0)) return false;
+      /* `g` est un ET : tous ces genres doivent etre la. */
+      if(r.g.length && !r.g.every(g => c.genres.indexOf(g) >= 0)) return false;
+      if(r.gUn.length && !r.gUn.some(g => c.genres.indexOf(g) >= 0)) return false;
       if(r.sans.length && r.sans.some(g => c.genres.indexOf(g) >= 0)) return false;
       if(!veutAnim && c.genres.indexOf(16) >= 0) return false;
       if(veutAnim && typeof rangCert === 'function'){
@@ -314,7 +327,11 @@ function vivierCineflix(r, revoir){
       }
       /* Le NAS note plus sévèrement que TMDB : on desserre un peu le seuil. */
       if(r.note && c.note && c.note < r.note - 0.6) return false;
+      /* Le plafond de note sert « action decomplexee » : un film que les
+         critiques ont adore n'est plus, par definition, de la serie B. */
+      if(r.noteMax && c.note && c.note > r.noteMax + 0.4) return false;
       if(r.duree && c.duree && c.duree > r.duree + 10) return false;
+      if(r.dureeMin && c.duree && c.duree < r.dureeMin - 10) return false;
       if(r.apres && c.annee && c.annee < r.apres) return false;
       if(r.avant && c.annee && c.annee > r.avant) return false;
       if(!revoir && c.vu > 0) return false;
@@ -331,7 +348,8 @@ async function vivierTmdb(r, pages, mode){
     : [];
   if(mode === 'plats' && !plats.length) return [];
   const champ = r.type === 'movie' ? 'primary_release_date' : 'first_air_date';
-  const veutAnim = r.genres.indexOf(16) >= 0 || r.genres.indexOf(10751) >= 0;
+  const dem = r.genres.concat(r.g, r.gUn);
+  const veutAnim = dem.indexOf(16) >= 0 || dem.indexOf(10751) >= 0;
   const base = { include_adult:'false', sort_by:'popularity.desc' };
   if(plats.length){
     base.watch_region = db.region || 'FR';
@@ -342,17 +360,28 @@ async function vivierTmdb(r, pages, mode){
        quasi vides : un minimum de votes garde les vrais titres. */
     base['vote_count.gte'] = String(r.votes || 150);
   }
-  if(r.genres.length) base.with_genres = r.genres.join('|');
+  /* TMDB ne sait pas melanger ET et OU dans with_genres : la virgule est un
+     ET, la barre un OU, et les deux ne se combinent pas. On envoie le ET (`g`)
+     a la requete, et le OU (`gUn`) est applique au retour sur les genre_ids
+     que /discover renvoie de toute facon. */
+  if(r.g.length) base.with_genres = r.g.join(',');
+  else if(r.genres.length) base.with_genres = r.genres.join('|');
+  else if(r.gUn.length) base.with_genres = r.gUn.join('|');
   const exclus = r.sans.slice();
   if(!veutAnim) exclus.push(16);
   if(exclus.length) base.without_genres = exclus.join(',');
   if(r.note){ base['vote_average.gte'] = String(r.note);
               base['vote_count.gte'] = String(r.votes || 150); }
+  if(r.noteMax){ base['vote_average.lte'] = String(r.noteMax);
+                 base['vote_count.gte'] = String(r.votes || 150); }
+  if(r.votes && !base['vote_count.gte']) base['vote_count.gte'] = String(r.votes);
   if(r.duree) base['with_runtime.lte'] = String(r.duree);
+  if(r.dureeMin) base['with_runtime.gte'] = String(r.dureeMin);
   if(r.apres) base[champ+'.gte'] = r.apres+'-01-01';
   if(r.avant) base[champ+'.lte'] = r.avant+'-12-31';
   if(r.pays)  base.with_origin_country = r.pays;
   if(r.mc && r.mc.length) base.with_keywords = r.mc.join('|');
+  if(r.sansMc && r.sansMc.length) base.without_keywords = r.sansMc.join(',');
 
   const lots = await Promise.all([1,2,3].slice(0, pages||2).map(p =>
     tmdb('/discover/'+r.type, Object.assign({}, base, {page:String(p)})).catch(()=>({results:[]}))));
@@ -361,6 +390,8 @@ async function vivierTmdb(r, pages, mode){
     if(!x.poster_path) return;
     const date = r.type === 'movie' ? x.release_date : x.first_air_date;
     const g = x.genre_ids || [];
+    /* Le OU de genres, que la requete n'a pas pu porter. */
+    if(r.gUn.length && r.g.length && !r.gUn.some(id => g.indexOf(id) >= 0)) return;
     out.push({ type:r.type, id:x.id, titre:(x.title||x.name||''), poster:x.poster_path,
                date:date, annee: Number(String(date||'').slice(0,4)) || 0,
                note: x.vote_average || 0, duree:0, genres:g, principal:g[0]||0,
@@ -438,9 +469,10 @@ function scorerCandidat(c, r){
 
   /* Le genre demandé compte double quand c'est le genre PRINCIPAL du film :
      une comédie l'emporte sur un film d'aventure qui a aussi fait rire. */
-  if(r.genres.length){
-    if(r.genres.indexOf(c.principal) >= 0) s += 4;
-    else if(r.genres.some(id => c.genres.indexOf(id) >= 0)) s += 1;
+  const dm = r.genres.concat(r.g || [], r.gUn || []);
+  if(dm.length){
+    if(dm.indexOf(c.principal) >= 0) s += 4;
+    else if(dm.some(id => c.genres.indexOf(id) >= 0)) s += 1;
   }
 
   if(c.flix) s += c.vu ? 1 : 3;              // jamais lancé : la vraie trouvaille
@@ -515,14 +547,22 @@ async function guider(source, txt){
     if(!r){ r = recetteGouts(); repli = true; }
   }else if(source === 'gouts'){
     r = recetteGouts();
+  }else if(source.indexOf('taxo:') === 0){
+    r = taxoRecette(source.slice(5)) || recetteGouts();
   }else{
     const h = HUMEURS.find(x => x.id === source);
     r = h ? recetteHumeur(h) : recetteGouts();
   }
   /* Les goûts s'appliquent toujours par-dessus l'humeur : ce qu'on fuit reste
      écarté, même quand on a envie de rire. */
+  /* Ce qu'on fuit reste ecarte — sauf si c'est precisement ce qu'on vient de
+     demander : cliquer « Horreur » dans la taxonomie est une demande
+     explicite, elle gagne sur le gout declare. */
   const gt = GOUTS.d || {};
-  (gt.fuis||[]).forEach(id => { if(r.sans.indexOf(id) < 0 && r.genres.indexOf(id) < 0) r.sans.push(id); });
+  const voulus = r.genres.concat(r.g, r.gUn);
+  (gt.fuis||[]).forEach(id => {
+    if(r.sans.indexOf(id) < 0 && voulus.indexOf(id) < 0) r.sans.push(id);
+  });
 
   if(repli && !aGouts()){
     g.err = 'Je n\'ai pas saisi, et je ne connais pas encore tes goûts. '+
@@ -623,7 +663,8 @@ async function guider(source, txt){
 
 function ouvrirGuide(){
   ui.guide = { txt:'', recette:null, res:[], loading:false, err:'', charge:false,
-               vus:{}, repli:false, source:'', perim:(ui.guide||{}).perim || 'flix' };
+               vus:{}, repli:false, source:'', taxoG:'', taxoSel:'',
+               perim:(ui.guide||{}).perim || 'flix' };
   go('guide');
 }
 /* Changer de source relance la même demande ailleurs : c'est le geste
@@ -643,6 +684,7 @@ function guiderTexte(){
 }
 function guiderHumeur(id){
   ui.guide.txt = '';
+  ui.guide.taxoSel = '';
   guider(id, '');
 }
 function guiderEncore(){
@@ -705,6 +747,10 @@ function viewGuide(){
       '✨ Selon mes goûts</button>' : '')+
   '</div></div>';
 
+  /* La taxonomie : le meme moteur, mais on entre par le rangement plutot que
+     par l'envie. Vingt genres, puis les sous-categories du genre ouvert. */
+  h += viewTaxoChips();
+
   if(g.loading)
     return h + '<div class="empty"><span class="spin"></span>'+
       '<p style="margin-top:12px">Je cherche…</p></div>';
@@ -719,12 +765,12 @@ function viewGuide(){
 
   if(!g.charge)
     return h + '<div class="empty">'+I.boussole+'<h3>Dis-moi ton envie</h3>'+
-      '<p>Écris ce dont tu as envie, ou choisis une humeur. '+
-      esc(portee())+'</p></div>';
+      '<p>Écris ce dont tu as envie, choisis une humeur, ou passe par les '+
+      'catégories. '+esc(portee())+'</p></div>';
 
   if(!g.res.length)
     return h + '<div class="empty">'+I.boussole+'<h3>Rien trouvé</h3>'+
-      '<p>Essaie une autre humeur.</p></div>';
+      '<p>Essaie une autre humeur, ou une catégorie voisine.</p></div>';
 
   const r = g.recette || {};
   h += '<div class="sectitle">'+esc(r.titre || 'Pour toi')+
