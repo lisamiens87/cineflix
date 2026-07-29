@@ -703,6 +703,10 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .hsactions{display:flex;gap:10px;flex-wrap:wrap}
 .hsactions .btn{padding:11px 20px}
+/* Films / Séries s'étiraient sur toute la largeur : la règle « flex:1 »
+   d'origine (pensée pour des pilules égales) n'a pas de sens pour des
+   onglets soulignés. */
+.chips.types .chip:not(.chipico){flex:0 0 auto;padding:0 3px}
 @media (max-width:520px){ .hstxt p{display:none} .hstxt{padding-bottom:16px} }
 @media (min-width:860px){
   .herosoir{min-height:380px;border-radius:0 0 18px 18px}
