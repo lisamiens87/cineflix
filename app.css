@@ -799,3 +799,38 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
   .sheet{left:0}
   .toast{margin-left:0}
 }
+
+
+/* ==================== Un seul bandeau (v2907t) ====================
+   « J'aime pas l'idée de deux bandeaux » : la barre du haut absorbe la loupe
+   et Films/Séries, et cesse de lister les écrans. Découvrir disparaît (le
+   logo y ramène), Sorties et Ma liste deviennent deux icônes discrètes à
+   droite. Sous le visuel, il ne reste QU'UNE rangée : les trois sources.
+   Le téléphone n'est pas concerné — sa barre du bas garde ses quatre
+   onglets, et navctx y est invisible. */
+.navctx{display:none}
+.nchip{font-size:12px;font-weight:750;letter-spacing:.06em;text-transform:uppercase;
+  color:#7e7e8a;padding:2px 1px;box-shadow:inset 0 -2px 0 transparent}
+.nchip.on{color:#fff;box-shadow:inset 0 -2px 0 var(--accent)}
+.navlogo{cursor:pointer}
+
+@media (min-width:1200px){
+  .navctx{display:flex;align-items:center;gap:20px;margin-left:6px}
+  .navctx .iconbtn{color:#9a9aa6;background:#ffffff10;border-radius:9px}
+
+  /* Découvrir sort de la barre : le logo fait ce travail. */
+  .tab.t-decouvrir{display:none}
+
+  /* Sorties et Ma liste : l'icône seule, rangée à droite avant Profil. */
+  .tab:last-child{margin-left:0}
+  .tab.t-sorties{margin-left:auto}
+  .tab.t-sorties svg,.tab.t-liste svg{display:block;width:20px;height:20px}
+  .tab.t-sorties span,.tab.t-liste span{display:none}
+  .tab.t-sorties,.tab.t-liste{color:#9a9aa6}
+  .tab.t-sorties.on,.tab.t-liste.on{color:#fff}
+
+  /* La rangée Films/Séries sous le visuel devient redondante : elle monte. */
+  .souscontrols .chips.types{display:none}
+  .souscontrols .souschips{padding-top:4px}
+  .souschips .iconbtn{margin-left:auto}
+}
