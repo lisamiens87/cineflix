@@ -40,7 +40,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from datetime import date
+from datetime import date, datetime, timezone
 from html import unescape
 
 TIMEOUT = 30
@@ -457,6 +457,29 @@ def enrichir_telerama(base, key, fiches):
 # ce dernier permet de retrouver le film sur TMDB sans ambiguïté.
 # Trois pages suffisent à couvrir les prochains mois. Une fois par heure : le
 # calendrier ne bouge pas toutes les cinq minutes.
+# ---------- Journal du NAS ----------
+# Le cron tourne avec « Masquer la sortie standard » coché, sinon c'est 288
+# courriels par jour. Conséquence vécue : quand un étage échoue, il échoue en
+# SILENCE — la collecte des mots-clés est restée à zéro sans que rien ne le
+# dise. Ce journal est la contrepartie : une ligne par étage, lisible depuis
+# l'app, qui dit ce qui s'est passé au dernier passage.
+def journal(base, key, cle, valeur):
+    """Ne lève jamais : un journal qui casse l'export serait une aberration."""
+    try:
+        corps = json.dumps([{"cle": cle, "valeur": str(valeur)[:400],
+                             "maj": datetime.now(timezone.utc).isoformat()}],
+                           ensure_ascii=False).encode("utf-8")
+        req = urllib.request.Request(
+            base.rstrip("/") + "/rest/v1/journal_nas?on_conflict=cle",
+            data=corps, method="POST",
+            headers={"apikey": key, "Authorization": "Bearer " + key,
+                     "Content-Type": "application/json",
+                     "Prefer": "resolution=merge-duplicates,return=minimal"})
+        urllib.request.urlopen(req, timeout=TIMEOUT).read()
+    except Exception:
+        pass
+
+
 # ---------- Mots-clés TMDB ----------
 # Les genres sont dix-neuf cases ; les mots-clés disent le SUJET : « heist »,
 # « road trip », « based on true story », « one night ». C'est ce qui permet à
@@ -506,8 +529,12 @@ def motscles_tmdb(ck, type_, tmdb_id):
 
 def _pousser_motscles(base, key, lignes):
     corps = json.dumps(lignes, ensure_ascii=False).encode("utf-8")
+    # PostgREST veut la cible du conflit EXPLICITEMENT quand la clé primaire
+    # est composite : sans ce paramètre, l'upsert échoue en 409 et le lot est
+    # perdu en silence.
     req = urllib.request.Request(
-        base.rstrip("/") + "/rest/v1/motscles_films", data=corps, method="POST",
+        base.rstrip("/") + "/rest/v1/motscles_films?on_conflict=type,tmdb_id",
+        data=corps, method="POST",
         headers={"apikey": key, "Authorization": "Bearer " + key,
                  "Content-Type": "application/json",
                  "Prefer": "resolution=merge-duplicates,return=minimal"})
@@ -519,6 +546,7 @@ def enrichir_motscles(base, key, fiches):
     nouveaux. La bibliothèque entière est couverte en une douzaine de passages."""
     ck = cle_tmdb()
     if not ck:
+        journal(base, key, "motscles", "clé TMDB introuvable dans config.js")
         return
     cache = lire_motscles(base, key)
     neuves, budget = [], MC_LOT
@@ -547,6 +575,9 @@ def enrichir_motscles(base, key, fiches):
     restants = sum(1 for f in fiches
                    if ("%s:%s" % (f["t"], f["id"])) not in cache)
     print("Mots-clés : %d ajoutés, %d restants" % (len(neuves), restants))
+    journal(base, key, "motscles",
+            "%d ajoutés, %d restants, %d fiches enrichies"
+            % (len(neuves), restants, sum(1 for f in fiches if f.get("mc"))))
 
 
 SORTIES_URL = "https://4k-ultra-hd.fr/prochaines-sorties-blu-ray-4k-ultra-hd"
@@ -958,14 +989,17 @@ def main():
             enrichir_telerama(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
         except Exception as e:
             print("Télérama sauté : %s" % e)
+            journal(a.supabase_url, a.supabase_key, "telerama", "ÉCHEC : %s" % e)
         try:
             enrichir_motscles(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
         except Exception as e:
             print("Mots-clés sautés : %s" % e)
+            journal(a.supabase_url, a.supabase_key, "motscles", "ÉCHEC : %s" % e)
         try:
             collecter_sorties(a.supabase_url, a.supabase_key)
         except Exception as e:
             print("Sorties physiques sautées : %s" % e)
+            journal(a.supabase_url, a.supabase_key, "sorties", "ÉCHEC : %s" % e)
 
     contenu = {
         "maj": date.today().isoformat(),
