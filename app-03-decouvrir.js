@@ -838,11 +838,11 @@ function viewDecouvrir(){
         'aria-label="Chercher">'+(ui.champOuvert ? I.close : I.search)+'</button>'+
       TYPES.map(t=>'<button class="chip '+t.cl+' '+(d.type===t.id?'on':'')+
         '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
-      (immersif ? bouton : '')+
     '</div>'+
     '<div class="souschips">'+
       PRESENCES.map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
         '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
+      (immersif ? bouton : '')+
     '</div>'+
     '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
 
