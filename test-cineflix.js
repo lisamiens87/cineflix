@@ -804,10 +804,23 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   }));
   ok('la raison cite le film aimé quand elle en vient un', await page.evaluate(()=>
      raisonDe({reco:'Heat', genres:[], flix:false}).indexOf('Heat') >= 0));
-  ok('sans abonnement déclaré, le périmètre se limite à Cinéflix', await page.evaluate(()=>{
-     GOUTS.d = { aimes:[], fuis:[], plats:[], totems:[] };
-     return platsProfil().length === 0;
+  ok('le guide propose trois sources, comme Découvrir', await page.evaluate(()=>
+     PERIMS.length === 3 && PERIMS.map(p=>p.id).join(',') === 'flix,plats,tout'));
+  ok('la portée annoncée change avec la source', await page.evaluate(()=>{
+     ouvrirGuide();
+     ui.guide.perim = 'flix';  const a = portee();
+     ui.guide.perim = 'plats'; const b = portee();
+     ui.guide.perim = 'tout';  const c = portee();
+     ui.guide.perim = 'flix';
+     return /serveur/i.test(a) && /illimit/i.test(b) && /demander/i.test(c) &&
+            a !== b && b !== c;
   }));
+  ok('hors Cinéflix, la raison annonce « à demander »', await page.evaluate(()=>
+     raisonDe({genres:[18], principal:18, flix:false, plat:null, vu:0,
+               annee:2020, pays:[], mc:null}, {}).indexOf('à demander') >= 0));
+  ok('sur une plateforme, la raison la nomme', await page.evaluate(()=>
+     raisonDe({genres:[18], principal:18, flix:false, plat:8, vu:0,
+               annee:2020, pays:[], mc:null}, {}).indexOf('Netflix') >= 0));
 
 
   ok('le filtre « français » écarte vraiment les films étrangers', await page.evaluate(()=>{

@@ -170,6 +170,17 @@ function lireSujets(t){
 }
 
 /* ---------- Le périmètre ---------- */
+/* Le guide n'était braqué que sur la bibliothèque. Les trois sources de
+   Découvrir s'appliquent tout aussi bien ici — avec une conséquence assumée :
+   hors Cinéflix, une suggestion n'est pas regardable ce soir, elle devient
+   une demande. L'écran le dit plutôt que de le cacher. */
+const PERIMS = [
+  { id:'flix',  label:'Cinéflix',    cl:'c-flix' },
+  { id:'plats', label:'Plateformes', cl:'c-plats' },
+  { id:'tout',  label:'Cinéma',      cl:'c-cinema' }
+];
+const perimGuide = ()=> (ui.guide && ui.guide.perim) || 'flix';
+
 const platsProfil = ()=> {
   const g = GOUTS.d || {};
   return Array.isArray(g.plats) ? g.plats.filter(Boolean) : [];
@@ -311,17 +322,26 @@ function vivierCineflix(r, revoir){
     });
 }
 
-/* 2. Les plateformes du profil : TMDB filtre lui-même. */
-async function vivierPlateformes(r, pages){
-  const plats = platsProfil();
-  if(!plats.length) return [];
+/* 2. Hors bibliothèque : TMDB fait le tri lui-même.
+   mode « plats » restreint aux abonnements du profil (à défaut, les quatre
+   plateformes connues) ; mode « tout » n'impose aucune disponibilité. */
+async function vivierTmdb(r, pages, mode){
+  const plats = mode === 'plats'
+    ? (platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id))
+    : [];
+  if(mode === 'plats' && !plats.length) return [];
   const champ = r.type === 'movie' ? 'primary_release_date' : 'first_air_date';
   const veutAnim = r.genres.indexOf(16) >= 0 || r.genres.indexOf(10751) >= 0;
-  const base = {
-    include_adult:'false', watch_region: db.region || 'FR',
-    with_watch_providers: plats.join('|'), with_watch_monetization_types:'flatrate',
-    sort_by:'popularity.desc'
-  };
+  const base = { include_adult:'false', sort_by:'popularity.desc' };
+  if(plats.length){
+    base.watch_region = db.region || 'FR';
+    base.with_watch_providers = plats.join('|');
+    base.with_watch_monetization_types = 'flatrate';
+  }else{
+    /* Sans contrainte de disponibilité, le fond de TMDB remonte des fiches
+       quasi vides : un minimum de votes garde les vrais titres. */
+    base['vote_count.gte'] = String(r.votes || 150);
+  }
   if(r.genres.length) base.with_genres = r.genres.join('|');
   const exclus = r.sans.slice();
   if(!veutAnim) exclus.push(16);
@@ -344,8 +364,8 @@ async function vivierPlateformes(r, pages){
     out.push({ type:r.type, id:x.id, titre:(x.title||x.name||''), poster:x.poster_path,
                date:date, annee: Number(String(date||'').slice(0,4)) || 0,
                note: x.vote_average || 0, duree:0, genres:g, principal:g[0]||0,
-               pays:[], vu:0, ajout:'', noteCrit:0, cert:'',
-               flix: surCineflix(r.type, x.id), plat: plats[0], reco:null, jt:0 });
+               pays:(x.origin_country||[]), vu:0, ajout:'', noteCrit:0, cert:'',
+               flix: surCineflix(r.type, x.id), plat: plats[0] || null, reco:null, jt:0 });
   }));
   return out;
 }
@@ -357,7 +377,9 @@ async function vivierTotems(r){
   const g = GOUTS.d || {};
   const totems = (g.totems||[]).slice(0,3);
   if(!totems.length || r.type !== 'movie') return [];
-  const plats = platsProfil();
+  const plats = perimGuide() === 'plats'
+    ? (platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id))
+    : platsProfil();
   const lots = await Promise.all(totems.map(t =>
     tmdb('/movie/'+t.id+'/recommendations', {page:'1'})
       .then(d => ({ src:t.titre, l:(d.results||[]) }))
@@ -377,6 +399,8 @@ async function vivierTotems(r){
   /* Celles qui sont déjà sur le serveur passent sans vérification. Pour les
      autres, on interroge les fournisseurs — mais pas indéfiniment : vingt
      titres au maximum, sinon l'écran met dix secondes à s'afficher. */
+  /* Hors Cinéflix, tout est proposable : plus rien à vérifier. */
+  if(perimGuide() === 'tout') return bruts;
   const dedans = bruts.filter(c => c.flix);
   const aTester = plats.length ? bruts.filter(c => !c.flix).slice(0, 20) : [];
   for(let i = 0; i < aTester.length; i += 5){
@@ -473,8 +497,9 @@ function raisonDe(c, r){
   else if(c.flix && c.vu) bits.push('déjà vu');
   else if(c.plat){
     const p = PLATEFORMES.find(x => x.id === c.plat);
-    if(p) bits.push('sur ' + p.nom);
+    bits.push(p ? 'sur ' + p.nom : 'en streaming');
   }
+  else bits.push('à demander');
   return bits.slice(0,4).join(' · ');
 }
 
@@ -510,18 +535,23 @@ async function guider(source, txt){
   render();
 
   try{
-    const [plateformes, totems] = await Promise.all([
-      vivierPlateformes(r, 2).catch(()=>[]),
+    const perim = perimGuide();
+    const [externes, totems] = await Promise.all([
+      perim === 'flix' ? Promise.resolve([]) : vivierTmdb(r, 3, perim).catch(()=>[]),
       (source === 'gouts' || repli) ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
     ]);
     if(seq !== guideSeq) return;
 
-    /* Par défaut on n'exhume que ce qui n'a jamais été lancé — c'est tout
-       l'intérêt d'un guide posé sur SA bibliothèque. Si la moisson est trop
-       maigre, on rouvre aux films déjà vus plutôt que de rendre une page vide. */
-    let cine = vivierCineflix(r, false);
-    if(cine.length < 12) cine = vivierCineflix(r, true);
-    const tout = totems.concat(cine, plateformes);
+    /* Sur la bibliothèque, on n'exhume que ce qui n'a jamais été lancé — c'est
+       tout l'intérêt d'un guide posé sur SA collection. Si la moisson est trop
+       maigre, on rouvre aux films déjà vus plutôt que de rendre une page vide.
+       Hors Cinéflix, la bibliothèque ne sert qu'à repérer ce qu'on a déjà. */
+    let cine = [];
+    if(perim === 'flix'){
+      cine = vivierCineflix(r, false);
+      if(cine.length < 12) cine = vivierCineflix(r, true);
+    }
+    const tout = totems.concat(cine, externes);
 
     /* Dédoublonnage : un même titre peut venir des trois viviers. On garde la
        version la plus informée — celle qui porte une raison, ou l'affiche. */
@@ -593,8 +623,17 @@ async function guider(source, txt){
 
 function ouvrirGuide(){
   ui.guide = { txt:'', recette:null, res:[], loading:false, err:'', charge:false,
-               vus:{}, repli:false, source:'' };
+               vus:{}, repli:false, source:'', perim:(ui.guide||{}).perim || 'flix' };
   go('guide');
+}
+/* Changer de source relance la même demande ailleurs : c'est le geste
+   « et sur Netflix, ça donnerait quoi ? ». */
+function setPerimGuide(id){
+  if(perimGuide() === id) return;
+  ui.guide.perim = id;
+  ui.guide.vus = {};
+  if(ui.guide.source) return guider(ui.guide.source, ui.guide.txt || '');
+  render();
 }
 function guiderTexte(){
   const v = (document.getElementById('gtxt')||{}).value || '';
@@ -622,6 +661,21 @@ function carteGuide(c){
   '</button>';
 }
 
+/* Une phrase qui dit exactement ce qu'on cherche, et surtout ce qu'on ne
+   trouvera pas. Rien n'agace plus qu'un guide dont on ignore la portée. */
+function portee(){
+  const p = perimGuide();
+  if(p === 'flix')
+    return 'Uniquement ce qui est déjà sur ton serveur, et que tu peux lancer maintenant.';
+  if(p === 'plats')
+    return platsProfil().length
+      ? 'Ce qui est en illimité sur tes abonnements — regardable ce soir, ailleurs que sur le serveur.'
+      : 'Ce qui est en illimité sur Netflix, Prime Video, Disney+ ou Canal+. '+
+        'Précise tes abonnements dans « Mes goûts » pour resserrer.';
+  return 'Tout le cinéma, sans condition de disponibilité : '+
+         'ce qui n\'est pas sur le serveur sera à demander.';
+}
+
 function viewGuide(){
   const g = ui.guide || (ui.guide = { txt:'', res:[], vus:{} });
   let h = header('Laisse-moi te guider', {back:'goBack()'});
@@ -634,6 +688,13 @@ function viewGuide(){
     '<button class="btn block" style="margin-top:10px" onclick="guiderTexte()">'+
       'Trouve-moi quelque chose</button>'+
   '</div>';
+
+  /* Les trois sources, aux mêmes couleurs que dans Découvrir : Cinéflix en
+     vert, Plateformes en rouge, Cinéma en orange. */
+  h += '<div class="wrap" style="padding-top:6px"><div class="souschips">'+
+    PERIMS.map(x=>'<button class="chip '+x.cl+' '+(perimGuide()===x.id?'on':'')+
+      '" onclick="setPerimGuide(\''+x.id+'\')">'+x.label+'</button>').join('')+
+  '</div></div>';
 
   h += '<div class="wrap" style="padding-top:4px"><div class="gchips">'+
     HUMEURS.map(x=>'<button class="chip humeur'+
@@ -659,8 +720,7 @@ function viewGuide(){
   if(!g.charge)
     return h + '<div class="empty">'+I.boussole+'<h3>Dis-moi ton envie</h3>'+
       '<p>Écris ce dont tu as envie, ou choisis une humeur. '+
-      'Je ne proposerai que ce que tu peux lancer maintenant : Cinéflix'+
-      (platsProfil().length ? ' et tes plateformes' : '')+'.</p></div>';
+      esc(portee())+'</p></div>';
 
   if(!g.res.length)
     return h + '<div class="empty">'+I.boussole+'<h3>Rien trouvé</h3>'+
@@ -674,6 +734,5 @@ function viewGuide(){
   h += '<div class="wrap"><button class="btn ghost block" onclick="guiderEncore()">'+
     'Autre chose</button></div>';
   return h + '<div class="wrap tiny muted center" style="padding-bottom:26px">'+
-    'Uniquement des titres regardables maintenant : Cinéflix'+
-    (platsProfil().length ? ' et tes abonnements' : '')+'.</div>';
+    esc(portee())+'</div>';
 }
