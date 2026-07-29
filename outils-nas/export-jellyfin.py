@@ -287,6 +287,23 @@ _tlr_ouvreur = [None]
 _tlr_chaine = []
 
 
+class TlrErreur(Exception):
+    """Une panne en lisant Télérama, avec UNE distinction qui change tout :
+    est-elle passagère (réseau, 5xx, délai) ou DÉFINITIVE pour ce titre
+    (404, page interdite, boucle de redirection chez eux) ?
+
+    Sans cette distinction, un titre dont la page est cassée n'est jamais mis
+    en cache, donc réessayé à chaque passage, et il bloque toute la file
+    derrière lui. Vécu le 29/07 sur « La Relève », dont deux URL se renvoient
+    l'une à l'autre CHEZ TÉLÉRAMA — la collecte entière s'est arrêtée sur ce
+    seul film."""
+
+    def __init__(self, message, code=0, definitif=False):
+        Exception.__init__(self, message)
+        self.code = code
+        self.definitif = definitif
+
+
 class _TlrRedir(urllib.request.HTTPRedirectHandler):
     """Garde la trace de la chaîne de redirections. « Boucle infinie » sans
     savoir SUR QUOI est un diagnostic inutilisable : ici on note chaque saut,
@@ -315,9 +332,14 @@ def _tlr_get(url):
         # On rhabille l'erreur avec l'URL demandée ET le chemin parcouru :
         # c'est la seule information qui permette de comprendre un blocage
         # qu'on ne peut pas reproduire depuis le bac à sable.
-        raise RuntimeError("%s | demandé: %s | chaîne: %s"
-                           % (type(e).__name__ + " " + str(e)[:60],
-                              url[:100], " ".join(_tlr_chaine) or "aucune"))
+        code = getattr(e, "code", 0)
+        boucle = "infinite loop" in str(e)
+        raise TlrErreur(
+            "%s %s | demandé: %s | chaîne: %s"
+            % (type(e).__name__, str(e)[:60], url[:100],
+               " ".join(_tlr_chaine) or "aucune"),
+            code,
+            boucle or code in (301, 302, 400, 401, 403, 404, 410))
 
 
 def telerama_note(nom, annee, type_):
@@ -329,8 +351,13 @@ def telerama_note(nom, annee, type_):
     données de mesure de l'article (data-note-t="TTT") et son JSON-LD
     (reviewRating.ratingValue, où 4/5 = TTT) — publics, eux.
     """
-    html = _tlr_get("https://www.telerama.fr/recherche/critiques?q="
-                    + urllib.parse.quote(str(nom)))
+    try:
+        html = _tlr_get("https://www.telerama.fr/recherche/critiques?q="
+                        + urllib.parse.quote(str(nom)))
+    except TlrErreur as e:
+        if e.definitif:
+            return None
+        raise
     voulu = "movie" if type_ == "movie" else "series"
     cartes = [(m.start(), m.group(1), m.group(2)) for m in re.finditer(
         r'href="([^"]+)"\s+class="search__card-content-img-link\s*([a-z]*)"', html)]
@@ -358,7 +385,15 @@ def telerama_note(nom, annee, type_):
     if lien.startswith("/"):
         lien = "https://www.telerama.fr" + lien
     time.sleep(TLR_PAUSE)
-    art = _tlr_get(lien)
+    try:
+        art = _tlr_get(lien)
+    except TlrErreur as e:
+        # Page cassée chez eux : on renvoie « pas de critique » plutôt que de
+        # relancer ce titre indéfiniment. Il sera réexaminé le jour où on
+        # purgera le cache.
+        if e.definitif:
+            return None
+        raise
     m = re.search(r'data-note-t="(T+)"', art)
     n = len(m.group(1)) if m else None
     if n is None:
