@@ -135,10 +135,15 @@ const TAXO = [
 ]},
 
 { id:'histoire', nom:'Histoire', emo:'🏛️', g:[G_HIST], sous:[
-  /* SUBSTITUT ASSUMÉ — le péplum ne s'étiquette pas ; la fresque, si : elle
-     est longue et connue. On écarte la guerre, qui a son propre genre. */
+  /* Première version : « long + connu + genre Histoire ». Testée, jetée —
+     elle remontait First Man et Raging Bull, longs et connus mais pas des
+     fresques, et elle RATAIT Gladiator, que TMDB ne range pas en Histoire.
+     La bonne clé n'est pas la durée, c'est l'ÉPOQUE : Rome, la Grèce, la
+     chevalerie, la Bible, les pharaons. Treize mots-clés, 34 films chez toi
+     (300, Ben-Hur, Braveheart, Gladiator, Exodus), 123 sur TMDB. */
   { id:'fresque-peplum', nom:'Fresque et péplum',
-    g:[G_HIST], sans:[G_GUERRE], dureeMin:130, votes:300 },
+    gUn:[G_HIST,G_AVENT,G_GUERRE,G_DRAME], sans:[G_ANIM,G_SF,G_HORR],
+    mc:[5049,1394,161257,12965,1405,162861,3036,10466,186939,11195,303295,272026,1462] },
   { id:'biopic', nom:'Biopic',
     gUn:[G_HIST,G_DRAME,G_MUS], mc:[5565] },
   /* L'événement prime sur la personne : on demande « histoire vraie » ET
