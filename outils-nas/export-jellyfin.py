@@ -284,16 +284,40 @@ TLR_VERDICTS = {1: "Bof", 2: "Bien", 3: "Très Bien", 4: "Bravo"}
 # ou de session : urllib ne mémorise rien, donc chaque redirection repart de
 # zéro. Constaté le 29/07, collecte à l'arrêt.
 _tlr_ouvreur = [None]
+_tlr_chaine = []
+
+
+class _TlrRedir(urllib.request.HTTPRedirectHandler):
+    """Garde la trace de la chaîne de redirections. « Boucle infinie » sans
+    savoir SUR QUOI est un diagnostic inutilisable : ici on note chaque saut,
+    et le message d'erreur porte le chemin complet."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        _tlr_chaine.append("%s>%s" % (code, newurl[:70]))
+        if len(_tlr_chaine) > 6:
+            return None
+        return urllib.request.HTTPRedirectHandler.redirect_request(
+            self, req, fp, code, msg, headers, newurl)
 
 
 def _tlr_get(url):
     if _tlr_ouvreur[0] is None:
         _tlr_ouvreur[0] = urllib.request.build_opener(
-            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
+            _TlrRedir())
+    del _tlr_chaine[:]
     req = urllib.request.Request(url, headers={
         "User-Agent": TLR_UA, "Accept-Language": "fr,fr-FR;q=0.9",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"})
-    return _tlr_ouvreur[0].open(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
+    try:
+        return _tlr_ouvreur[0].open(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
+    except Exception as e:
+        # On rhabille l'erreur avec l'URL demandée ET le chemin parcouru :
+        # c'est la seule information qui permette de comprendre un blocage
+        # qu'on ne peut pas reproduire depuis le bac à sable.
+        raise RuntimeError("%s | demandé: %s | chaîne: %s"
+                           % (type(e).__name__ + " " + str(e)[:60],
+                              url[:100], " ".join(_tlr_chaine) or "aucune"))
 
 
 def telerama_note(nom, annee, type_):
@@ -473,7 +497,7 @@ def enrichir_telerama(base, key, fiches):
                 trouve = None
                 echecs += 1
                 suite += 1
-                dernier_echec = str(e)[:120]
+                dernier_echec = str(e)[:260]
             else:
                 suite = 0
                 r = {"cle": cle, "t": trouve[0] if trouve else 0,
