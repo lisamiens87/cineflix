@@ -642,9 +642,15 @@ def notifier_acces(base, key):
     except ImportError:
         return
     # Ceux dont le statut a changé depuis la dernière annonce.
-    bouges = lire_tout(base, key,
-        "/rest/v1/profils?select=user_id,pseudo,email,statut,notif_statut"
-        "&statut=not.eq.notif_statut")
+    #
+    # PIÈGE : PostgREST ne sait PAS comparer deux colonnes entre elles.
+    # « statut=not.eq.notif_statut » compare la colonne au TEXTE
+    # « notif_statut », donc renvoie tout le monde — et on renotifierait
+    # l'ensemble du foyer à chaque passage. Le tri se fait ici.
+    tous = lire_tout(base, key,
+        "/rest/v1/profils?select=user_id,pseudo,email,statut,notif_statut")
+    bouges = [p for p in (tous or [])
+              if (p.get("statut") or "") != (p.get("notif_statut") or "")]
     if not bouges:
         return
     admins = [a["user_id"] for a in
