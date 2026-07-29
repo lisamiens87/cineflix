@@ -270,8 +270,8 @@ function vivierCineflix(r, revoir){
       }
       /* Le NAS note plus sévèrement que TMDB : on desserre un peu le seuil. */
       if(r.note && c.note && c.note < r.note - 0.6) return false;
-      /* Le plafond de note sert « action decomplexee » : un film que les
-         critiques ont adore n'est plus, par definition, de la serie B. */
+      /* Le plafond de note sert « action décomplexée » : un film que les
+         critiques ont adoré n'est plus, par définition, de la série B.
          PAS de tolérance ici, contrairement au plancher : la marge de +0,4
          existait parce que le NAS note plus sévèrement que TMDB — argument qui
          vaut pour un minimum, pas pour un maximum. Avec elle, Casino Royale
