@@ -619,3 +619,92 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
   body{--vign:148px}
   body.vue-compacte{--vign:112px}
 }
+
+
+/* ========================= L'identité éditoriale ==========================
+   Direction retenue par Alexandre parmi trois propositions (29/07) : l'app
+   cesse de ressembler à un outil pour ressembler à un cinéma. Concrètement :
+   un rouge signature à la place du bleu générique, une typographie display
+   (Archivo Expanded) pour les titres, des boutons francs, des filtres qui
+   deviennent des onglets soulignés au lieu de pilules cerclées — et surtout
+   moins de bordures : c'est le contenu qui structure l'écran.
+
+   Toute la couche vit ICI, en fin de fichier : elle surcharge, elle ne
+   réécrit pas. La retirer rend l'ancienne interface intacte. */
+
+:root{
+  --bg:#0b0b0f; --surface:#141419; --surface2:#1d1d24; --line:#22222a;
+  --accent:#ff4d3d; --accent-dim:#ff4d3d1e;
+}
+
+/* ---- Les titres parlent cinéma ---- */
+.htitle{font-family:'Archivo Expanded',Archivo,-apple-system,sans-serif;
+  text-transform:uppercase;font-size:16.5px;letter-spacing:.05em;font-weight:800}
+.sectitle{font-family:'Archivo Expanded',Archivo,sans-serif;font-size:12.5px;
+  letter-spacing:.08em;display:flex;align-items:center;gap:12px}
+.sectitle::after{content:"";flex:1;height:1px;background:var(--line)}
+.acc h1{font-family:'Archivo Expanded',Archivo,sans-serif;text-transform:uppercase;
+  letter-spacing:.01em;font-size:23px}
+
+/* ---- Les filtres de tête : des onglets, plus des pilules ----
+   Un onglet souligné dit « tu es ici » ; une pilule cerclée dit « clique-moi
+   peut-être ». La rangée des types et celle des sources passent en onglets,
+   chacun gardant sa couleur d'identité dans le soulignement. */
+.chips .chip,.souschips .chip{background:transparent;border:0;border-radius:0;
+  height:34px;padding:0 3px;font-size:12px;font-weight:750;letter-spacing:.06em;
+  text-transform:uppercase;color:#7e7e8a;box-shadow:inset 0 -2px 0 transparent;
+  transition:color .15s,box-shadow .15s}
+.chips .chip.on,.souschips .chip.on{background:transparent;border:0;color:#fff;
+  box-shadow:inset 0 -2px 0 var(--accent)}
+.chips{gap:18px}
+.souschips{gap:18px}
+.souschips .chip{flex:0 0 auto}
+.chips .chip.c-films.on{box-shadow:inset 0 -2px 0 #5b8def}
+.chips .chip.c-series.on{box-shadow:inset 0 -2px 0 #a855f7}
+.souschips .chip.c-cinema.on{box-shadow:inset 0 -2px 0 #ffb84d}
+.souschips .chip.c-plats.on{box-shadow:inset 0 -2px 0 #ff4d3d}
+.souschips .chip.c-flix.on{box-shadow:inset 0 -2px 0 #3ecf8e}
+/* Le bouton-loupe reste un bouton : c'est une action, pas un état. */
+.chip.chipico{background:var(--surface);border:0;border-radius:9px;color:#9a9aa6}
+.chip.chipico.ouvert{background:var(--surface2);color:#fff}
+
+/* ---- Les chips du guide (humeurs, catégories) : carrées et pleines ---- */
+.gchips .chip{background:var(--surface);border:0;border-radius:7px;height:auto;
+  text-transform:none;letter-spacing:0}
+.gchips .chip.on{background:var(--accent);color:#fff}
+
+/* ---- Les boutons : francs, carrés, majuscules ---- */
+.btn{border-radius:5px;text-transform:uppercase;letter-spacing:.05em;
+  font-weight:800;font-size:13px}
+.btn:not(.ghost){background:#fff;border-color:#fff;color:#0b0b0f}
+.btn.ghost{background:transparent;border:1px solid #ffffff38;color:#fff}
+
+/* ---- Les vignettes : l'affiche d'abord ---- */
+.wrapimg{border-radius:6px}
+.gnote{background:#0b0b0fd9;color:#fff;font-weight:800}
+.gname{font-weight:600}
+
+/* ---- Le choix du soir ---- */
+.herosoir{position:relative;overflow:hidden;margin-bottom:4px;
+  min-height:min(58vw,340px);display:flex;align-items:flex-end}
+.hsfond{position:absolute;inset:0}
+.hsfond img{width:100%;height:100%;object-fit:cover;object-position:center 25%;opacity:.6}
+.hsfond::after{content:"";position:absolute;inset:0;
+  background:linear-gradient(to right,var(--bg) 4%,transparent 60%),
+             linear-gradient(to top,var(--bg) 3%,transparent 55%)}
+.hstxt{position:relative;z-index:2;padding:70px 16px 20px;max-width:600px}
+.hssur{font-size:11px;font-weight:800;letter-spacing:.2em;color:var(--accent);
+  text-transform:uppercase;margin-bottom:8px}
+.hstxt h2{font-family:'Archivo Expanded',Archivo,sans-serif;font-weight:800;
+  font-size:clamp(22px,5.4vw,38px);line-height:1.04;text-transform:uppercase;
+  letter-spacing:-.005em;margin:0 0 8px}
+.hsmeta{font-size:12.5px;color:#b9b9c2;font-weight:600;margin-bottom:8px}
+.hstxt p{color:#b9b9c2;font-size:13.5px;max-width:52ch;margin:0 0 14px;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hsactions{display:flex;gap:10px;flex-wrap:wrap}
+.hsactions .btn{padding:11px 20px}
+@media (max-width:520px){ .hstxt p{display:none} .hstxt{padding-bottom:16px} }
+@media (min-width:860px){
+  .herosoir{min-height:380px;border-radius:0 0 18px 18px}
+  .hstxt{padding:90px 24px 28px}
+}
