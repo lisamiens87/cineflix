@@ -457,6 +457,98 @@ def enrichir_telerama(base, key, fiches):
 # ce dernier permet de retrouver le film sur TMDB sans ambiguïté.
 # Trois pages suffisent à couvrir les prochains mois. Une fois par heure : le
 # calendrier ne bouge pas toutes les cinq minutes.
+# ---------- Mots-clés TMDB ----------
+# Les genres sont dix-neuf cases ; les mots-clés disent le SUJET : « heist »,
+# « road trip », « based on true story », « one night ». C'est ce qui permet à
+# l'app de répondre à « un film de braquage » ou « un huis clos » — impossible
+# avec les seuls genres.
+#
+# Ils sont en ANGLAIS chez TMDB, et le resteront : la traduction se fait côté
+# app, dans un lexique français → identifiants. On ne stocke donc que des
+# identifiants (des entiers), ce qui coûte trois fois moins que les libellés.
+#
+# Un film sans aucun mot-clé est mémorisé avec une liste vide : sans ça on le
+# réinterrogerait à chaque passage, indéfiniment.
+MC_LOT = 200        # films enrichis par passage — une requête TMDB chacun
+MC_MAX = 12         # mots-clés gardés par film
+
+
+def lire_motscles(base, key):
+    """Le cache complet, en une requête : { 'movie:603': [818, 9748], … }"""
+    out = {}
+    try:
+        lignes = lire_supabase(base, key,
+            "/rest/v1/motscles_films?select=type,tmdb_id,mc&limit=20000")
+    except Exception:
+        return out
+    for l in lignes or []:
+        out["%s:%s" % (l.get("type"), l.get("tmdb_id"))] = l.get("mc") or []
+    return out
+
+
+def motscles_tmdb(ck, type_, tmdb_id):
+    """None = panne réseau (on retentera) ; [] = ce film n'a pas de mot-clé."""
+    url = ("https://api.themoviedb.org/3/%s/%s/keywords?api_key=%s"
+           % (type_, tmdb_id, ck))
+    try:
+        with urllib.request.urlopen(url, timeout=TIMEOUT) as r:
+            d = json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        return [] if e.code == 404 else None
+    except Exception:
+        return None
+    # /movie/{id}/keywords renvoie « keywords », /tv/{id}/keywords « results ».
+    l = d.get("keywords")
+    if not isinstance(l, list):
+        l = d.get("results")
+    return [k.get("id") for k in (l or []) if k.get("id")][:MC_MAX]
+
+
+def _pousser_motscles(base, key, lignes):
+    corps = json.dumps(lignes, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        base.rstrip("/") + "/rest/v1/motscles_films", data=corps, method="POST",
+        headers={"apikey": key, "Authorization": "Bearer " + key,
+                 "Content-Type": "application/json",
+                 "Prefer": "resolution=merge-duplicates,return=minimal"})
+    urllib.request.urlopen(req, timeout=TIMEOUT).read()
+
+
+def enrichir_motscles(base, key, fiches):
+    """Colle les mots-clés connus sur les fiches, et en collecte un lot de
+    nouveaux. La bibliothèque entière est couverte en une douzaine de passages."""
+    ck = cle_tmdb()
+    if not ck:
+        return
+    cache = lire_motscles(base, key)
+    neuves, budget = [], MC_LOT
+    for f in fiches:
+        cle = "%s:%s" % (f["t"], f["id"])
+        connu = cache.get(cle)
+        if connu is not None:
+            if connu:
+                f["mc"] = connu
+            continue
+        if budget <= 0:
+            continue
+        budget -= 1
+        mc = motscles_tmdb(ck, f["t"], f["id"])
+        if mc is None:
+            continue
+        cache[cle] = mc
+        if mc:
+            f["mc"] = mc
+        neuves.append({"type": f["t"], "tmdb_id": f["id"], "mc": mc})
+    if neuves:
+        # Par paquets : une seule requête de 200 lignes passe, mais autant
+        # rester sous la taille où PostgREST commence à tousser.
+        for i in range(0, len(neuves), 100):
+            _pousser_motscles(base, key, neuves[i:i + 100])
+    restants = sum(1 for f in fiches
+                   if ("%s:%s" % (f["t"], f["id"])) not in cache)
+    print("Mots-clés : %d ajoutés, %d restants" % (len(neuves), restants))
+
+
 SORTIES_URL = "https://4k-ultra-hd.fr/prochaines-sorties-blu-ray-4k-ultra-hd"
 SORTIES_PAGES = 8
 # Appariements TMDB par passage : la première relève compte ~330 titres, et
@@ -866,6 +958,10 @@ def main():
             enrichir_telerama(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
         except Exception as e:
             print("Télérama sauté : %s" % e)
+        try:
+            enrichir_motscles(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
+        except Exception as e:
+            print("Mots-clés sautés : %s" % e)
         try:
             collecter_sorties(a.supabase_url, a.supabase_key)
         except Exception as e:
