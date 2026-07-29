@@ -159,7 +159,8 @@ async function majProfil(){
   const pseudo = (db.pseudo||'').trim() || (db.auth.email||'').split('@')[0];
   db.pseudo = pseudo; saveDB();
   const mp = ui.monProfil || {};
-  const corps = { user_id: db.auth.uid, pseudo: pseudo, maj: new Date().toISOString() };
+  const corps = { user_id: db.auth.uid, pseudo: pseudo, email: db.auth.email || null,
+                  maj: new Date().toISOString() };
   if(mp.avatar) corps.avatar = mp.avatar;
   if(mp.jellyfin !== undefined) corps.jellyfin = mp.jellyfin || null;
   if(db.onboarde) corps.onboarde = true;
@@ -174,15 +175,24 @@ async function majProfil(){
                  avatar: mp.avatar || null });
 }
 
+/* Un compte en attente (ou refusé) ne voit pas l'app. Ce test n'est que
+   l'habillage : le catalogue lui est fermé par Supabase, pas par ce booléen. */
+const accesValide = ()=> !ui.monProfil || ui.monProfil.statut === 'valide';
+const accesRefuse = ()=> !!(ui.monProfil && ui.monProfil.statut === 'refuse');
+
 async function chargerMonProfil(){
   if(!connecte()) return;
   try{
-    const l = await sbFetch('/rest/v1/profils?select=pseudo,avatar,jellyfin,onboarde&user_id=eq.'+
-                            encodeURIComponent(db.auth.uid), {});
+    const l = await sbFetch('/rest/v1/profils?select=pseudo,avatar,jellyfin,onboarde,statut'+
+                            '&user_id=eq.'+encodeURIComponent(db.auth.uid), {});
     const p = (Array.isArray(l) && l[0]) || null;
     if(!p) return;
+    /* Statut inconnu = on laisse passer : le vrai verrou est en base (politique
+       RLS + déclencheur), cet écran n'est qu'une politesse. Bloquer ici sur une
+       lecture ratée ferait un faux positif désagréable. */
     ui.monProfil = { avatar: (p.avatar && p.avatar.type) ? p.avatar : null,
-                     jellyfin: p.jellyfin || '', onboarde: !!p.onboarde };
+                     jellyfin: p.jellyfin || '', onboarde: !!p.onboarde,
+                     statut: p.statut || 'valide' };
     if(p.pseudo && p.pseudo !== 'Sans nom' && !(db.pseudo||'').trim()) db.pseudo = p.pseudo;
     /* Le serveur fait foi sur « a-t-il déjà fait le parcours » : un nouvel
        appareil ne doit pas le redemander à quelqu'un qui l'a déjà fait. */
@@ -391,14 +401,9 @@ async function envoyerAuth(){
 }
 
 /* ---------- Inscription ---------- */
-function verifierInvitation(){
-  const v = ((document.getElementById('acinv')||{}).value || '').trim();
-  const attendu = String(CFG.invitation || '').trim();
-  if(attendu && v.toUpperCase() !== attendu.toUpperCase())
-    return setAuthErr('Ce code d\'invitation n\'est pas le bon. Demande-le à l\'administrateur.');
-  ui.auth = Object.assign({}, ui.auth, {pas:'compte', err:''});
-  render();
-}
+/* Plus de code d'invitation : n'importe qui peut DEMANDER un compte, et c'est
+   l'administrateur qui ouvre la porte. Un secret partagé finissait de toute
+   façon par circuler — et il était lisible dans le source de la page. */
 async function creerCompte(){
   const champ = id => ((document.getElementById(id)||{}).value || '').trim();
   const prenom = champ('acnom'), email = champ('acmail');
@@ -413,13 +418,12 @@ async function creerCompte(){
     await sbSignUp(email, c1);
     db.pseudo = prenom; db.onboarde = false; saveDB();
     ui.auth.occupe = false;
-    /* On ne passe pas par apresConnexion : un nouveau venu doit d'abord
-       traverser le parcours de goûts, c'est tout son intérêt. */
+    /* Le profil est créé en attente (le déclencheur y veille) : on va droit
+       à l'écran d'attente, sans passer par le parcours de goûts — il aura
+       tout le temps une fois entré. */
+    ui.monProfil = { avatar:null, jellyfin:'', onboarde:false, statut:'attente' };
     await majProfil();
-    await Promise.all([ catalogueDepuisSupabase().catch(()=>{}),
-                        verifierAdmin() ]);
-    choisirJellyfin();
-    demarrerBienvenue();
+    go('attente');
   }catch(e){
     ui.auth.occupe = false;
     const m = String(e.message||'');
@@ -433,8 +437,46 @@ async function creerCompte(){
   }
 }
 
+/* ---------- Écran d'attente ---------- */
+async function rafraichirAcces(){
+  ui.attenteOccupe = true; render();
+  await chargerMonProfil();
+  ui.attenteOccupe = false;
+  if(accesValide()){ toast('Accès ouvert — bienvenue !'); return apresConnexion(); }
+  render();
+  if(accesRefuse()) return;
+  toast('Toujours en attente');
+}
+
+function viewAttente(){
+  const refuse = accesRefuse();
+  let h = '<div class="acc">'+
+    '<div class="acclogo'+(refuse?'':' ok')+'">'+(refuse ? I.close : I.horloge)+'</div>'+
+    '<h1>'+(refuse ? 'Demande refusée' : 'Demande envoyée')+'</h1>'+
+    '<p class="accsub">'+(refuse
+      ? 'L\'administrateur n\'a pas donné suite à ta demande. '+
+        'Si c\'est une erreur, parle-lui directement.'
+      : 'Ton profil est créé. L\'administrateur de Cinéflix a été prévenu : '+
+        'il ouvrira ton accès, et tu recevras une notification.')+'</p>'+
+    '<div class="card" style="padding:14px;margin-top:20px;text-align:left">'+
+      '<div class="small muted">Ton profil</div>'+
+      '<div style="font-weight:660;margin-top:2px">'+esc(db.pseudo||'—')+'</div>'+
+      '<div class="tiny muted" style="margin-top:4px">'+esc((db.auth&&db.auth.email)||'')+'</div>'+
+    '</div>';
+  if(!refuse)
+    h += '<button class="btn block" style="margin-top:16px" '+(ui.attenteOccupe?'disabled':'')+
+      ' onclick="rafraichirAcces()">'+
+      (ui.attenteOccupe ? '<span class="spin"></span> Vérification…' : 'Vérifier maintenant')+
+      '</button>';
+  h += '<div class="accliens"><button onclick="deconnexionConfirmee()">Se déconnecter</button></div>';
+  return h + '</div>';
+}
+
 async function apresConnexion(){
   await chargerMonProfil();
+  /* Rien à charger tant que l'accès n'est pas ouvert — et de toute façon
+     Supabase ne renverrait rien. */
+  if(!accesValide()){ await majProfil(); return go('attente'); }
   await majProfil();
   await Promise.all([ catalogueDepuisSupabase().catch(e=>{ CAT.erreur = e.message; }),
                       chargerElements().catch(()=>{}),
@@ -506,29 +548,11 @@ function viewAuth(){
 }
 
 function viewInscription(a){
-  let h = '<div class="acc">';
-
-  if(a.pas !== 'compte'){
-    h += '<div class="acclogo">'+I.user+'</div>'+
-      '<h1>Créer un profil</h1>'+
-      '<p class="accsub">Cinéflix est privé. Demande son code d\'invitation à '+
-      'l\'administrateur du foyer.</p>'+
-      '<label class="fld" style="margin-top:22px"><span>Code d\'invitation</span>'+
-        /* JAMAIS le vrai code en exemple : le formulaire donnerait la réponse
-           à la question qu'il pose. */
-        '<input type="text" id="acinv" autocapitalize="characters" autocorrect="off" '+
-        'spellcheck="false" placeholder="le code qu\'on t\'a donné" '+
-        'onkeydown="if(event.key===\'Enter\'){this.blur();verifierInvitation()}"></label>'+
-      (a.err ? '<div class="accerr">'+esc(a.err)+'</div>' : '')+
-      '<button class="btn block" style="margin-top:14px" onclick="verifierInvitation()">'+
-        'Continuer</button>'+
-      '<div class="accliens"><button onclick="setAuthMode(\'connexion\')">'+
-        'J\'ai déjà un profil</button></div>';
-    return h + '</div>';
-  }
-
-  h += '<h1>Ton profil</h1>'+
-    '<p class="accsub">Le code à six chiffres remplace le mot de passe : '+
+  return '<div class="acc">'+
+    '<div class="acclogo">'+I.user+'</div>'+
+    '<h1>Demander un accès</h1>'+
+    '<p class="accsub">Cinéflix est privé. Ta demande part à l\'administrateur du '+
+    'foyer, qui ouvrira ton accès. Le code à six chiffres remplace le mot de passe : '+
     'plus simple à retenir, plus rapide à taper sur un canapé.</p>'+
     '<label class="fld" style="margin-top:20px"><span>Ton prénom</span>'+
       '<input type="text" id="acnom" placeholder="Ton prénom" autocomplete="given-name" '+
@@ -546,13 +570,82 @@ function viewInscription(a){
     (a.err ? '<div class="accerr">'+esc(a.err)+'</div>' : '')+
     '<button class="btn block" style="margin-top:14px" '+(a.occupe?'disabled':'')+
       ' onclick="creerCompte()">'+
-      (a.occupe ? '<span class="spin"></span> Un instant…' : 'Créer mon profil')+'</button>'+
+      (a.occupe ? '<span class="spin"></span> Un instant…' : 'Envoyer ma demande')+'</button>'+
     '<div class="accliens">'+
-      '<button onclick="ui.auth.pas=\'invit\';ui.auth.err=\'\';render()">Retour</button>'+
       '<button onclick="setAuthMode(\'connexion\')">J\'ai déjà un profil</button>'+
-    '</div>';
+    '</div>'+
+  '</div>';
+}
 
-  return h + '</div>';
+/* ============================ Demandes d'accès (admin) ============================ */
+let acces = { lignes:[], charge:false, occupe:false, err:'' };
+
+async function chargerAcces(){
+  if(!estAdmin) return;
+  acces.occupe = true; acces.err = '';
+  if(view === 'acces') render();
+  try{
+    acces.lignes = await sbFetch('/rest/v1/profils?select=user_id,pseudo,email,statut,maj'+
+                                 '&statut=eq.attente&order=maj.asc', {}) || [];
+    acces.charge = true;
+  }catch(e){ acces.err = e.message || 'lecture impossible'; }
+  acces.occupe = false;
+  if(view === 'acces' || view === 'profil') render();
+}
+
+async function deciderAcces(uid, decision, qui){
+  closeSheet();
+  try{
+    await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
+      {method:'PATCH', headers:{ Prefer:'return=minimal' },
+       body: JSON.stringify({ statut: decision, maj: new Date().toISOString() })});
+    acces.lignes = acces.lignes.filter(l => l.user_id !== uid);
+    render();
+    toast(decision === 'valide' ? 'Accès ouvert à '+(qui||'ce profil')
+                                : 'Demande refusée');
+  }catch(e){ toast('Échec : '+(e.message||'réessaie')); }
+}
+
+function menuAcces(uid, qui){
+  openSheet('<h3>'+esc(qui||'Demande d\'accès')+'</h3>'+
+    '<p class="small muted" style="margin:0 0 8px">Une fois l\'accès ouvert, cette '+
+    'personne voit tout le catalogue et peut demander des titres.</p>'+
+    '<button class="opt" onclick="deciderAcces(\''+uid+'\',\'valide\',\''+
+      esc(qui||'').replace(/'/g,"\\'")+'\')">Ouvrir l\'accès</button>'+
+    '<button class="opt danger" onclick="deciderAcces(\''+uid+'\',\'refuse\',\''+
+      esc(qui||'').replace(/'/g,"\\'")+'\')">Refuser</button>'+
+    '<button class="opt" onclick="closeSheet()">Annuler</button>');
+}
+
+function viewAcces(){
+  let html = header('Demandes d\'accès', {back:'goBack()',
+    right:'<button class="iconbtn" onclick="chargerAcces()">'+I.horloge+'</button>'});
+
+  if(acces.occupe && !acces.charge)
+    return html + '<div class="empty"><span class="spin"></span>'+
+      '<p style="margin-top:12px">Chargement…</p></div>';
+  if(acces.err)
+    return html + '<div class="empty"><h3>Lecture impossible</h3><p>'+esc(acces.err)+'</p>'+
+      '<button class="btn ghost" onclick="chargerAcces()">Réessayer</button></div>';
+  if(!acces.lignes.length)
+    return html + '<div class="empty">'+I.user+'<h3>Aucune demande</h3>'+
+      '<p>Personne n\'attend d\'accès à Cinéflix pour le moment.</p></div>';
+
+  html += '<div class="list">'+acces.lignes.map(l =>
+    '<div class="lrow">'+
+      avatarHtml(null, 'moyen', l.pseudo)+
+      '<div class="cinfo" style="margin-left:12px">'+
+        '<div class="cname2">'+esc(l.pseudo||'Sans nom')+'</div>'+
+        '<div class="csub">'+esc(l.email||'—')+' · '+
+          esc(relatif(String(l.maj||'').slice(0,10)))+'</div>'+
+      '</div>'+
+      '<button class="iconbtn" onclick="menuAcces(\''+l.user_id+'\',\''+
+        esc(l.pseudo||'').replace(/'/g,"\\'")+'\')">'+I.dots+'</button>'+
+    '</div>').join('')+'</div>';
+
+  return html + '<div class="wrap tiny muted center" style="padding-bottom:26px">'+
+    'Tant que tu n\'as pas ouvert l\'accès, ces personnes ne voient rien de '+
+    'Cinéflix — le catalogue leur est fermé côté serveur.</div>';
 }
 
 /* ============================ Écran : la file (admin) ============================ */

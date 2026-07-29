@@ -707,11 +707,30 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      await page.locator('.accliens button:has-text("Ce n")').count() === 1);
 
 
-  ok('l’écran d’invitation ne souffle jamais le vrai code', await page.evaluate(()=>{
-     ui.auth = { mode:'inscription', pas:'invit', err:'', occupe:false };
+  ok('l’inscription demande un accès, sans aucun code partagé', await page.evaluate(()=>{
+     ui.auth = { mode:'inscription', err:'', occupe:false };
      const h = viewInscription(ui.auth);
-     return h.indexOf('acinv') >= 0 && h.indexOf(CFG.invitation || 'CINEFLIX87') < 0;
+     return h.indexOf('acinv') < 0 && h.indexOf('CINEFLIX87') < 0 &&
+            h.indexOf('acnom') >= 0 && h.indexOf('accode2') >= 0 &&
+            /demande/i.test(h);
   }));
+  ok('un compte en attente ne voit qu’un écran d’attente', await page.evaluate(()=>{
+     ui.monProfil = { statut:'attente' };
+     const bloque = !accesValide();
+     const h = viewAttente();
+     ui.monProfil = { statut:'valide' };
+     return bloque && accesValide() && /envoy/i.test(h) && h.indexOf('rafraichirAcces') >= 0;
+  }));
+  ok('un compte refusé le sait, et ne réessaie pas en boucle', await page.evaluate(()=>{
+     ui.monProfil = { statut:'refuse' };
+     const h = viewAttente();
+     const ok2 = accesRefuse() && !accesValide() &&
+                 /refus/i.test(h) && h.indexOf('rafraichirAcces') < 0;
+     ui.monProfil = { statut:'valide' };
+     return ok2;
+  }));
+  ok('statut inconnu = on laisse passer (le verrou est en base)',
+     await page.evaluate(()=>{ ui.monProfil = null; return accesValide(); }));
 
   // 11. Le moteur : comprendre l'humeur
   ok('« rire sans me prendre la tête » donne la comédie', await page.evaluate(()=>{

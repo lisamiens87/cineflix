@@ -109,8 +109,9 @@ let ui = {
           vus:{}, repli:false, source:'' }
 };
 
-const DEPTH = { auth:0, accueil:0, bienvenue:0, decouvrir:0, sorties:0, liste:0, profil:0,
-                fiche:1, reglages:1, file:1, guide:1, personne:2, saison:2 };
+const DEPTH = { auth:0, accueil:0, bienvenue:0, attente:0, decouvrir:0, sorties:0,
+                liste:0, profil:0, fiche:1, reglages:1, file:1, acces:1, guide:1,
+                personne:2, saison:2 };
 let navDir = 'none';
 /* Les vues dont on mémorise le défilement : ouvrir un titre puis revenir
    doit ramener exactement où on en était. La filmographie d'une personne
@@ -138,6 +139,7 @@ function currentBack(){
   if(view === 'fiche') return params.from || 'decouvrir';
   if(view === 'reglages') return params.from || 'profil';
   if(view === 'file') return 'profil';
+  if(view === 'acces') return 'profil';
   if(view === 'guide') return params.from || 'decouvrir';
   return null;
 }
@@ -204,6 +206,8 @@ function render(){
   if(view === 'auth')           html = viewAuth();
   else if(view === 'accueil')   html = viewAccueil();
   else if(view === 'bienvenue') html = viewBienvenue();
+  else if(view === 'attente')   html = viewAttente();
+  else if(view === 'acces')     html = viewAcces();
   else if(view === 'guide')     html = viewGuide();
   else if(view === 'file')      html = viewFile();
   else if(view === 'decouvrir') html = viewDecouvrir();
@@ -219,7 +223,7 @@ function render(){
   /* La barre du bas disparaît sur les écrans qui n'ont qu'une chose à faire :
      la mise en route, et la connexion. */
   document.body.classList.toggle('accueil',
-    view === 'accueil' || view === 'auth' || view === 'bienvenue');
+    view === 'accueil' || view === 'auth' || view === 'bienvenue' || view === 'attente');
   app.classList.remove('enter','back');
   if(navDir === 'enter' || navDir === 'back'){
     void app.offsetWidth;
@@ -253,7 +257,7 @@ function renderNav(){
     : params.from === 'guide' ? 'decouvrir'
     : (params.from || (view === 'personne' ? ((ui.personne||{}).nav||{}).ffrom : ''));
   const cur = (view === 'fiche' || view === 'personne') ? (depuis || 'decouvrir')
-            : (view === 'reglages' || view === 'file') ? 'profil'
+            : (view === 'reglages' || view === 'file' || view === 'acces') ? 'profil'
             : view === 'guide' ? 'decouvrir'
             : view;
   document.getElementById('nav').innerHTML = tabs.map(([id,label,icon,badge])=>

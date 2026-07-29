@@ -71,11 +71,18 @@ function viewProfil(){
     const enAttente = file.charge
       ? file.lignes.filter(l => l.statut === 'demande' && !surCineflix(l.type, l.tmdb_id)).length
       : null;
+    const nAcces = acces.charge ? acces.lignes.length : null;
     html += '<div class="sectitle">Administration</div><div class="wrap" style="padding-top:0">'+
       '<button class="btn block" onclick="go(\'file\');chargerFile()">'+I.envoi+
         ' File de demandes'+(enAttente ? ' ('+enAttente+')' : '')+'</button>'+
+      /* Les demandes d'ACCÈS sont d'une autre nature que les demandes de
+         titres : quelqu'un attend derrière, et il ne voit rien tant que tu
+         n'as pas tranché. Le bouton se teinte quand il y en a. */
+      '<button class="btn '+(nAcces ? '' : 'ghost ')+'block" style="margin-top:8px" '+
+        'onclick="go(\'acces\');chargerAcces()">'+I.user+
+        ' Demandes d\'accès'+(nAcces ? ' ('+nAcces+')' : '')+'</button>'+
       '<div class="tiny muted center" style="margin-top:8px">'+
-        'Les demandes de tout le monde, à accepter ou refuser.</div>'+
+        'Les titres réclamés, et les personnes qui veulent entrer.</div>'+
     '</div>';
   }
 
@@ -279,10 +286,20 @@ async function boot(){
     return;
   }
 
+  /* Le statut d'accès AVANT tout le reste : un compte en attente n'a rien à
+     charger, et Supabase ne lui renverrait de toute façon rien. */
+  if(sbPret() && connecte()){
+    await chargerMonProfil();
+    if(!accesValide()){
+      document.body.classList.remove('booting');
+      view = 'attente'; params = {}; render();
+      return;
+    }
+  }
+
   // Le catalogue passe avant le premier rendu : les pastilles doivent être justes d'emblée.
   await chargerCatalogue();
   if(sbPret() && connecte()){
-    await chargerMonProfil();
     await Promise.all([ chargerElements().catch(()=>{}), chargerGouts().catch(()=>{}),
                         verifierAdmin() ]);
     pousserEnAttente();
@@ -296,6 +313,7 @@ async function boot(){
   /* La mise en route se déroule au premier lancement même quand la clé vient
      du serveur : elle sert aussi à demander le prénom et à expliquer les
      puces de présence. Seule l'étape de la clé disparaît. */
+  if(estAdmin) chargerAcces();
   if(!db.onboarde) demarrerBienvenue();
   else if(!db.apiKey) go('reglages', {from:'decouvrir'});
   if(memoryOnly) toast('Stockage indisponible sur cet appareil');

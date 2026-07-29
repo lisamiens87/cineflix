@@ -65,17 +65,15 @@ window.CINEFLIX = {
      Détermine les dates cinéma, numérique et Blu-ray affichées.          */
   region: 'FR',
 
-  /* --- Code d'invitation du foyer ---------------------------------------
-     Exigé pour créer un profil. À dire franchement : ce code est vérifié
-     DANS LE NAVIGATEUR, donc lisible par qui ouvre le code source de la
-     page. C'est un dissuasif contre le passant, pas un verrou.
+  /* --- Validation des accès -------------------------------------------
+     Il n'y a plus de code d'invitation : n'importe qui peut DEMANDER un
+     compte, et l'administrateur ouvre la porte depuis Profil → Demandes
+     d'accès. Un secret partagé finissait de toute façon par circuler, et
+     il était lisible dans le source de cette page.
 
-     Le vrai verrou, si tu le veux : Supabase → Authentication → Providers →
-     Email → désactiver l'inscription, et créer les comptes toi-même depuis
-     le tableau de bord. Les deux se cumulent très bien.
-
-     Laisser vide rouvre l'inscription à tout le monde.                     */
-  invitation: 'CINEFLIX87',
+     Le verrou n'est pas ici : il est dans Supabase (politique RLS sur le
+     catalogue + déclencheur qui empêche quiconque de se valider soi-même).
+     Un compte en attente ne voit rien, même en trafiquant l'app.          */
 
   /* --- Comptes Jellyfin du serveur --------------------------------------
      Proposés à l'inscription pour relier un profil Cinéflix à son compte

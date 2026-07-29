@@ -107,7 +107,7 @@ function choisirProfil(email){
   go('auth');
 }
 function nouveauProfil(){
-  ui.auth = { mode:'inscription', pas:'invit', code:'', err:'', occupe:false };
+  ui.auth = { mode:'inscription', code:'', err:'', occupe:false };
   go('auth');
 }
 function changerDeProfil(){
