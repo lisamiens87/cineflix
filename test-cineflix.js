@@ -816,6 +816,58 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      return v.length === 1 && v[0].titre === 'Jamais vu';
   }));
 
+
+  // 12 bis. Les sujets (mots-clés TMDB) — du genre au SUJET
+  ok('« un film de braquage » devient un sujet, pas un genre', await page.evaluate(()=>{
+     const r = lireHumeur('un film de braquage');
+     return !!r && r.mc.indexOf(10051) >= 0 && r.genres.length === 0 &&
+            /braquage/i.test(r.titre);
+  }));
+  ok('« un huis clos » et « une histoire vraie » sont reconnus', await page.evaluate(()=>{
+     const a = lireHumeur('un huis clos'), b = lireHumeur('une histoire vraie');
+     return !!a && a.mc.indexOf(162914) >= 0 && !!b && b.mc.indexOf(9672) >= 0;
+  }));
+  ok('un sujet se combine à une humeur', await page.evaluate(()=>{
+     const r = lireHumeur('une comédie de braquage');
+     return !!r && r.genres.indexOf(35) >= 0 && r.mc.indexOf(10051) >= 0;
+  }));
+  ok('un sujet se combine à un modificateur', await page.evaluate(()=>{
+     const r = lireHumeur('un film de vengeance français');
+     return !!r && r.mc.indexOf(9748) >= 0 && r.pays === 'FR';
+  }));
+  ok('le sujet filtre la bibliothèque quand elle est couverte', await page.evaluate(()=>{
+     CAT.items = [
+       {t:'movie', id:1, nom:'Le Casse', sortie:'2014-01-01', note:7, duree:100,
+        genres:['Thriller'], pays:['FR'], vu:0, noteCrit:0, mc:[10051]},
+       {t:'movie', id:2, nom:'Autre chose', sortie:'2014-01-01', note:8, duree:100,
+        genres:['Thriller'], pays:['FR'], vu:0, noteCrit:0, mc:[6054]}
+     ];
+     const v = vivierCineflix(lireHumeur('un film de braquage'), false);
+     return v.length === 1 && v[0].titre === 'Le Casse';
+  }));
+  ok('un film pas encore enrichi n’est pas puni tant que la collecte est en cours',
+     await page.evaluate(()=>{
+     CAT.items = [
+       {t:'movie', id:1, nom:'Enrichi', sortie:'2014-01-01', note:7, duree:100,
+        genres:['Thriller'], pays:['FR'], vu:0, noteCrit:0, mc:[10051]},
+       {t:'movie', id:2, nom:'Pas encore', sortie:'2014-01-01', note:8, duree:100,
+        genres:['Thriller'], pays:['FR'], vu:0, noteCrit:0}
+     ];
+     /* Couverture 50 % : sous le seuil, on garde les deux. */
+     return couvertureMC() === 0.5 &&
+            vivierCineflix(lireHumeur('un film de braquage'), false).length === 2;
+  }));
+  ok('le sujet pèse plus que le genre dans le score', await page.evaluate(()=>{
+     GOUTS.d = { aimes:[], fuis:[], plats:[], totems:[] };
+     const r = { genres:[53], sans:[], mc:[10051] };
+     const sujet = {genres:[18],principal:18,mc:[10051],flix:true,vu:0,note:7,jt:0,noteCrit:0,duree:0,annee:2020,reco:null};
+     const genre = {genres:[53],principal:53,mc:[6054], flix:true,vu:0,note:7,jt:0,noteCrit:0,duree:0,annee:2020,reco:null};
+     return scorerCandidat(sujet, r) > scorerCandidat(genre, r);
+  }));
+  ok('la raison annonce le sujet plutôt que le genre', await page.evaluate(()=>
+     raisonDe({genres:[18],principal:18,mc:[10051],flix:true,vu:0,annee:2020,pays:[]},
+              {mc:[10051]}).indexOf('Braquage') === 0));
+
   // 13. Le guide de bout en bout
   await page.evaluate(()=>{
      CAT.items = [

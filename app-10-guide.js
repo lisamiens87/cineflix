@@ -78,6 +78,93 @@ const MODIFS = [
     dit:'série', appli:r=>{ r.type = 'tv'; } }
 ];
 
+/* ---------- Le lexique des SUJETS ----------
+   Les genres sont dix-neuf cases ; les mots-clés TMDB disent de quoi parle le
+   film. C'est ce qui sépare « une comédie » de « un film de braquage ».
+
+   PIÈGE STRUCTUREL : les mots-clés de TMDB sont en ANGLAIS et le resteront
+   (« heist », « road trip », « based on true story »). Ce tableau est le pont.
+   Les identifiants ont été résolus contre /search/keyword, pas devinés. */
+const SUJETS = [
+  { dit:'braquage',        mots:['braquage','casse','hold up','holdup','cambriolage'], mc:[10051,642,15363] },
+  { dit:'road movie',      mots:['road movie','road trip','sur la route','voyage en voiture'], mc:[7312] },
+  { dit:'histoire vraie',  mots:['histoire vraie','faits reels','tire de la realite','biopic','biographie'], mc:[9672,5565] },
+  { dit:'vengeance',       mots:['vengeance','venger','revanche'], mc:[9748] },
+  { dit:'post-apocalyptique', mots:['post apocalyptique','apocalyptique','fin du monde','dystopie','dystopique'], mc:[4458,4565,12332] },
+  { dit:'guerre',          mots:['seconde guerre','deuxieme guerre','39 45','premiere guerre','14 18','nazis'], mc:[1956,2504,375138] },
+  { dit:'espionnage',      mots:['espionnage','espion','agent secret','barbouze'], mc:[470,5265,1568] },
+  { dit:'tueur en série',  mots:['tueur en serie','serial killer','psychopathe'], mc:[10714] },
+  { dit:'super-héros',     mots:['super heros','superheros','superhero','comics'], mc:[9715] },
+  { dit:'zombies',         mots:['zombie','zombies','morts vivants'], mc:[12377] },
+  { dit:'extraterrestres', mots:['extraterrestre','extraterrestres','alien','aliens','ovni'], mc:[9951] },
+  { dit:'voyage dans le temps', mots:['voyage dans le temps','remonter le temps','boucle temporelle'], mc:[4379] },
+  { dit:'prison',          mots:['prison','prisonnier','evasion','s evader','taule'], mc:[378,10685] },
+  { dit:'procès',          mots:['proces','tribunal','avocat','justice','pretoire'], mc:[33519] },
+  { dit:'mafia',           mots:['mafia','mafieux','gangster','pegre','parrain'], mc:[10391,3149] },
+  { dit:'amitié',          mots:['amitie','copains','potes','entre amis'], mc:[6054] },
+  { dit:'apprentissage',   mots:['adolescence','adolescent','passage a l age adulte','jeunesse','initiatique'], mc:[10683] },
+  { dit:'lycée',           mots:['lycee','college','ecole','etudiants','fac'], mc:[6270] },
+  { dit:'boxe',            mots:['boxe','boxeur','ring'], mc:[209476] },
+  { dit:'sport',           mots:['sport','sportif','competition','entrainement'], mc:[333328] },
+  { dit:'musique',         mots:['musique','musicien','groupe de rock','chanteur','concert','jazz'], mc:[4048] },
+  { dit:'Noël',            mots:['noel','fetes de fin d annee','pere noel'], mc:[207317] },
+  { dit:'enquête',         mots:['enquete','detective','inspecteur','investigation'], mc:[703] },
+  { dit:'survie',          mots:['survie','survivre','naufrage','perdu en pleine nature'], mc:[10349,2580] },
+  { dit:'espace',          mots:['espace','spatial','astronaute','cosmos','vaisseau'], mc:[3801,14626,161176] },
+  { dit:'intelligence artificielle', mots:['intelligence artificielle','robot','robots','androide','ia'], mc:[378084,14544] },
+  { dit:'addiction',       mots:['drogue','addiction','toxicomane','alcoolisme','dependance'], mc:[1803] },
+  { dit:'hôpital',         mots:['hopital','medecin','chirurgien','maladie','soignants'], mc:[11612] },
+  { dit:'journalisme',     mots:['journalisme','journaliste','presse','reporter'], mc:[917] },
+  { dit:'politique',       mots:['politique','president','election','pouvoir','campagne'], mc:[6078] },
+  { dit:'danse',           mots:['danse','danseur','danseuse','ballet'], mc:[1691] },
+  { dit:'enlèvement',      mots:['enlevement','kidnapping','rapt','otage'], mc:[1930] },
+  { dit:'amnésie',         mots:['amnesie','perte de memoire','memoire effacee','se souvenir de rien'], mc:[1453] },
+  { dit:'jumeaux',         mots:['jumeaux','jumelles','sosie'], mc:[15016] },
+  { dit:'sous-marin',      mots:['sous marin','submersible'], mc:[339] },
+  { dit:'avion',           mots:['avion','aviation','pilote de chasse','crash aerien'], mc:[3800] },
+  { dit:'train',           mots:['train','ferroviaire','gare'], mc:[13008] },
+  { dit:'vampires',        mots:['vampire','vampires'], mc:[3133] },
+  { dit:'sorcellerie',     mots:['sorciere','sorcier','sorcellerie','magie'], mc:[616,2343] },
+  { dit:'arts martiaux',   mots:['arts martiaux','kung fu','karate','samourai','ninja'], mc:[779,1462] },
+  { dit:'course-poursuite',mots:['course poursuite','poursuite en voiture','cascades'], mc:[9844] },
+  { dit:'complot',         mots:['complot','conspiration','manipulation d etat'], mc:[10410] },
+  { dit:'épidémie',        mots:['epidemie','pandemie','virus','contagion'], mc:[188973] },
+  { dit:'montagne',        mots:['montagne','alpinisme','escalade','sommet'], mc:[8624] },
+  { dit:'mariage',         mots:['mariage','noces','se marier'], mc:[13027] },
+  { dit:'divorce',         mots:['divorce','separation','rupture'], mc:[15160] },
+  { dit:'adoption',        mots:['adoption','adopter','famille d accueil'], mc:[2393] },
+  { dit:'immigration',     mots:['immigration','immigre','exil','clandestin'], mc:[1900] },
+  { dit:'racisme',         mots:['racisme','discrimination','segregation'], mc:[12425] },
+  { dit:'résistance',      mots:['resistance','maquis','occupation'], mc:[357283] },
+  { dit:'dictature',       mots:['dictature','dictateur','totalitaire','regime'], mc:[7606] },
+  { dit:'dinosaures',      mots:['dinosaure','dinosaures','jurassique'], mc:[12616] },
+  { dit:'secte',           mots:['secte','gourou','communaute fermee'], mc:[6158] },
+  { dit:'pirates',         mots:['pirate','pirates','corsaire','flibustier'], mc:[12988] },
+  { dit:'huis clos',       mots:['huis clos','une seule nuit','en vase clos','confine'], mc:[162914] },
+  { dit:'province',        mots:['province','petite ville','campagne','village'], mc:[1415] }
+];
+
+/* Quelle part de la bibliothèque a déjà reçu ses mots-clés ? Le NAS les
+   collecte par lots ; tant que la couverture est faible, un filtre dur ferait
+   disparaître des titres qui n'ont simplement pas encore été interrogés. */
+let _couvMC = null, _couvSrc = null;
+function couvertureMC(){
+  if(_couvSrc !== CAT.items){
+    _couvSrc = CAT.items;
+    const l = CAT.items || [];
+    _couvMC = l.length ? l.filter(i => i && i.mc).length / l.length : 0;
+  }
+  return _couvMC;
+}
+
+function lireSujets(t){
+  const out = [];
+  SUJETS.forEach(s=>{
+    if(s.mots.some(m => t.indexOf(' '+m) >= 0 || t.indexOf(m+' ') >= 0)) out.push(s);
+  });
+  return out;
+}
+
 /* ---------- Le périmètre ---------- */
 const platsProfil = ()=> {
   const g = GOUTS.d || {};
@@ -113,7 +200,7 @@ function idsDepuisNoms(noms){
 /* ---------- Construire la recette ---------- */
 function recetteVide(){
   return { genres:[], sans:[], note:0, votes:0, duree:0, apres:0, avant:0,
-           pays:'', type:'movie', titre:'', dits:[] };
+           pays:'', type:'movie', titre:'', dits:[], mc:[] };
 }
 function recetteHumeur(h){
   const r = recetteVide();
@@ -147,10 +234,23 @@ function lireHumeur(txt){
     if(n > score){ score = n; best = h; }
   });
   const mods = MODIFS.filter(m => m.mots.some(x => t.indexOf(x) >= 0));
-  if(!best && !mods.length) return null;
+  const sujets = lireSujets(t);
+  if(!best && !mods.length && !sujets.length) return null;
   const r = best ? recetteHumeur(best) : recetteGouts();
   mods.forEach(m => { m.appli(r); r.dits.push(m.dit); });
-  if(!best) r.titre = 'D\'après tes goûts';
+  /* Un sujet reconnu vaut mieux qu'une humeur devinée : quand il n'y a pas
+     d'humeur, c'est lui qui donne son titre à la sélection, et on laisse les
+     genres ouverts — « un film de braquage » n'est pas un genre. */
+  sujets.forEach(x=>{
+    x.mc.forEach(id => { if(r.mc.indexOf(id) < 0) r.mc.push(id); });
+    r.dits.push(x.dit);
+  });
+  if(!best){
+    r.titre = sujets.length
+      ? sujets.map(x=>x.dit).join(' · ').replace(/^./, c=>c.toUpperCase())
+      : 'D\'après tes goûts';
+    if(sujets.length){ r.genres = []; r.note = 0; r.votes = 0; }
+  }
   return r;
 }
 
@@ -170,6 +270,7 @@ function fiche2candidat(i, t){
               sépare une comédie d'un dessin animé qui fait rire. */
            principal: idsDepuisNoms(noms.slice(0,1))[0] || 0,
            pays: i.pays || [], vu: i.vu || 0, ajout: i.ajout || '',
+           mc: i.mc || null,
            noteCrit: i.noteCrit || 0, cert: i.cert || '',
            flix:true, plat:null, reco:null, jt: i.jt || 0 };
 }
@@ -182,6 +283,13 @@ function vivierCineflix(r, revoir){
   return (CAT.items||[]).filter(i => i && i.t === t).map(i => fiche2candidat(i, t))
     .filter(c=>{
       if(r.pays && (c.pays||[]).indexOf(r.pays) < 0) return false;
+      /* Le sujet demandé. Tant que le NAS n'a pas couvert la bibliothèque, un
+         film sans mots-clés connus reste dans la course : l'écarter reviendrait
+         à punir un titre pour une collecte en retard. */
+      if(r.mc.length){
+        if(c.mc){ if(!r.mc.some(id => c.mc.indexOf(id) >= 0)) return false; }
+        else if(couvertureMC() > 0.6) return false;
+      }
       if(r.genres.length && !r.genres.some(g => c.genres.indexOf(g) >= 0)) return false;
       if(r.sans.length && r.sans.some(g => c.genres.indexOf(g) >= 0)) return false;
       if(!veutAnim && c.genres.indexOf(16) >= 0) return false;
@@ -220,6 +328,7 @@ async function vivierPlateformes(r, pages){
   if(r.apres) base[champ+'.gte'] = r.apres+'-01-01';
   if(r.avant) base[champ+'.lte'] = r.avant+'-12-31';
   if(r.pays)  base.with_origin_country = r.pays;
+  if(r.mc && r.mc.length) base.with_keywords = r.mc.join('|');
 
   const lots = await Promise.all([1,2,3].slice(0, pages||2).map(p =>
     tmdb('/discover/'+r.type, Object.assign({}, base, {page:String(p)})).catch(()=>({results:[]}))));
@@ -292,6 +401,13 @@ function scorerCandidat(c, r){
   s += Math.min(4, bonus);
   (g.fuis||[]).forEach(id => { if(c.genres.indexOf(id) >= 0) s -= 6; });
 
+  /* Le sujet est ce qu'on a demandé de plus précis : il pèse plus que le
+     genre, qui n'est qu'une famille. */
+  if(r.mc && r.mc.length && c.mc){
+    const n = r.mc.filter(id => c.mc.indexOf(id) >= 0).length;
+    if(n) s += Math.min(8, 4 + 2 * n);
+  }
+
   /* Le genre demandé compte double quand c'est le genre PRINCIPAL du film :
      une comédie l'emporte sur un film d'aventure qui a aussi fait rire. */
   if(r.genres.length){
@@ -334,11 +450,17 @@ function choisirSuggestions(liste, n){
   return out;
 }
 
-function raisonDe(c){
+function raisonDe(c, r){
   if(c.reco) return 'Parce que tu as aimé ' + c.reco;
   const bits = [];
+  /* Quand un sujet a été demandé et que le film le porte, c'est LA raison :
+     elle est plus parlante que son genre. */
+  if(r && r.mc && r.mc.length && c.mc){
+    const s = SUJETS.find(x => x.mc.some(id => c.mc.indexOf(id) >= 0 && r.mc.indexOf(id) >= 0));
+    if(s) bits.push(s.dit.charAt(0).toUpperCase() + s.dit.slice(1));
+  }
   const g = nomGenre(c.principal) || c.genres.map(nomGenre).filter(Boolean)[0];
-  if(g) bits.push(g);
+  if(g && bits.indexOf(g) < 0) bits.push(g);
   if((c.pays||[]).indexOf('FR') >= 0) bits.push('France');
   if(c.annee) bits.push(String(c.annee));
   if(c.jt >= 3) bits.push(c.jt + ' T Télérama');
@@ -492,7 +614,7 @@ function carteGuide(c){
       (c.flix ? '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>' : '')+
     '</div>'+
     '<div class="gname">'+esc(c.titre)+'</div>'+
-    '<div class="graison">'+esc(raisonDe(c))+'</div>'+
+    '<div class="graison">'+esc(raisonDe(c, (ui.guide||{}).recette))+'</div>'+
   '</button>';
 }
 
