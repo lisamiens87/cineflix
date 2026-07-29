@@ -514,8 +514,10 @@ function viewInscription(a){
       '<p class="accsub">Cinéflix est privé. Demande son code d\'invitation à '+
       'l\'administrateur du foyer.</p>'+
       '<label class="fld" style="margin-top:22px"><span>Code d\'invitation</span>'+
+        /* JAMAIS le vrai code en exemple : le formulaire donnerait la réponse
+           à la question qu'il pose. */
         '<input type="text" id="acinv" autocapitalize="characters" autocorrect="off" '+
-        'spellcheck="false" placeholder="ex. CINEFLIX87" '+
+        'spellcheck="false" placeholder="le code qu\'on t\'a donné" '+
         'onkeydown="if(event.key===\'Enter\'){this.blur();verifierInvitation()}"></label>'+
       (a.err ? '<div class="accerr">'+esc(a.err)+'</div>' : '')+
       '<button class="btn block" style="margin-top:14px" onclick="verifierInvitation()">'+

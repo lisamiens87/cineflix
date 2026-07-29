@@ -706,6 +706,13 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   ok('« Ce n’est pas moi » ramène à l’accueil',
      await page.locator('.accliens button:has-text("Ce n")').count() === 1);
 
+
+  ok('l’écran d’invitation ne souffle jamais le vrai code', await page.evaluate(()=>{
+     ui.auth = { mode:'inscription', pas:'invit', err:'', occupe:false };
+     const h = viewInscription(ui.auth);
+     return h.indexOf('acinv') >= 0 && h.indexOf(CFG.invitation || 'CINEFLIX87') < 0;
+  }));
+
   // 11. Le moteur : comprendre l'humeur
   ok('« rire sans me prendre la tête » donne la comédie', await page.evaluate(()=>{
      const r = lireHumeur("j'ai envie de rire sans me prendre la tête");
