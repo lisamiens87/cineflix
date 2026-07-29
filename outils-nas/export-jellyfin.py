@@ -39,6 +39,7 @@ import tempfile
 import time
 import urllib.error
 import urllib.parse
+import http.cookiejar
 import urllib.request
 from datetime import date, datetime, timezone
 from html import unescape
@@ -277,10 +278,22 @@ def _tlr_cle(t, nom, annee):
 TLR_VERDICTS = {1: "Bof", 2: "Bien", 3: "Très Bien", 4: "Bravo"}
 
 
+# Un ouvreur QUI GARDE LES COOKIES, partagé par tous les appels du passage.
+# Sans lui, telerama.fr renvoie l'anonyme dans une boucle de redirections
+# (« HTTP Error 301 : infinite loop ») dès qu'il attend un cookie de consentement
+# ou de session : urllib ne mémorise rien, donc chaque redirection repart de
+# zéro. Constaté le 29/07, collecte à l'arrêt.
+_tlr_ouvreur = [None]
+
+
 def _tlr_get(url):
+    if _tlr_ouvreur[0] is None:
+        _tlr_ouvreur[0] = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
     req = urllib.request.Request(url, headers={
-        "User-Agent": TLR_UA, "Accept-Language": "fr"})
-    return urllib.request.urlopen(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
+        "User-Agent": TLR_UA, "Accept-Language": "fr,fr-FR;q=0.9",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"})
+    return _tlr_ouvreur[0].open(req, timeout=TIMEOUT).read().decode("utf-8", "ignore")
 
 
 def telerama_note(nom, annee, type_):
