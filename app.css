@@ -599,9 +599,10 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
   .tab svg{width:21px;height:21px}
   .tab.on svg{transform:none}
   .tab:active svg{transform:scale(.94)}
-  /* La pastille était centrée sous une icône : elle se cale maintenant au bout
-     de la ligne. */
-  .tab .pastille-nav{position:static;margin:0 0 0 auto;left:auto;top:auto}
+  /* La pastille était centrée sous une icône ; mise en ligne, elle se plaçait
+     entre l'icône et le mot — « ♡ 14 Ma liste ». « order » la renvoie en
+     dernier, la marge automatique la colle au bord droit du rail. */
+  .tab .pastille-nav{position:static;order:9;margin:0 0 0 auto;left:auto;top:auto}
 
   /* Plus de barre en bas : la marge de sécurité du pouce n'a plus lieu d'être. */
   .app{max-width:1240px;padding-bottom:36px}
