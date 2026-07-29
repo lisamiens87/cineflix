@@ -155,24 +155,48 @@ function lireHumeur(txt){
 }
 
 /* ---------- Les viviers ---------- */
-/* 1. La bibliothèque : aucune requête, tout est déjà en mémoire. */
-function vivierCineflix(r){
+/* 1. La bibliothèque : aucune requête, tout est déjà en mémoire — et le NAS
+   y met bien plus que des titres. Le pays, la note des critiques, la note
+   Télérama, la durée, la classification, et surtout : COMBIEN DE FOIS tu l'as
+   lancé. C'est cette dernière colonne qui fait la différence entre un guide et
+   une grille — 2 179 de tes 2 270 films n'ont jamais été ouverts. */
+function fiche2candidat(i, t){
+  const noms = i.genres || [];
+  return { type:t, id:i.id, titre:i.nom, poster:'', date:i.sortie,
+           annee: Number(String(i.sortie||'').slice(0,4)) || 0,
+           note: i.note || 0, duree: i.duree || 0,
+           genres: idsDepuisNoms(noms),
+           /* Jellyfin liste le genre PRINCIPAL en premier : c'est lui qui
+              sépare une comédie d'un dessin animé qui fait rire. */
+           principal: idsDepuisNoms(noms.slice(0,1))[0] || 0,
+           pays: i.pays || [], vu: i.vu || 0, ajout: i.ajout || '',
+           noteCrit: i.noteCrit || 0, cert: i.cert || '',
+           flix:true, plat:null, reco:null, jt: i.jt || 0 };
+}
+
+function vivierCineflix(r, revoir){
   const t = r.type;
-  return (CAT.items||[]).filter(i => i && i.t === t).map(i=>{
-    const ids = idsDepuisNoms(i.genres||[]);
-    return { type:t, id:i.id, titre:i.nom, poster:'', date:i.sortie,
-             annee: Number(String(i.sortie||'').slice(0,4)) || 0,
-             note: i.note || 0, duree: i.duree || 0, genres: ids,
-             flix:true, plat:null, reco:null, jt: i.jt || 0 };
-  }).filter(c=>{
-    if(r.genres.length && !r.genres.some(g => c.genres.indexOf(g) >= 0)) return false;
-    if(r.sans.length && r.sans.some(g => c.genres.indexOf(g) >= 0)) return false;
-    if(r.note && c.note && c.note < r.note - 0.6) return false;   // le NAS note plus sévèrement
-    if(r.duree && c.duree && c.duree > r.duree + 10) return false;
-    if(r.apres && c.annee && c.annee < r.apres) return false;
-    if(r.avant && c.annee && c.annee > r.avant) return false;
-    return true;
-  });
+  /* L'animation n'entre que si on l'a demandée : sans cette garde, « je veux
+     rire » remonte Toy Story, qui porte bien le genre Comédie. */
+  const veutAnim = r.genres.indexOf(16) >= 0 || r.genres.indexOf(10751) >= 0;
+  return (CAT.items||[]).filter(i => i && i.t === t).map(i => fiche2candidat(i, t))
+    .filter(c=>{
+      if(r.pays && (c.pays||[]).indexOf(r.pays) < 0) return false;
+      if(r.genres.length && !r.genres.some(g => c.genres.indexOf(g) >= 0)) return false;
+      if(r.sans.length && r.sans.some(g => c.genres.indexOf(g) >= 0)) return false;
+      if(!veutAnim && c.genres.indexOf(16) >= 0) return false;
+      if(veutAnim && typeof rangCert === 'function'){
+        const rg = rangCert(c.cert);
+        if(rg != null && rg > 10) return false;      // « en famille » = tous publics
+      }
+      /* Le NAS note plus sévèrement que TMDB : on desserre un peu le seuil. */
+      if(r.note && c.note && c.note < r.note - 0.6) return false;
+      if(r.duree && c.duree && c.duree > r.duree + 10) return false;
+      if(r.apres && c.annee && c.annee < r.apres) return false;
+      if(r.avant && c.annee && c.annee > r.avant) return false;
+      if(!revoir && c.vu > 0) return false;
+      return true;
+    });
 }
 
 /* 2. Les plateformes du profil : TMDB filtre lui-même. */
@@ -180,13 +204,16 @@ async function vivierPlateformes(r, pages){
   const plats = platsProfil();
   if(!plats.length) return [];
   const champ = r.type === 'movie' ? 'primary_release_date' : 'first_air_date';
+  const veutAnim = r.genres.indexOf(16) >= 0 || r.genres.indexOf(10751) >= 0;
   const base = {
     include_adult:'false', watch_region: db.region || 'FR',
     with_watch_providers: plats.join('|'), with_watch_monetization_types:'flatrate',
     sort_by:'popularity.desc'
   };
   if(r.genres.length) base.with_genres = r.genres.join('|');
-  if(r.sans.length)   base.without_genres = r.sans.join(',');
+  const exclus = r.sans.slice();
+  if(!veutAnim) exclus.push(16);
+  if(exclus.length) base.without_genres = exclus.join(',');
   if(r.note){ base['vote_average.gte'] = String(r.note);
               base['vote_count.gte'] = String(r.votes || 150); }
   if(r.duree) base['with_runtime.lte'] = String(r.duree);
@@ -200,9 +227,11 @@ async function vivierPlateformes(r, pages){
   lots.forEach(d => (d.results||[]).forEach(x=>{
     if(!x.poster_path) return;
     const date = r.type === 'movie' ? x.release_date : x.first_air_date;
+    const g = x.genre_ids || [];
     out.push({ type:r.type, id:x.id, titre:(x.title||x.name||''), poster:x.poster_path,
                date:date, annee: Number(String(date||'').slice(0,4)) || 0,
-               note: x.vote_average || 0, duree:0, genres:(x.genre_ids||[]),
+               note: x.vote_average || 0, duree:0, genres:g, principal:g[0]||0,
+               pays:[], vu:0, ajout:'', noteCrit:0, cert:'',
                flix: surCineflix(r.type, x.id), plat: plats[0], reco:null, jt:0 });
   }));
   return out;
@@ -224,9 +253,11 @@ async function vivierTotems(r){
   const bruts = [];
   lots.forEach(x => x.l.forEach(y=>{
     if(!y.poster_path) return;
+    const g2 = y.genre_ids || [];
     bruts.push({ type:'movie', id:y.id, titre:y.title||y.name||'', poster:y.poster_path,
                  date:y.release_date, annee:Number(String(y.release_date||'').slice(0,4))||0,
-                 note:y.vote_average||0, duree:0, genres:(y.genre_ids||[]),
+                 note:y.vote_average||0, duree:0, genres:g2, principal:g2[0]||0,
+                 pays:[], vu:0, ajout:'', noteCrit:0, cert:'',
                  flix: surCineflix('movie', y.id), plat:null, reco:x.src, jt:0 });
   }));
 
@@ -247,38 +278,78 @@ async function vivierTotems(r){
 }
 
 /* ---------- Le score ---------- */
+/* Deux familles de points, et elles ne disent pas la même chose :
+   ce que la personne aime (ses goûts, son humeur du moment) et ce que
+   l'objet vaut (les critiques, Télérama) — plus un signal que seule une
+   bibliothèque personnelle possède : « tu ne l'as jamais lancé ». */
 function scorerCandidat(c, r){
   const g = GOUTS.d || {};
   let s = 0;
   if(c.reco) s += 3;
+
   let bonus = 0;
   (g.aimes||[]).forEach(id => { if(c.genres.indexOf(id) >= 0) bonus += 2; });
   s += Math.min(4, bonus);
-  if(c.flix) s += 2;
-  if(c.note >= 7.5) s += 1;
-  if(c.jt >= 3) s += 1;
   (g.fuis||[]).forEach(id => { if(c.genres.indexOf(id) >= 0) s -= 6; });
+
+  /* Le genre demandé compte double quand c'est le genre PRINCIPAL du film :
+     une comédie l'emporte sur un film d'aventure qui a aussi fait rire. */
+  if(r.genres.length){
+    if(r.genres.indexOf(c.principal) >= 0) s += 4;
+    else if(r.genres.some(id => c.genres.indexOf(id) >= 0)) s += 1;
+  }
+
+  if(c.flix) s += c.vu ? 1 : 3;              // jamais lancé : la vraie trouvaille
+  if(c.noteCrit >= 85) s += 2; else if(c.noteCrit >= 70) s += 1;
+  if(c.jt >= 3) s += 2; else if(c.jt) s += 1;
+  if(c.note >= 7.5) s += 1;
+
   if(g.duree && c.duree && c.duree > g.duree) s -= 3;
   if(g.vieux === false && c.annee && c.annee < 1990) s -= 2;
-  /* La recette du moment pèse aussi : un titre qui coche son genre principal
-     doit passer devant un titre simplement bien noté. */
-  if(r.genres.length && r.genres.some(id => c.genres.indexOf(id) >= 0)) s += 2;
   return s;
+}
+
+/* Une saga alignée n'est pas une suggestion : « Toy Story 1, 2, 3 » compte
+   pour un. On réduit le titre à sa racine — sans numéro, sans sous-titre. */
+function racineTitre(t){
+  return gLettres(String(t||'')
+    .replace(/\s*[:\-–—].*$/,'')
+    .replace(/\s+(\d+|[ivx]+)\s*$/i,'')).slice(0,14);
+}
+
+/* Le tri final. Un peu de hasard PAR-DESSUS le score : deux visites de suite
+   ne doivent pas donner la même liste, sans pour autant remonter n'importe
+   quoi — l'écart de trois points ne renverse que des candidats voisins. */
+function choisirSuggestions(liste, n){
+  liste.forEach(c => { c._r = c._s + Math.random() * 3; });
+  liste.sort((a,b)=> b._r - a._r);
+  const out = [], vues = new Set();
+  for(const c of liste){
+    if(out.length >= n) break;
+    const rc = racineTitre(c.titre);
+    if(rc && vues.has(rc)) continue;
+    vues.add(rc);
+    out.push(c);
+  }
+  return out;
 }
 
 function raisonDe(c){
   if(c.reco) return 'Parce que tu as aimé ' + c.reco;
   const bits = [];
-  const g1 = c.genres.map(nomGenre).filter(Boolean)[0];
-  if(g1) bits.push(g1);
+  const g = nomGenre(c.principal) || c.genres.map(nomGenre).filter(Boolean)[0];
+  if(g) bits.push(g);
+  if((c.pays||[]).indexOf('FR') >= 0) bits.push('France');
   if(c.annee) bits.push(String(c.annee));
-  if(c.flix) bits.push('sur Cinéflix');
+  if(c.jt >= 3) bits.push(c.jt + ' T Télérama');
+  else if(c.noteCrit >= 85) bits.push('critiques ' + c.noteCrit + '%');
+  if(c.flix && !c.vu) bits.push('jamais lancé');
+  else if(c.flix && c.vu) bits.push('déjà vu');
   else if(c.plat){
     const p = PLATEFORMES.find(x => x.id === c.plat);
-    if(p) bits.push('sur '+p.nom);
+    if(p) bits.push('sur ' + p.nom);
   }
-  if(c.jt >= 3) bits.push(c.jt+' T Télérama');
-  return bits.slice(0,3).join(' · ');
+  return bits.slice(0,4).join(' · ');
 }
 
 /* ---------- L'orchestration ---------- */
@@ -319,7 +390,11 @@ async function guider(source, txt){
     ]);
     if(seq !== guideSeq) return;
 
-    const cine = vivierCineflix(r);
+    /* Par défaut on n'exhume que ce qui n'a jamais été lancé — c'est tout
+       l'intérêt d'un guide posé sur SA bibliothèque. Si la moisson est trop
+       maigre, on rouvre aux films déjà vus plutôt que de rendre une page vide. */
+    let cine = vivierCineflix(r, false);
+    if(cine.length < 12) cine = vivierCineflix(r, true);
     const tout = totems.concat(cine, plateformes);
 
     /* Dédoublonnage : un même titre peut venir des trois viviers. On garde la
@@ -354,10 +429,7 @@ async function guider(source, txt){
     });
 
     liste.forEach(c => { c._s = scorerCandidat(c, r); });
-    /* Un léger hasard sur les ex æquo : deux visites de suite ne donnent pas
-       exactement la même liste, sans casser l'ordre du score. */
-    liste.sort((a,b)=> (b._s - a._s) || (Math.random() - 0.5));
-    liste = liste.slice(0, 20);
+    liste = choisirSuggestions(liste, 20);
 
     /* Les titres venus de la bibliothèque n'ont pas d'affiche : le NAS
        n'envoie que des identifiants. On va la chercher. */
@@ -371,8 +443,8 @@ async function guider(source, txt){
         if(!f) return;
         c.poster = f.poster_path || '';
         if(!c.duree) c.duree = f.runtime || 0;
-        if(!c.genres.length) c.genres = (f.genres||[]).map(x=>x.id);
         if(!c.note) c.note = f.vote_average || 0;
+        if(!c.genres.length) c.genres = (f.genres||[]).map(x=>x.id);
       });
       liste = liste.filter(c => c.poster);
     }
