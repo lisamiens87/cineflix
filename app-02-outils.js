@@ -260,7 +260,12 @@ function renderNav(){
             : (view === 'reglages' || view === 'file' || view === 'acces') ? 'profil'
             : view === 'guide' ? 'decouvrir'
             : view;
-  document.getElementById('nav').innerHTML = tabs.map(([id,label,icon,badge])=>
+  /* Le logo vit DANS la barre : invisible sur téléphone (la barre du bas
+     n'a pas de place), il devient l'ancre gauche de la barre horizontale
+     du bureau. CINÉ blanc, FLIX rouge — la signature de la maquette. */
+  document.getElementById('nav').innerHTML =
+    '<div class="navlogo">CINÉ<i>FLIX</i></div>' +
+    tabs.map(([id,label,icon,badge])=>
     '<button class="tab '+(cur===id?'on':'')+'" onclick="go(\''+id+'\')">'+icon+
     (badge ? '<span class="pastille-nav">'+badge+'</span>' : '')+
     '<span>'+label+'</span></button>'
