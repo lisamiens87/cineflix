@@ -778,11 +778,23 @@ function heroSoirHtml(){
       (meta ? '<div class="hsmeta">'+esc(meta)+'</div>' : '')+
       (h.txt ? '<p>'+esc(h.txt)+'</p>' : '')+
       '<div class="hsactions">'+
-        '<button class="btn" onclick="ouvrirFiche('+h.id+',\'movie\')">▶ Regarder</button>'+
+        '<button class="btn" onclick="regarderSoir()">▶ Regarder</button>'+
         '<button class="btn ghost" onclick="ouvrirGuide()">Laisse-moi te guider</button>'+
       '</div>'+
     '</div>'+
   '</div>';
+}
+
+/* « Regarder » sur la couverture tient sa promesse : il ouvre le film DANS
+   Jellyfin, par son identifiant — plus la fiche Cinéflix. Si l'identifiant
+   manque (catalogue pas encore réexporté), on retombe sur la fiche. */
+function regarderSoir(){
+  const h = ui.heroSoir;
+  if(!h) return;
+  const f = ficheDe('movie', h.id);
+  if(f && f.jf && typeof ouvrirJellyfin === 'function')
+    return ouvrirJellyfin(h.nom, f.jf);
+  ouvrirFiche(h.id, 'movie');
 }
 
 /* La petite barre posée sur l'image : le logo, rien d'autre. Sur le bureau
