@@ -525,3 +525,96 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
 .csub .av.mini{margin-right:2px}
 .cname2 .cnt{display:inline-block;margin-left:6px;padding:1px 7px;border-radius:9px;
   background:rgba(255,255,255,.14);font-size:11px;font-weight:700;vertical-align:2px}
+
+
+/* ============================ Le bureau ====================================
+   L'app est née pour un téléphone : une colonne de 720 px, une barre d'onglets
+   en bas, le pouce à portée. Sur un écran de 2 600 px, ça donnait un ruban au
+   milieu du vide — 27 % de la largeur utilisée.
+
+   Rien n'est refait pour autant : tout ce qui suit vit dans des media queries
+   et le téléphone ne voit pas une ligne de ces règles. On élargit la colonne,
+   on donne aux vignettes la place qu'un grand écran permet, et à partir de
+   1200 px la barre du bas devient un rail à gauche — parce qu'une barre
+   d'onglets collée en bas d'un écran de portable, la souris ne va jamais la
+   chercher. */
+
+/* ---- Tablette et petit portable ---- */
+@media (min-width:860px){
+  .app{max-width:1060px;padding-bottom:calc(84px + var(--safe-b))}
+  .navin{max-width:1060px}
+
+  /* Les vignettes : le même composant, simplement plus grand. La grille est
+     déjà en auto-fill, il suffit de relever le plancher. */
+  body{--vign:120px}
+  body.vue-compacte{--vign:92px}
+
+  .wrap{padding:18px 24px}
+  .grid{padding:6px 24px;gap:16px}
+  .chips,.souschips{padding-left:24px;padding-right:24px}
+  .sectitle{padding-left:24px;padding-right:24px}
+  .resume{padding-left:24px;padding-right:24px}
+  .hbar{padding:14px 24px}
+
+  /* La fiche : l'image d'en-tête a de la place, l'affiche aussi. */
+  .hero{height:280px}
+  .dhead{padding:0 24px;margin-top:-96px;gap:20px}
+  .dhead .poster{width:150px}
+  .dmeta{padding-top:104px}
+  .dmeta h2{font-size:24px}
+  .actions{padding:20px 24px 0}
+  .stats{padding:20px 24px}
+
+  /* Une ligne de texte de 1 000 px ne se lit pas : le confort de lecture
+     plafonne autour de 70 caractères, quelle que soit la largeur disponible. */
+  .overview{max-width:72ch;padding:0;margin:16px 24px 0}
+  .empty p{max-width:60ch;margin-left:auto;margin-right:auto}
+
+  /* Le panneau du bas devient une vraie fenêtre : au centre, arrondi partout.
+     Le geste « tirer vers le bas » n'existe pas à la souris. */
+  .sheet{align-items:center}
+  .sheetin{max-width:520px;border-radius:18px;border-bottom:1px solid var(--line);
+    padding-bottom:24px;max-height:calc(100vh - 80px)}
+
+  .pgrid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+  .grid.rangee .gcard{width:132px;flex:0 0 132px}
+  body.vue-compacte .grid.rangee .gcard{width:112px;flex:0 0 112px}
+}
+
+/* ---- Portable et bureau : la barre du bas passe à gauche ---- */
+@media (min-width:1200px){
+  body{padding-left:216px}
+  /* L'écran « qui regarde ce soir ? » n'a pas de barre : il resterait décalé. */
+  body.accueil{padding-left:0}
+
+  nav{top:0;bottom:0;right:auto;width:216px;
+    border-top:0;border-right:1px solid var(--line);
+    padding-bottom:0;display:flex;align-items:flex-start}
+  .navin{max-width:none;width:100%;grid-template-columns:1fr;
+    align-content:start;gap:2px;padding:22px 10px}
+  .tab{flex-direction:row;justify-content:flex-start;align-items:center;gap:13px;
+    padding:12px 14px;min-height:46px;font-size:14px;font-weight:600;
+    border-radius:11px}
+  .tab.on{background:var(--accent-dim)}
+  .tab svg{width:21px;height:21px}
+  .tab.on svg{transform:none}
+  .tab:active svg{transform:scale(.94)}
+  /* La pastille était centrée sous une icône : elle se cale maintenant au bout
+     de la ligne. */
+  .tab .pastille-nav{position:static;margin:0 0 0 auto;left:auto;top:auto}
+
+  /* Plus de barre en bas : la marge de sécurité du pouce n'a plus lieu d'être. */
+  .app{max-width:1240px;padding-bottom:36px}
+  .sheet{left:216px}
+  .toast{margin-left:108px}
+
+  body{--vign:132px}
+  body.vue-compacte{--vign:100px}
+  .hero{height:330px}
+}
+
+@media (min-width:1600px){
+  .app{max-width:1440px}
+  body{--vign:148px}
+  body.vue-compacte{--vign:112px}
+}
