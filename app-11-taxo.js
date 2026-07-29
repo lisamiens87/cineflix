@@ -45,7 +45,8 @@ const TAXO = [
   { id:'testosterone', nom:'Testostérone',
     g:[G_ACTION], mc:[779,1462,13116,188955,15248,12371] },
   { id:'militaire', nom:'Militaire',
-    gUn:[G_ACTION,G_THRIL,G_GUERRE], mc:[162365,15218,11219,379459,3541,15087,339,13015] }
+    /* « terrorism » a été retiré : il faisait entrer The Dark Knight Rises. */
+    gUn:[G_ACTION,G_THRIL,G_GUERRE], mc:[162365,15218,11219,379459,3541,15087,339] }
 ]},
 
 { id:'animation', nom:'Animation', emo:'🎨', g:[G_ANIM], sous:[
@@ -81,10 +82,13 @@ const TAXO = [
   { id:'parodie', nom:'Parodie', g:[G_COM], mc:[9755,11931,364753] }
 ]},
 
-/* Concert et Théâtre viennent de Jellyfin, pas de TMDB : hors Cinéflix, on
-   fait ce qu'on peut avec le genre Musique. L'écran le dit. */
+/* Concert et Théâtre sont des rayons Jellyfin : sur le serveur, le NOM du
+   genre est la vérité et rien ne le bat. Hors serveur, ils existent quand même
+   chez TMDB, mais par leurs mots-clés — « concert film », « live performance »,
+   « music documentary ». Les deux voies cohabitent : locNoms sur Cinéflix,
+   mots-clés partout ailleurs. */
 { id:'concert', nom:'Concert', emo:'🎤', locNoms:['concert'],
-  g:[G_MUS], mc:[6029,318206], sous:[] },
+  gUn:[G_MUS,G_DOC], mc:[6029,156205,11634,246377,162066,204236,318206], sous:[] },
 
 { id:'crime', nom:'Crime', emo:'🔫', g:[G_CRIME], sous:[
   { id:'mafia-gangsters', nom:'Mafia et gangsters',
@@ -131,7 +135,9 @@ const TAXO = [
      On élargit à l'occupation et au nazisme, et on écarte l'action pure pour
      rester du côté de l'ombre. */
   { id:'resistance-occupation', nom:'Résistance et occupation',
-    gUn:[G_GUERRE,G_DRAME,G_HIST], mc:[9904,357283,2652,1956], sans:[G_ACTION] }
+    /* Le drame seul faisait entrer Shutter Island par le mot-clé « nazi ».
+       On exige le cadre : Guerre ou Histoire. */
+    gUn:[G_GUERRE,G_HIST], mc:[9904,357283,2652,1956], sans:[G_ACTION] }
 ]},
 
 { id:'histoire', nom:'Histoire', emo:'🏛️', g:[G_HIST], sous:[
@@ -151,7 +157,10 @@ const TAXO = [
   { id:'histoire-vraie', nom:'Histoire vraie',
     gUn:[G_HIST,G_DRAME,G_CRIME,G_THRIL], sans:[G_FANT,G_ANIM,G_SF], mc:[9672], sansMc:[5565] },
   { id:'film-costumes', nom:'Film en costumes',
-    gUn:[G_HIST,G_DRAME,G_ROM], sans:[G_GUERRE,G_ANIM], mc:[15060,195013] }
+    /* Sans exclure Rome et les gladiateurs, Gladiator arrivait ici alors
+       qu'il a sa propre case. */
+    gUn:[G_HIST,G_DRAME,G_ROM], sans:[G_GUERRE,G_ANIM], mc:[15060,195013],
+    sansMc:[5049,1394] }
 ]},
 
 { id:'horreur', nom:'Horreur', emo:'🎃', g:[G_HORR], sous:[] },
@@ -187,8 +196,12 @@ const TAXO = [
     g:[G_SF], sans:[G_ACTION,G_HORR], note:6.7 }
 ]},
 
+/* Le document réunit sous Théâtre la captation, l'adaptation d'une pièce et
+   le spectacle vivant filmé. « based on play or musical » (518 films) porte
+   l'adaptation, les autres la captation et le one-man-show. Vérifié : rend
+   Douze hommes en colère. */
 { id:'theatre', nom:'Théâtre', emo:'🎙️', locNoms:['theatre'],
-  mc:[284103,9716], sous:[] },
+  mc:[10181,4326,195729,246884,6656,9716,284103], sous:[] },
 
 { id:'thriller', nom:'Thriller', emo:'😬', g:[G_THRIL], sous:[
   { id:'thriller-haletant', nom:'Thriller haletant',
