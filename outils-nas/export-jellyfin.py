@@ -417,17 +417,27 @@ def enrichir_telerama(base, key, fiches):
     cache = {r["cle"]: r for r in lire_supabase(base, key,
         "/rest/v1/telerama?select=cle,t,verdict&limit=100000")}
     nouveaux, faits = [], 0
+    echecs, dernier_echec, suite = 0, "", 0
     for f in fiches:
         annee = (f.get("sortie") or "")[:4]
         cle = _tlr_cle(f["t"], f["nom"], annee)
         r = cache.get(cle)
-        if r is None and faits < TLR_LOT_BIB:
+        if r is None and faits < TLR_LOT_BIB and suite < 3:
             faits += 1
             try:
                 trouve = telerama_note(f["nom"], annee, f["t"])
-            except Exception:
-                trouve = None                # réseau : on retentera plus tard
+            except Exception as e:
+                # Réseau, blocage, changement de page : on ne met RIEN en cache,
+                # on retentera. Mais on compte — parce qu'un échec silencieux
+                # répété brûle le budget de chaque passage pour rien, et c'est
+                # exactement comme ça que la collecte est restée bloquée un jour
+                # entier sans que personne ne le voie.
+                trouve = None
+                echecs += 1
+                suite += 1
+                dernier_echec = str(e)[:120]
             else:
+                suite = 0
                 r = {"cle": cle, "t": trouve[0] if trouve else 0,
                      "verdict": trouve[1] if trouve else ""}
                 cache[cle] = r
@@ -439,14 +449,28 @@ def enrichir_telerama(base, key, fiches):
     _pousser_telerama(base, key, nouveaux)
     reste = sum(1 for f in fiches
                 if _tlr_cle(f["t"], f["nom"], (f.get("sortie") or "")[:4]) not in cache)
+    notes = sum(1 for f in fiches if f.get("jt"))
     if nouveaux:
         print("Télérama : %d titre(s) de la bibliothèque vérifié(s), reste %d"
               % (len(nouveaux), reste))
-    # La bibliothèque est couverte : le budget qui reste sert aux autres vues.
+
+    # Trois échecs d'affilée : le site ne répond pas comme prévu. Inutile de
+    # consommer le reste du budget — on le dit et on rendra la main au prochain
+    # passage.
+    if suite >= 3:
+        journal(base, key, "telerama",
+                "BLOQUÉ après %d échec(s) — %s | %d/%d fiches notées, %d à voir"
+                % (echecs, dernier_echec or "cause inconnue", notes, len(fiches), reste))
+        return
+
+    n = 0
     if faits < TLR_LOT:
         n = semis_telerama(base, key, cache, TLR_LOT - faits)
         if n:
             print("Télérama : %d titre(s) hors bibliothèque vérifié(s)" % n)
+    journal(base, key, "telerama",
+            "%d vérifiés (%d échecs), %d semis, %d/%d fiches notées, %d à voir"
+            % (faits, echecs, n, notes, len(fiches), reste))
 
 
 # ---------- Sorties physiques France (4K UHD / Blu-ray) ----------
