@@ -39,7 +39,7 @@ const TAXO = [
      valeur, pas un fait observable. On l'approche par la note des critiques et
      le nombre de votes : c'est discutable, c'est testable, c'est corrigible. */
   { id:'action-decomplexee', nom:'Action décomplexée',
-    g:[G_ACTION], sans:[G_ANIM,G_DOC], noteMax:6.6, votes:150 },
+    g:[G_ACTION], sans:[G_ANIM,G_DOC,G_DRAME], noteMax:6.6, votes:150, simple:true },
   { id:'action-auteur', nom:'Action d\'auteur',
     g:[G_ACTION], sans:[G_ANIM], note:7.2, votes:1000 },
   { id:'testosterone', nom:'Testostérone',
@@ -254,7 +254,7 @@ function taxoRecette(id){
   ['g','gUn','sans','mc','sansMc','locNoms'].forEach(k=>{
     (src[k]||[]).forEach(v => { if(r[k].indexOf(v) < 0) r[k].push(v); });
   });
-  ['note','noteMax','votes','duree','dureeMin','apres','avant','pays'].forEach(k=>{
+  ['note','noteMax','votes','duree','dureeMin','apres','avant','pays','simple'].forEach(k=>{
     if(src[k]) r[k] = src[k];
   });
   r.taxo = id;
