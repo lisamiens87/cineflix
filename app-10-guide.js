@@ -140,7 +140,11 @@ const SUJETS = [
   { dit:'dinosaures',      mots:['dinosaure','dinosaures','jurassique'], mc:[12616] },
   { dit:'secte',           mots:['secte','gourou','communaute fermee'], mc:[6158] },
   { dit:'pirates',         mots:['pirate','pirates','corsaire','flibustier'], mc:[12988] },
-  { dit:'huis clos',       mots:['huis clos','une seule nuit','en vase clos','confine'], mc:[162914] },
+  /* « Huis clos » est mal servi par TMDB : le concept existe mais il est très
+     peu étiqueté. On prend l'union de toutes les variantes plausibles — ça
+     restera la moins bonne entrée du lexique, autant le savoir. */
+  { dit:'huis clos',       mots:['huis clos','une seule nuit','en vase clos','confine','enferme'],
+    mc:[162914,18029,348145,377474,301728,186527,2147,18233,2321] },
   { dit:'province',        mots:['province','petite ville','campagne','village'], mc:[1415] }
 ];
 
