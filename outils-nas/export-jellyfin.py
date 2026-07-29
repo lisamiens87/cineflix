@@ -156,6 +156,11 @@ def resume(it, genre, tmdb_id):
         "lu": (ud.get("LastPlayedDate") or "")[:10],
         "genres": it.get("Genres") or [],
         "pays": pays_codes(it),
+        # L'identifiant Jellyfin du titre : c'est lui qui permet au bouton
+        # « Regarder » d'ouvrir la fiche du serveur directement, au lieu de
+        # passer par la page de recherche. 32 caractères par film, et le
+        # bouton cesse de tâtonner.
+        "jf": it.get("Id") or "",
     }
 
 
