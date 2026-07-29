@@ -629,8 +629,12 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      await p2.evaluate(() => BROUILLON.plats.indexOf(8) >= 0));
   await p2.click('.accliens button:has-text("Passer")');
   await p2.waitForTimeout(150);
-  ok('étape 7 : les comptes Jellyfin déclarés sont proposés',
-     (await p2.locator('.rgbloc').last().innerText()).includes('Je ne sais pas'));
+  ok('étape 7 : trois réglages, et PAS la question du compte serveur',
+     await p2.locator('.rgbloc').count() === 3 &&
+     !(await p2.locator('.acc').innerText()).toLowerCase().includes('compte sur le serveur'));
+  ok('la version originale se répond par oui ou non, pas par « j’adore »',
+     (await p2.locator('.rgbloc').first().innerText()).match(/\bOUI\b/i) !== null &&
+     !(await p2.locator('.rgbloc').first().innerText()).toLowerCase().includes('adore'));
   await p2.click('.accliens button:has-text("Passer")');
   await p2.waitForTimeout(150);
   ok('l\'écran final propose le guide',

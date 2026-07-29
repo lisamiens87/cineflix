@@ -114,6 +114,13 @@ function viewProfil(){
     (window.BUILD ? ' · v'+esc(window.BUILD) : '')+'</div>';
 }
 
+async function lierJellyfin(u){
+  ui.monProfil = Object.assign(ui.monProfil||{}, {jellyfin: u});
+  render();
+  try{ await majProfil(); toast(u ? 'Relié à « '+u+' »' : 'Lien retiré'); }
+  catch(e){ toast('Enregistrement impossible'); }
+}
+
 async function rafraichirCatalogue(){
   toast('Actualisation…');
   await chargerCatalogue();
@@ -125,11 +132,28 @@ async function rafraichirCatalogue(){
 function viewReglages(){
   let html = header('Réglages', {back:'goBack()'});
 
+  const mp = ui.monProfil || {};
   html += '<div class="sectitle">Moi</div><div class="wrap" style="padding-top:0">'+
     '<label class="fld"><span>Mon prénom</span>'+
       '<input type="text" id="rgpseudo" value="'+esc(db.pseudo||'')+'" placeholder="Ton prénom" '+
       'autocomplete="given-name">'+
       '<em>Sert à signer tes demandes.</em></label>'+
+    /* Le compte Jellyfin ne sert encore à rien — d'où sa place ici, et pas
+       dans le parcours d'accueil où il n'aurait fait qu'embrouiller. */
+    ((CFG.jellyfinUsers||[]).length
+      ? '<div class="rgbloc" style="margin-top:4px">'+
+          '<div class="rglbl" style="text-align:left">Mon compte sur le serveur</div>'+
+          '<div class="gchips" style="justify-content:flex-start">'+
+            (CFG.jellyfinUsers||[]).map(u =>
+              '<button class="chip '+(mp.jellyfin === u ? 'on':'')+
+              '" onclick="lierJellyfin(\''+esc(u)+'\')">'+esc(u)+'</button>').join('')+
+            '<button class="chip '+(!mp.jellyfin ? 'on':'')+
+            '" onclick="lierJellyfin(\'\')">Aucun</button>'+
+          '</div>'+
+          '<div class="tiny muted" style="margin-top:6px">Pas encore utilisé : '+
+            'servira à reprendre un film là où tu l\'avais laissé.</div>'+
+        '</div>'
+      : '')+
   '</div>';
 
   html += '<div class="sectitle">Connexion TMDB</div><div class="wrap" style="padding-top:0">'+

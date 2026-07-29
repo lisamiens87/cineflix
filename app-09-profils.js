@@ -400,9 +400,15 @@ function viewBienvenue(){
       '<button class="chip '+(BROUILLON[champ] === val ? 'on':'')+
       '" onclick="bienvRegler(\''+champ+'\','+(typeof val === 'string' ? '\''+val+'\'' : val)+')">'+
       esc(lib)+'</button>';
+    /* On ne demande PAS le compte Jellyfin ici : il ne sert encore à rien, et
+       choisir entre trois identifiants techniques n'a aucun sens pour un
+       arrivant. La question attendra d'avoir une utilité visible — elle vit
+       en attendant dans les Réglages. */
     h += '<h1>Deux ou trois détails</h1>'+
-      '<div class="rgbloc"><div class="rglbl">La version originale sous-titrée</div>'+
-        '<div class="gchips">'+opt('vo','oui','J\'adore')+opt('vo','peu','Peu importe')+
+      '<p class="accsub">De quoi affiner ce qu\'on te proposera. '+
+      'Rien n\'est définitif.</p>'+
+      '<div class="rgbloc"><div class="rglbl">Les films en version originale</div>'+
+        '<div class="gchips">'+opt('vo','oui','Oui')+opt('vo','peu','Peu importe')+
           opt('vo','non','Plutôt en français')+'</div></div>'+
       '<div class="rgbloc"><div class="rglbl">La longueur</div>'+
         '<div class="gchips">'+opt('duree',0,'Peu importe')+opt('duree',110,'Moins d\'1h50')+
@@ -410,15 +416,6 @@ function viewBienvenue(){
       '<div class="rgbloc"><div class="rglbl">Les films d\'avant 1990</div>'+
         '<div class="gchips">'+opt('vieux',true,'Volontiers')+opt('vieux',false,'Non merci')+
         '</div></div>'+
-      '<div class="rgbloc"><div class="rglbl">Ton compte sur le serveur</div>'+
-        '<div class="gchips">'+(CFG.jellyfinUsers||[]).map(u=>
-          '<button class="chip '+(BROUILLON.jellyfin === u ? 'on':'')+
-          '" onclick="bienvRegler(\'jellyfin\',\''+esc(u)+'\')">'+esc(u)+'</button>').join('')+
-          '<button class="chip '+(BROUILLON.jellyfin === '' ? 'on':'')+
-          '" onclick="bienvRegler(\'jellyfin\',\'\')">Je ne sais pas</button>'+
-        '</div>'+
-        '<div class="tiny muted" style="margin-top:6px">Servira à retrouver '+
-          'où tu en étais dans un film.</div></div>'+
       piedBienv({});
   }
 
