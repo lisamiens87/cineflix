@@ -596,9 +596,16 @@ async function chargerAcces(){
 async function deciderAcces(uid, decision, qui){
   closeSheet();
   try{
-    await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
-      {method:'PATCH', headers:{ Prefer:'return=minimal' },
+    /* return=representation, et PAS return=minimal : quand une règle de
+       sécurité interdit l'écriture, Supabase répond 200 avec une liste VIDE,
+       sans la moindre erreur. C'est exactement comme ça qu'une validation a
+       pu paraître réussie tout en ne changeant rien du tout. On compte les
+       lignes, et on le dit. */
+    const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
+      {method:'PATCH', headers:{ Prefer:'return=representation' },
        body: JSON.stringify({ statut: decision, maj: new Date().toISOString() })});
+    if(!Array.isArray(r) || !r.length)
+      return toast('Refusé par le serveur — rien n\'a changé.');
     acces.lignes = acces.lignes.filter(l => l.user_id !== uid);
     render();
     toast(decision === 'valide' ? 'Accès ouvert à '+(qui||'ce profil')
