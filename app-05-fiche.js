@@ -140,7 +140,7 @@ function actionsFiche(o, type){
    où une apostrophe dans un titre suffirait à tout casser. */
 function ficheObjet(){ return (ui.fiche && ui.fiche.data) || {}; }
 
-function ouvrirJellyfin(titre){
+function ouvrirJellyfin(titre, jf){
   const base = jellyBase || (db.jellyfin||'').replace(/\/+$/,'');
   if(!base){
     return openSheet('<h3>Serveur non renseigné</h3>'+
@@ -149,13 +149,23 @@ function ouvrirJellyfin(titre){
       '<button class="opt" onclick="closeSheet();go(\'reglages\',{from:\'profil\'})">Ouvrir les réglages</button>'+
       '<button class="opt" onclick="closeSheet()">Annuler</button>');
   }
-  /* Jellyfin n'expose pas de lien par identifiant TMDB : on ouvre la recherche
-     du serveur sur le titre, ce qui tombe juste dans l'immense majorité des cas. */
+  /* Avec l'identifiant Jellyfin (fourni par le NAS depuis la v2907v), on
+     atterrit sur LA fiche du serveur — plus de détour par la recherche. Le
+     lancement direct de la lecture, lui, restera hors de portée tant que le
+     serveur est en HTTP simple : l'app est servie en HTTPS et le navigateur
+     interdit d'appeler l'API en clair (contenu mixte). Le jour où
+     « tailscale serve » posera du HTTPS, un vrai lecteur intégré deviendra
+     possible. */
+  if(jf){
+    window.open(base + '/web/#/details?id=' + encodeURIComponent(jf), '_blank', 'noopener');
+    return;
+  }
   window.open(base + '/web/#/search.html?query=' + encodeURIComponent(titre||''), '_blank', 'noopener');
 }
 function regarder(id, type){
   const o = ficheObjet();
-  ouvrirJellyfin(o.title || o.name || '');
+  const f = typeof ficheDe === 'function' ? ficheDe(type, id) : null;
+  ouvrirJellyfin(o.title || o.name || '', (f && f.jf) || '');
 }
 
 function menuDemande(id, type){
@@ -332,7 +342,9 @@ function viewSaison(){
     '</div></div>';
   if(surCineflix('tv', st.tv))
     h += '<div class="actions"><button class="btn vert" onclick="ouvrirJellyfin('+
-      JSON.stringify(nom).replace(/"/g,'&quot;')+')">'+I.play+' Regarder sur Cinéflix</button></div>';
+      JSON.stringify(nom).replace(/"/g,'&quot;')+','+
+      JSON.stringify((ficheDe('tv', st.tv)||{}).jf || '').replace(/"/g,'&quot;')+
+      ')">'+I.play+' Regarder sur Cinéflix</button></div>';
   if(d.overview)
     h += '<div class="overview clamp" onclick="this.classList.toggle(\'clamp\')">'+esc(d.overview)+'</div>';
 
