@@ -770,7 +770,7 @@ function heroSoirHtml(){
   if(!h || !h.fond) return '';
   const meta = [h.annee, h.crit ? 'critiques '+h.crit+' %' : '',
                 h.jt >= 2 ? 'T'.repeat(h.jt)+' Télérama' : ''].filter(Boolean).join(' · ');
-  return '<div class="herosoir">'+
+  return '<div class="herosoir">'+ hsBarre() +
     '<div class="hsfond"><img src="'+IMG(h.fond,'w1280')+'" alt=""></div>'+
     '<div class="hstxt">'+
       '<div class="hssur">Le choix du soir · jamais lancé</div>'+
@@ -778,51 +778,97 @@ function heroSoirHtml(){
       (meta ? '<div class="hsmeta">'+esc(meta)+'</div>' : '')+
       (h.txt ? '<p>'+esc(h.txt)+'</p>' : '')+
       '<div class="hsactions">'+
-        '<button class="btn" onclick="ouvrirFiche('+h.id+',\'movie\')">Voir la fiche</button>'+
-        '<button class="btn ghost" onclick="ouvrirGuide()">✦ Laisse-moi te guider</button>'+
+        '<button class="btn" onclick="ouvrirFiche('+h.id+',\'movie\')">▶ Regarder</button>'+
+        '<button class="btn ghost" onclick="ouvrirGuide()">Laisse-moi te guider</button>'+
       '</div>'+
     '</div>'+
   '</div>';
 }
 
+/* La petite barre posée sur l'image : le logo, rien d'autre. Sur le bureau
+   elle disparaît — la vraie barre de navigation est déjà en haut. */
+function hsBarre(){
+  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div></div>';
+}
+
+/* ---------- Le Top de la bibliothèque ----------
+   Sept affiches numérotées, façon couverture de magazine. Le classement est
+   celui des critiques et de Télérama — pas le mien. Les affiches manquent aux
+   fiches du NAS : on les demande à TMDB une fois par session. */
+let topReq = false;
+function assurerTopBib(){
+  if(ui.topBib || topReq) return;
+  const l = (CAT.items||[]).filter(i => i && i.t === 'movie' && (i.noteCrit||0) >= 80)
+    .sort((a,b)=>((b.noteCrit||0)+(b.jt||0)*5+(b.note||0)) -
+                 ((a.noteCrit||0)+(a.jt||0)*5+(a.note||0)))
+    .slice(0,7);
+  if(l.length < 5) return;
+  topReq = true;
+  Promise.all(l.map(c => tmdb('/movie/'+c.id).catch(()=>null))).then(fs=>{
+    ui.topBib = l.map((c,i)=>({ id:c.id, nom:c.nom,
+      poster:(fs[i] && fs[i].poster_path) || '' })).filter(x=>x.poster);
+    if(view === 'decouvrir') render();
+  });
+}
+function topBibHtml(){
+  const t = ui.topBib;
+  if(!t || t.length < 5) return '';
+  return '<div class="sectitle">Top de ta bibliothèque</div>'+
+    '<div class="top7">'+t.map((x,i)=>
+      '<button class="t7c" onclick="ouvrirFiche('+x.id+',\'movie\')">'+
+        '<div class="chiffre">'+(i+1)+'</div>'+
+        '<div class="aff">'+posterEl(x.poster,'w342','',x.nom)+'</div>'+
+      '</button>').join('')+'</div>';
+}
+
 function viewDecouvrir(){
   const d = ui.disc, cherche = enRecherche();
-  const sub =
+  /* Deux visages. La COUVERTURE : logo posé sur l'image, contrôles sous elle,
+     comme la maquette retenue. L'OUTIL : l'en-tête classique, dès que l'on
+     cherche — là, l'efficacité prime sur la mise en scène. */
+  const immersif = !cherche && !ui.champOuvert;
+
+  const bouton = '<button class="iconbtn '+(filtresActifs()?'actif ':'')+(cherche?'masque':'')+
+    '" id="fbtn" onclick="ouvrirFiltres()">'+I.filtre+'</button>';
+
+  const rangees =
     (ui.champOuvert ? champRecherche() : '') +
     '<div class="chips types">'+
       '<button class="chip chipico '+(ui.champOuvert?'ouvert':'')+'" onclick="ouvrirChamp()" '+
         'aria-label="Chercher">'+(ui.champOuvert ? I.close : I.search)+'</button>'+
       TYPES.map(t=>'<button class="chip '+t.cl+' '+(d.type===t.id?'on':'')+
         '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
+      (immersif ? bouton : '')+
     '</div>'+
-    /* La rangée des sources est la deuxième, toujours visible : c'est le
-       geste central de l'app, il ne se cache pas derrière un panneau. */
     '<div class="souschips">'+
       PRESENCES.map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
         '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
     '</div>'+
     '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
 
-  const bouton = '<button class="iconbtn '+(filtresActifs()?'actif ':'')+(cherche?'masque':'')+
-    '" id="fbtn" onclick="ouvrirFiltres()">'+I.filtre+'</button>';
+  if(!immersif)
+    return header('Découvrir', {right:bouton, sub:rangees}) + banniereCle() + banniereCatalogue() +
+      '<div id="dres">'+(cherche ? corpsRecherche() : corpsDecouverte())+'</div>'+
+      '<div style="height:20px"></div>';
 
-  /* Une seule ligne, discrète, mais à l'endroit où l'on hésite : juste avant
-     de se mettre à faire défiler des milliers d'affiches. Elle disparaît
-     pendant une recherche, où l'intention est déjà connue. */
-  let hero = '';
-  if(!cherche && ui.presence === 'dispo'){
-    assurerHeroSoir();
-    hero = heroSoirHtml();
-  }
-  /* Le héros embarque son propre bouton de guide : quand il est là, la ligne
-     discrète ferait doublon. */
-  const guide = (cherche || hero) ? '' :
-    '<div class="wrap" style="padding:10px 16px 0">'+
+  let haut, top = '', guide = '';
+  if(ui.presence === 'dispo'){
+    assurerHeroSoir(); assurerTopBib();
+    /* Tant que l'image n'est pas là, une couverture vide tient la place :
+       l'écran ne saute pas quand elle arrive. */
+    haut = heroSoirHtml() || '<div class="herosoir vide">'+hsBarre()+'</div>';
+    top = topBibHtml();
+  }else{
+    haut = '<div class="minihaut">'+hsBarre()+'</div>';
+    guide = '<div class="wrap" style="padding:10px 16px 0">'+
       '<button class="btn ghost block guidebtn" onclick="ouvrirGuide()">'+
-        '✨ Laisse-moi te guider</button></div>';
+        'Laisse-moi te guider</button></div>';
+  }
 
-  return header('Découvrir', {right:bouton, sub:sub}) + banniereCle() + banniereCatalogue() +
-    hero + guide +
-    '<div id="dres">'+(cherche ? corpsRecherche() : corpsDecouverte())+'</div>'+
+  return haut +
+    '<div class="souscontrols">'+rangees+'</div>'+
+    banniereCle() + banniereCatalogue() + guide + top +
+    '<div id="dres">'+corpsDecouverte()+'</div>'+
     '<div style="height:20px"></div>';
 }
+
