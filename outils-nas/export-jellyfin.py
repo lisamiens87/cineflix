@@ -601,6 +601,90 @@ def journal(base, key, cle, valeur):
         pass
 
 
+# ---------- Demandes d'accès ----------
+# Quelqu'un demande un compte : il ne voit RIEN tant que l'administrateur n'a
+# pas tranché. Le laisser attendre sans que personne ne soit prévenu serait la
+# pire version de ce mécanisme — d'où cette notification, qui emprunte la même
+# tuyauterie que « ton film est arrivé ».
+#
+# La colonne `notif_statut` retient ce qui a déjà été annoncé : on ne notifie
+# QUE les changements, jamais l'état courant. Sans elle, chaque passage du cron
+# renverrait la même alerte toutes les cinq minutes.
+def _pousser_profil(base, key, uid, champs):
+    corps = json.dumps(champs, ensure_ascii=False).encode("utf-8")
+    req = urllib.request.Request(
+        base.rstrip("/") + "/rest/v1/profils?user_id=eq." + uid,
+        data=corps, method="PATCH",
+        headers={"apikey": key, "Authorization": "Bearer " + key,
+                 "Content-Type": "application/json",
+                 "Prefer": "return=minimal"})
+    urllib.request.urlopen(req, timeout=TIMEOUT).read()
+
+
+def _abos_de(base, key, users):
+    if not users:
+        return {}
+    abos = lire_tout(base, key,
+        "/rest/v1/push_abonnements?select=endpoint,p256dh,auth,user_id"
+        "&user_id=in.(%s)" % ",".join(users))
+    par = {}
+    for ab in abos:
+        par.setdefault(ab["user_id"], []).append(ab)
+    return par
+
+
+def notifier_acces(base, key):
+    prive = os.environ.get("VAPID_PRIVATE", "").strip()
+    if not prive:
+        return
+    try:
+        from cryptography.hazmat.primitives.asymmetric import ec  # noqa: F401
+    except ImportError:
+        return
+    # Ceux dont le statut a changé depuis la dernière annonce.
+    bouges = lire_tout(base, key,
+        "/rest/v1/profils?select=user_id,pseudo,email,statut,notif_statut"
+        "&statut=not.eq.notif_statut")
+    if not bouges:
+        return
+    admins = [a["user_id"] for a in
+              (lire_tout(base, key, "/rest/v1/admins?select=user_id") or [])]
+    envoyees = 0
+    for p in bouges:
+        st, qui = p.get("statut"), (p.get("pseudo") or "Quelqu'un")
+        cibles, corps = [], None
+        if st == "attente":
+            cibles = admins
+            corps = {"titre": "%s demande un accès" % qui,
+                     "corps": "%s attend ton feu vert pour entrer sur Cinéflix."
+                              % (p.get("email") or qui),
+                     "url": "https://lisamiens87.github.io/cineflix/"}
+        elif st == "valide":
+            cibles = [p["user_id"]]
+            corps = {"titre": "Ton accès est ouvert !",
+                     "corps": "Bienvenue sur Cinéflix — la bibliothèque t'attend.",
+                     "url": "https://lisamiens87.github.io/cineflix/"}
+        # Un refus ne mérite pas de notification : la personne le verra en
+        # ouvrant l'app, sans qu'on le lui sonne sur son téléphone.
+        if corps and cibles:
+            par = _abos_de(base, key, sorted(set(cibles)))
+            texte = json.dumps(corps, ensure_ascii=False)
+            for u in cibles:
+                for ab in par.get(u, []):
+                    try:
+                        envoyer_push(ab["endpoint"], ab["p256dh"], ab["auth"], texte,
+                                     prive, "mailto:alexandre.mesnier@cabinet-ekinox.fr")
+                        envoyees += 1
+                    except Exception:
+                        pass
+        try:
+            _pousser_profil(base, key, p["user_id"], {"notif_statut": st})
+        except Exception:
+            pass
+    journal(base, key, "acces", "%d changement(s), %d notification(s)"
+            % (len(bouges), envoyees))
+
+
 # ---------- Mots-clés TMDB ----------
 # Les genres sont dix-neuf cases ; les mots-clés disent le SUJET : « heist »,
 # « road trip », « based on true story », « one night ». C'est ce qui permet à
@@ -1111,6 +1195,11 @@ def main():
         except Exception as e:
             print("Télérama sauté : %s" % e)
             journal(a.supabase_url, a.supabase_key, "telerama", "ÉCHEC : %s" % e)
+        try:
+            notifier_acces(a.supabase_url, a.supabase_key)
+        except Exception as e:
+            print("Demandes d'accès sautées : %s" % e)
+            journal(a.supabase_url, a.supabase_key, "acces", "ÉCHEC : %s" % e)
         try:
             enrichir_motscles(a.supabase_url, a.supabase_key, fiches_f + fiches_s)
         except Exception as e:
