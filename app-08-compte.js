@@ -44,6 +44,9 @@ function appliquerSession(d){
   db.auth = { token:d.access_token, refresh:d.refresh_token,
               uid:(d.user&&d.user.id) || (db.auth&&db.auth.uid),
               email:(d.user&&d.user.email) || (db.auth&&db.auth.email) };
+  /* Si le cache local appartient à un AUTRE compte, il part à la poubelle
+     avant que quoi que ce soit puisse être réécrit sous cette identité. */
+  changerDIdentite(db.auth.uid);
   saveDB();
   return db.auth;
 }
@@ -69,7 +72,7 @@ async function sbRefresh(){
    on purge et on ramène à la connexion avec un mot d'explication, plutôt
    que de laisser chaque écran échouer en silence. */
 function sessionMorte(){
-  db.auth = null; db.items = {};
+  db.auth = null; db.items = {}; db.itemsUid = '';
   estAdmin = false; file.charge = false;
   if(typeof GOUTS === 'object'){ GOUTS.d = null; GOUTS.charge = false; }
   saveDB();
@@ -88,7 +91,7 @@ function seDeconnecter(){
     '<button class="opt" onclick="closeSheet()">Annuler</button>');
 }
 function deconnexionConfirmee(){
-  db.auth = null; db.items = {};
+  db.auth = null; db.items = {}; db.itemsUid = '';
   estAdmin = false; file.charge = false;
   if(typeof GOUTS === 'object'){ GOUTS.d = null; GOUTS.charge = false; }
   saveDB();
@@ -277,6 +280,7 @@ async function chargerElements(){
     };
   });
   db.items = neuf;
+  db.itemsUid = db.auth.uid;
   saveDB();
 }
 
@@ -294,6 +298,9 @@ async function verifierAdmin(){
    un geste fait hors réseau ne doit pas disparaître en silence. */
 async function pousser(it){
   if(!sbPret() || !connecte() || !it) return;
+  /* Garde-fou : ne JAMAIS écrire le cache d'un utilisateur sous l'identité
+     d'un autre. Un onglet resté ouvert sur une session périmée s'arrête ici. */
+  if(db.itemsUid && db.itemsUid !== db.auth.uid) return;
   try{
     await sbFetch('/rest/v1/elements', {method:'POST',
       headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
@@ -309,6 +316,7 @@ async function pousser(it){
 }
 async function retirer(type, id){
   if(!sbPret() || !connecte()) return;
+  if(db.itemsUid && db.itemsUid !== db.auth.uid) return;
   try{
     await sbFetch('/rest/v1/elements?user_id=eq.'+encodeURIComponent(db.auth.uid)+
                   '&type=eq.'+type+'&tmdb_id=eq.'+id,

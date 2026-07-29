@@ -56,6 +56,11 @@ let db = {
      grille d'avatars, pour ne pas avoir à exposer les prénoms du foyer
      à qui trouverait l'adresse de l'app. */
   foyer:[],
+  /* À QUI appartient le cache `items`. Un navigateur = UN stockage, partagé
+     par tous les onglets : sans cette marque, le cache d'Alexandre peut être
+     réécrit sous l'identité d'un compte connecté dans un autre onglet.
+     Arrivé pour de vrai le 29/07. */
+  itemsUid:'',
   onboarde:false, v:1
 };
 
@@ -148,6 +153,37 @@ async function writeNow(){
   storageKO = false; dirty = false;
 }
 function flushDB(){ if(dirty){ clearTimeout(saveTimer); writeNow().catch(()=>{}); } }
+
+/* ---------- Deux onglets, deux comptes ----------
+   Le stockage est commun à tous les onglets d'un même navigateur. Ouvrir un
+   second compte dans un second onglet écrase donc la session du premier — qui
+   continue pourtant de fonctionner, et écrit désormais SOUS LA MAUVAISE
+   IDENTITÉ. C'est exactement ce qui s'est produit le 29/07.
+
+   On ne peut pas cloisonner deux sessions dans un seul stockage. Ce qu'on peut
+   faire, c'est refuser de mentir : l'onglet devenu obsolète se recharge. */
+window.addEventListener('storage', e => {
+  if(e.key !== KEY || !e.newValue) return;
+  let autre = null;
+  try{ autre = JSON.parse(e.newValue); }catch(x){ return; }
+  const ici = (db.auth || {}).uid || '';
+  const la  = ((autre || {}).auth || {}).uid || '';
+  if(ici === la) return;
+  try{ toast('Compte changé dans un autre onglet — rechargement'); }catch(x){}
+  setTimeout(()=>{ try{ location.reload(); }catch(x){} }, 600);
+});
+
+/* Le cache local appartenait à quelqu'un d'autre : on le jette. Mieux vaut un
+   écran vide une seconde que la liste de souhaits du voisin. */
+function changerDIdentite(uid){
+  if(db.itemsUid && uid && db.itemsUid !== uid){
+    db.items = {};
+    if(typeof GOUTS === 'object'){ GOUTS.d = null; GOUTS.charge = false; }
+    if(typeof ui === 'object') ui.monProfil = null;
+  }
+  db.itemsUid = uid || '';
+  saveDB();
+}
 document.addEventListener('visibilitychange', ()=>{ if(document.hidden) flushDB(); });
 window.addEventListener('pagehide', flushDB);
 window.addEventListener('blur', flushDB);

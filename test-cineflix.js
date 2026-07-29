@@ -967,6 +967,35 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   ok('aucune erreur de démarrage avalée en silence', dem.err === null);
   await ctx3.close();
 
+
+  // 15. Deux comptes, un seul navigateur — le piège du 29/07
+  ok('changer d’identité jette le cache de l’ancien', await page.evaluate(()=>{
+     db.items = { 'movie:1': {type:'movie', id:1, fav:true} };
+     db.itemsUid = 'utilisateur-A';
+     changerDIdentite('utilisateur-B');
+     return Object.keys(db.items).length === 0 && db.itemsUid === 'utilisateur-B';
+  }));
+  ok('la même identité garde son cache', await page.evaluate(()=>{
+     db.items = { 'movie:1': {type:'movie', id:1, fav:true} };
+     db.itemsUid = 'utilisateur-A';
+     changerDIdentite('utilisateur-A');
+     return Object.keys(db.items).length === 1;
+  }));
+  ok('un onglet périmé n’écrit jamais sous la mauvaise identité',
+     await page.evaluate(async ()=>{
+     /* Le cache appartient à A, la session est passée à B : pousser() doit
+        se taire plutôt que d'attribuer les favoris de A au compte de B. */
+     let appels = 0;
+     const vrai = window.fetch;
+     window.fetch = function(){ appels++; return vrai.apply(this, arguments); };
+     db.itemsUid = 'utilisateur-A';
+     db.auth = { token:'x', uid:'utilisateur-B', email:'b@x.fr' };
+     await pousser({type:'movie', id:9, titre:'X'});
+     window.fetch = vrai;
+     db.auth = null; db.itemsUid = '';
+     return appels === 0;
+  }));
+
   await browser.close();
 
   console.log('');

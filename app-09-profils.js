@@ -113,7 +113,7 @@ function nouveauProfil(){
 function changerDeProfil(){
   /* On quitte la session mais on garde la liste des têtes : le but est
      justement de revenir vite à une autre. */
-  db.auth = null; db.items = {};
+  db.auth = null; db.items = {}; db.itemsUid = '';
   estAdmin = false; file.charge = false;
   GOUTS.d = null; GOUTS.charge = false;
   saveDB();
