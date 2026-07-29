@@ -480,8 +480,11 @@ function carteTitre(r, type){
   else if(st === 'encours') tag = '<div class="tag encours">'+I.horloge+'En cours</div>';
   else if(st === 'fav')     tag = '<div class="tag fav">'+I.coeurPlein+'</div>';
 
-  const sous = st === 'obtenu'  ? '<div class="gsub dispo">À regarder maintenant</div>'
-             : st === 'demande' ? '<div class="gsub demande">Demandé</div>'
+  /* « À regarder maintenant » sous CHAQUE affiche possédée : sur une grille
+     entière de titres possédés, la même phrase répétée cinquante fois n'est
+     plus une information, c'est du bruit. La coche verte suffit. Les deux
+     autres états restent : eux sont rares, donc signifiants. */
+  const sous = st === 'demande' ? '<div class="gsub demande">Demandé</div>'
              : st === 'encours' ? '<div class="gsub encours">En cours</div>'
              : '';
 
@@ -739,6 +742,49 @@ function champRecherche(){
   '</div>';
 }
 
+/* ---------- Le choix du soir ----------
+   L'écran ne s'ouvre plus sur une grille anonyme : il met UN film en scène —
+   jamais lancé, très bien noté, tiré au hasard dans le haut du panier pour
+   changer à chaque session. C'est la promesse d'une bibliothèque personnelle,
+   dite en une image plutôt qu'en deux mille vignettes. */
+let heroTente = false;
+function assurerHeroSoir(){
+  if(ui.heroSoir || heroTente) return;
+  const l = (CAT.items||[]).filter(i => i && i.t === 'movie' && !i.vu &&
+                                        (i.noteCrit||0) >= 75);
+  if(!l.length) return;
+  heroTente = true;
+  l.sort((a,b)=>(b.noteCrit||0)-(a.noteCrit||0));
+  const c = l[Math.floor(Math.random()*Math.min(40, l.length))];
+  tmdb('/movie/'+c.id).then(f=>{
+    let txt = (f.overview||'').split('. ').slice(0,2).join('. ');
+    if(txt && !/[.!?]$/.test(txt)) txt += '.';
+    ui.heroSoir = { id:c.id, nom:c.nom,
+      annee:String(c.sortie||'').slice(0,4), crit:c.noteCrit||0, jt:c.jt||0,
+      fond:f.backdrop_path || f.poster_path || '', txt:txt };
+    if(view === 'decouvrir') render();
+  }).catch(()=>{});
+}
+function heroSoirHtml(){
+  const h = ui.heroSoir;
+  if(!h || !h.fond) return '';
+  const meta = [h.annee, h.crit ? 'critiques '+h.crit+' %' : '',
+                h.jt >= 2 ? 'T'.repeat(h.jt)+' Télérama' : ''].filter(Boolean).join(' · ');
+  return '<div class="herosoir">'+
+    '<div class="hsfond"><img src="'+IMG(h.fond,'w1280')+'" alt=""></div>'+
+    '<div class="hstxt">'+
+      '<div class="hssur">Le choix du soir · jamais lancé</div>'+
+      '<h2>'+esc(h.nom)+'</h2>'+
+      (meta ? '<div class="hsmeta">'+esc(meta)+'</div>' : '')+
+      (h.txt ? '<p>'+esc(h.txt)+'</p>' : '')+
+      '<div class="hsactions">'+
+        '<button class="btn" onclick="ouvrirFiche('+h.id+',\'movie\')">Voir la fiche</button>'+
+        '<button class="btn ghost" onclick="ouvrirGuide()">✦ Laisse-moi te guider</button>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+}
+
 function viewDecouvrir(){
   const d = ui.disc, cherche = enRecherche();
   const sub =
@@ -763,13 +809,20 @@ function viewDecouvrir(){
   /* Une seule ligne, discrète, mais à l'endroit où l'on hésite : juste avant
      de se mettre à faire défiler des milliers d'affiches. Elle disparaît
      pendant une recherche, où l'intention est déjà connue. */
-  const guide = cherche ? '' :
+  let hero = '';
+  if(!cherche && ui.presence === 'dispo'){
+    assurerHeroSoir();
+    hero = heroSoirHtml();
+  }
+  /* Le héros embarque son propre bouton de guide : quand il est là, la ligne
+     discrète ferait doublon. */
+  const guide = (cherche || hero) ? '' :
     '<div class="wrap" style="padding:10px 16px 0">'+
       '<button class="btn ghost block guidebtn" onclick="ouvrirGuide()">'+
         '✨ Laisse-moi te guider</button></div>';
 
   return header('Découvrir', {right:bouton, sub:sub}) + banniereCle() + banniereCatalogue() +
-    guide +
+    hero + guide +
     '<div id="dres">'+(cherche ? corpsRecherche() : corpsDecouverte())+'</div>'+
     '<div style="height:20px"></div>';
 }
