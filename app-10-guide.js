@@ -310,7 +310,12 @@ function vivierCineflix(r, revoir){
       /* Le sujet demandé. Tant que le NAS n'a pas couvert la bibliothèque, un
          film sans mots-clés connus reste dans la course : l'écarter reviendrait
          à punir un titre pour une collecte en retard. */
-      if(r.mc.length){
+      /* Les mots-clés ne s'appliquent PAS quand le rayon a déjà été reconnu
+         par son nom : Concert et Théâtre sont des genres du serveur, aucun de
+         ces films ne porte de mot-clé TMDB, et le filtre les effaçait. Les
+         mots-clés restent la porte d'entrée hors Cinéflix, où le nom du rayon
+         n'existe pas. */
+      if(r.mc.length && !r.locNoms.length){
         if(c.mc){ if(!r.mc.some(id => c.mc.indexOf(id) >= 0)) return false; }
         else if(couvertureMC() > 0.6) return false;
       }
