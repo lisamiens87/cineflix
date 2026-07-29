@@ -823,52 +823,46 @@ function topBibHtml(){
 
 function viewDecouvrir(){
   const d = ui.disc, cherche = enRecherche();
-  /* Deux visages. La COUVERTURE : logo posé sur l'image, contrôles sous elle,
-     comme la maquette retenue. L'OUTIL : l'en-tête classique, dès que l'on
-     cherche — là, l'efficacité prime sur la mise en scène. */
-  const immersif = !cherche && !ui.champOuvert;
+  /* Deux pages sous un même nom. La COUVERTURE : le grand visuel, le Top,
+     rien d'autre — c'est la page d'accueil. Le CATALOGUE (ui.exploration) :
+     les trois sources, les filtres, la grille — on y entre par Films ou
+     Séries. La recherche bascule d'office côté catalogue. */
+  const catalogue = ui.exploration || cherche || ui.champOuvert;
 
-  const bouton = '<button class="iconbtn '+(filtresActifs()?'actif ':'')+(cherche?'masque':'')+
-    '" id="fbtn" onclick="ouvrirFiltres()">'+I.filtre+'</button>';
-
-  const rangees =
-    (ui.champOuvert ? champRecherche() : '') +
-    '<div class="chips types">'+
-      '<button class="chip chipico '+(ui.champOuvert?'ouvert':'')+'" onclick="ouvrirChamp()" '+
-        'aria-label="Chercher">'+(ui.champOuvert ? I.close : I.search)+'</button>'+
-      TYPES.map(t=>'<button class="chip '+t.cl+' '+(d.type===t.id?'on':'')+
-        '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
-    '</div>'+
-    '<div class="souschips">'+
-      PRESENCES.map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
-        '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
-      (immersif ? bouton : '')+
-    '</div>'+
-    '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
-
-  if(!immersif)
-    return header('Découvrir', {right:bouton, sub:rangees}) + banniereCle() + banniereCatalogue() +
+  if(catalogue){
+    ui.exploration = true;
+    const bouton = '<button class="iconbtn '+(filtresActifs()?'actif ':'')+(cherche?'masque':'')+
+      '" id="fbtn" onclick="ouvrirFiltres()">'+I.filtre+'</button>';
+    const rangees =
+      (ui.champOuvert ? champRecherche() : '') +
+      '<div class="chips types">'+
+        '<button class="chip chipico '+(ui.champOuvert?'ouvert':'')+'" onclick="ouvrirChamp()" '+
+          'aria-label="Chercher">'+(ui.champOuvert ? I.close : I.search)+'</button>'+
+        TYPES.map(t=>'<button class="chip '+t.cl+' '+(d.type===t.id?'on':'')+
+          '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
+      '</div>'+
+      '<div class="souschips">'+
+        PRESENCES.map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
+          '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
+      '</div>'+
+      '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
+    return header(d.type === 'movie' ? 'Films' : 'Séries', {right:bouton, sub:rangees}) +
+      banniereCle() + banniereCatalogue() +
       '<div id="dres">'+(cherche ? corpsRecherche() : corpsDecouverte())+'</div>'+
       '<div style="height:20px"></div>';
-
-  let haut, top = '', guide = '';
-  if(ui.presence === 'dispo'){
-    assurerHeroSoir(); assurerTopBib();
-    /* Tant que l'image n'est pas là, une couverture vide tient la place :
-       l'écran ne saute pas quand elle arrive. */
-    haut = heroSoirHtml() || '<div class="herosoir vide">'+hsBarre()+'</div>';
-    top = topBibHtml();
-  }else{
-    haut = '<div class="minihaut">'+hsBarre()+'</div>';
-    guide = '<div class="wrap" style="padding:10px 16px 0">'+
-      '<button class="btn ghost block guidebtn" onclick="ouvrirGuide()">'+
-        'Laisse-moi te guider</button></div>';
   }
 
-  return haut +
-    '<div class="souscontrols">'+rangees+'</div>'+
-    banniereCle() + banniereCatalogue() + guide + top +
-    '<div id="dres">'+corpsDecouverte()+'</div>'+
+  /* ---- La couverture ---- */
+  assurerHeroSoir(); assurerTopBib();
+  const haut = heroSoirHtml() || '<div class="herosoir vide">'+hsBarre()+'</div>';
+  /* Les entrées vers le catalogue : indispensables sur téléphone (la barre du
+     bas n'a pas Films/Séries), inoffensives sur le bureau. */
+  const entrees = '<div class="entrees wrap">'+
+    '<button class="btn ghost" onclick="ouvrirCatalogue(\'movie\')">Films</button>'+
+    '<button class="btn ghost" onclick="ouvrirCatalogue(\'tv\')">Séries</button>'+
+  '</div>';
+  return haut + banniereCle() + banniereCatalogue() + topBibHtml() + entrees +
     '<div style="height:20px"></div>';
 }
+
 
