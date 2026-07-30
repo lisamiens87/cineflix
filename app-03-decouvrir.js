@@ -797,10 +797,17 @@ function regarderSoir(){
   ouvrirFiche(h.id, 'movie');
 }
 
-/* La petite barre posée sur l'image : le logo, rien d'autre. Sur le bureau
-   elle disparaît — la vraie barre de navigation est déjà en haut. */
+/* La petite barre posée sur l'image : le logo, et les deux entrées du
+   catalogue à sa droite. Sur le bureau la barre entière disparaît — la vraie
+   barre de navigation est déjà en haut. Les entrées (.hsent) sont masquées
+   par défaut dans app-base : seul le téléphone les allume (app-mobile), au
+   dessus de 860 px c'est la rangée .entrees sous le visuel qui sert. */
 function hsBarre(){
-  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div></div>';
+  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div>'+
+    '<div class="hsent">'+
+      '<button onclick="ouvrirCatalogue(\'movie\')">Films</button>'+
+      '<button onclick="ouvrirCatalogue(\'tv\')">Séries</button>'+
+    '</div></div>';
 }
 
 /* ---------- Le Top de la bibliothèque ----------
@@ -830,6 +837,57 @@ function topBibHtml(){
       '<button class="t7c" onclick="ouvrirFiche('+x.id+',\'movie\')">'+
         '<div class="chiffre">'+(i+1)+'</div>'+
         '<div class="aff">'+posterEl(x.poster,'w342','',x.nom)+'</div>'+
+      '</button>').join('')+'</div>';
+}
+
+/* ---------- Les deux rangées sous le Top ----------
+   « Ajouts récents » et « Continuer la lecture » : même forme que le Top,
+   sans les chiffres — un ajout n'est pas un classement. Les affiches
+   manquent aux fiches du NAS ; on les demande à TMDB une fois par session,
+   comme pour le Top, et jamais plus de dix par rangée.
+
+   « Continuer la lecture » repose sur le champ `pos` (minutes déjà lues),
+   ajouté à l'export du NAS. Tant qu'aucune fiche ne le porte, la rangée
+   n'existe simplement pas : rien à afficher, rien à expliquer. */
+const RANGS = {};
+function assurerRangee(nom, choisir){
+  if(ui[nom] || RANGS[nom]) return;
+  const l = choisir();
+  if(!l.length) return;
+  RANGS[nom] = true;
+  Promise.all(l.map(c => tmdb('/'+(c.t === 'tv' ? 'tv' : 'movie')+'/'+c.id).catch(()=>null)))
+    .then(fs=>{
+      ui[nom] = l.map((c,i)=>({ id:c.id, t:c.t, nom:c.nom,
+        pos:c.pos||0, duree:c.duree||0,
+        poster:(fs[i] && fs[i].poster_path) || '' })).filter(x=>x.poster);
+      if(view === 'decouvrir') render();
+    });
+}
+function assurerRecents(){
+  assurerRangee('recents', ()=> (CAT.items||[])
+    .filter(i => i && i.ajout)
+    .sort((a,b)=> String(b.ajout).localeCompare(String(a.ajout)))
+    .slice(0,10));
+}
+function assurerReprises(){
+  /* « En cours » = commencé, pas fini. On laisse deux minutes de marge au
+     bout : un générique qu'on coupe ne doit pas ressortir toute la semaine. */
+  assurerRangee('reprises', ()=> (CAT.items||[])
+    .filter(i => i && (i.pos||0) > 0 && (i.duree||0) > 0 && i.pos < i.duree - 2)
+    .sort((a,b)=> String(b.lu||'').localeCompare(String(a.lu||'')))
+    .slice(0,10));
+}
+function rangeeHtml(titre, l, jauge){
+  if(!l || !l.length) return '';
+  return '<div class="sectitle">'+titre+'</div>'+
+    '<div class="top7 plate">'+l.map(x=>
+      '<button class="t7c" onclick="ouvrirFiche('+x.id+',\''+x.t+'\')">'+
+        '<div class="aff">'+posterEl(x.poster,'w342','',x.nom)+
+          (jauge && x.duree
+            ? '<i class="jauge" style="width:'+
+              Math.max(3, Math.min(100, Math.round(x.pos / x.duree * 100)))+'%"></i>'
+            : '')+
+        '</div>'+
       '</button>').join('')+'</div>';
 }
 
@@ -865,7 +923,7 @@ function viewDecouvrir(){
   }
 
   /* ---- La couverture ---- */
-  assurerHeroSoir(); assurerTopBib();
+  assurerHeroSoir(); assurerTopBib(); assurerRecents(); assurerReprises();
   const haut = heroSoirHtml() || '<div class="herosoir vide">'+hsBarre()+'</div>';
   /* Les entrées vers le catalogue : indispensables sur téléphone (la barre du
      bas n'a pas Films/Séries), inoffensives sur le bureau. */
@@ -873,8 +931,10 @@ function viewDecouvrir(){
     '<button class="btn ghost" onclick="ouvrirCatalogue(\'movie\')">Films</button>'+
     '<button class="btn ghost" onclick="ouvrirCatalogue(\'tv\')">Séries</button>'+
   '</div>';
-  return haut + banniereCle() + banniereCatalogue() + topBibHtml() + entrees +
-    '<div style="height:20px"></div>';
+  return haut + banniereCle() + banniereCatalogue() + topBibHtml() +
+    rangeeHtml('Ajouts récents', ui.recents, false) +
+    rangeeHtml('Continuer la lecture', ui.reprises, true) +
+    entrees + '<div style="height:20px"></div>';
 }
 
 
