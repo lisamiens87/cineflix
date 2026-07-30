@@ -141,7 +141,7 @@ def pays_codes(it):
 def resume(it, genre, tmdb_id):
     """La fiche compacte d'un titre — ce que l'app trie sans appeler personne."""
     ud = it.get("UserData") or {}
-    return {
+    fiche = {
         "t": "movie" if genre == "Movie" else "tv",
         "id": tmdb_id,
         "nom": it.get("Name") or "",
@@ -162,6 +162,17 @@ def resume(it, genre, tmdb_id):
         # bouton cesse de tâtonner.
         "jf": it.get("Id") or "",
     }
+    # Où en est la lecture, en minutes : c'est ce qui alimente la rangée
+    # « Continuer la lecture » de la couverture. Le champ n'est écrit que
+    # s'il y a vraiment quelque chose à reprendre — inutile d'alourdir
+    # 2 300 fiches d'un zéro, et l'app sait lire son absence.
+    # ATTENTION : cette progression est celle du SEUL compte Jellyfin avec
+    # lequel l'export se connecte (JELLYFIN_USER, sinon le premier admin).
+    # Tant que le lot 2 n'est pas fait, tout le foyer voit la même reprise.
+    pos = int(round((ud.get("PlaybackPositionTicks") or 0) / 600000000))
+    if pos > 0:
+        fiche["pos"] = pos
+    return fiche
 
 
 def recuperer(base, token, genre, user_id):
