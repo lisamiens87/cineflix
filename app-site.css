@@ -1,1 +1,189 @@
+/* ============================== app-site.css ==============================
+   LE GRAND ÉCRAN — uniquement des @media (min-width:…), chargé en dernier
+   pour gagner la cascade. Trois paliers : 860 (tablette), 1200 (la barre
+   passe en haut, couverture pleine largeur), 1600 (très grand).
+   L'ORDRE DES BLOCS COMPTE : les derniers réécrivent les premiers, c'est le
+   journal des décisions (rail → barre du haut → un seul bandeau…).
+   La conversation « site web » travaille ici ; elle ne touche JAMAIS
+   app-mobile.css. */
 
+/* ============================ Le bureau ====================================
+   L'app est née pour un téléphone : une colonne de 720 px, une barre d'onglets
+   en bas, le pouce à portée. Sur un écran de 2 600 px, ça donnait un ruban au
+   milieu du vide — 27 % de la largeur utilisée.
+
+   Rien n'est refait pour autant : tout ce qui suit vit dans des media queries
+   et le téléphone ne voit pas une ligne de ces règles. On élargit la colonne,
+   on donne aux vignettes la place qu'un grand écran permet, et à partir de
+   1200 px la barre du bas devient un rail à gauche — parce qu'une barre
+   d'onglets collée en bas d'un écran de portable, la souris ne va jamais la
+   chercher. */
+
+/* ---- Tablette et petit portable ---- */
+@media (min-width:860px){
+  .app{max-width:1060px;padding-bottom:calc(84px + var(--safe-b))}
+  .navin{max-width:1060px}
+
+  /* Les vignettes : le même composant, simplement plus grand. La grille est
+     déjà en auto-fill, il suffit de relever le plancher. */
+  body{--vign:120px}
+  body.vue-compacte{--vign:92px}
+
+  .wrap{padding:18px 24px}
+  .grid{padding:6px 24px;gap:16px}
+  .chips,.souschips{padding-left:24px;padding-right:24px}
+  .sectitle{padding-left:24px;padding-right:24px}
+  .resume{padding-left:24px;padding-right:24px}
+  .hbar{padding:14px 24px}
+
+  /* La fiche : l'image d'en-tête a de la place, l'affiche aussi. */
+  .hero{height:280px}
+  .dhead{padding:0 24px;margin-top:-96px;gap:20px}
+  .dhead .poster{width:150px}
+  .dmeta{padding-top:104px}
+  .dmeta h2{font-size:24px}
+  .actions{padding:20px 24px 0}
+  .stats{padding:20px 24px}
+
+  /* Une ligne de texte de 1 000 px ne se lit pas : le confort de lecture
+     plafonne autour de 70 caractères, quelle que soit la largeur disponible. */
+  .overview{max-width:72ch;padding:0;margin:16px 24px 0}
+  .empty p{max-width:60ch;margin-left:auto;margin-right:auto}
+
+  /* Le panneau du bas devient une vraie fenêtre : au centre, arrondi partout.
+     Le geste « tirer vers le bas » n'existe pas à la souris. */
+  .sheet{align-items:center}
+  .sheetin{max-width:520px;border-radius:18px;border-bottom:1px solid var(--line);
+    padding-bottom:24px;max-height:calc(100vh - 80px)}
+
+  .pgrid{grid-template-columns:repeat(auto-fill,minmax(132px,1fr))}
+  .grid.rangee .gcard{width:132px;flex:0 0 132px}
+  body.vue-compacte .grid.rangee .gcard{width:112px;flex:0 0 112px}
+}
+
+/* ---- Portable et bureau : la barre du bas passe à gauche ---- */
+@media (min-width:1200px){
+  body{padding-left:216px}
+  /* L'écran « qui regarde ce soir ? » n'a pas de barre : il resterait décalé. */
+  body.accueil{padding-left:0}
+
+  nav{top:0;bottom:0;right:auto;width:216px;
+    border-top:0;border-right:1px solid var(--line);
+    padding-bottom:0;display:flex;align-items:flex-start}
+  .navin{max-width:none;width:100%;grid-template-columns:1fr;
+    align-content:start;gap:2px;padding:22px 10px}
+  .tab{flex-direction:row;justify-content:flex-start;align-items:center;gap:13px;
+    padding:12px 14px;min-height:46px;font-size:14px;font-weight:600;
+    border-radius:11px}
+  .tab.on{background:var(--accent-dim)}
+  .tab svg{width:21px;height:21px}
+  .tab.on svg{transform:none}
+  .tab:active svg{transform:scale(.94)}
+  /* La pastille était centrée sous une icône ; mise en ligne, elle se plaçait
+     entre l'icône et le mot — « ♡ 14 Ma liste ». « order » la renvoie en
+     dernier, la marge automatique la colle au bord droit du rail. */
+  .tab .pastille-nav{position:static;order:9;margin:0 0 0 auto;left:auto;top:auto}
+
+  /* Plus de barre en bas : la marge de sécurité du pouce n'a plus lieu d'être. */
+  .app{max-width:1240px;padding-bottom:36px}
+  .sheet{left:216px}
+  .toast{margin-left:108px}
+
+  body{--vign:132px}
+  body.vue-compacte{--vign:100px}
+  .hero{height:330px}
+}
+
+@media (min-width:1600px){
+  .app{max-width:1440px}
+  body{--vign:148px}
+  body.vue-compacte{--vign:112px}
+}
+@media (min-width:860px){
+  .herosoir{border-radius:0 0 18px 18px}
+}
+
+/* ---- Le bureau : la barre passe en HAUT, à l'horizontale ----
+   Elle remplace le rail gauche de la v2907o : la maquette retenue met la
+   navigation sur l'image, en toutes lettres, comme un site de cinéma. Les
+   propriétés du rail sont toutes réinitialisées ici — même media query,
+   déclarée plus bas, donc elle gagne. */
+@media (min-width:1200px){
+  body{padding-left:0;padding-top:58px}
+  body.accueil{padding-top:0}
+
+  nav{top:0;bottom:auto;left:0;right:0;width:auto;height:58px;
+    border-right:0;border-top:0;border-bottom:1px solid #ffffff12;
+    padding:0 30px;display:flex;align-items:center;
+    background:rgba(11,11,15,.55);
+    backdrop-filter:blur(16px) saturate(150%);
+    -webkit-backdrop-filter:blur(16px) saturate(150%)}
+  .navin{width:100%;max-width:none;display:flex;align-items:center;gap:30px;padding:0}
+  .navlogo{display:block;margin-right:6px}
+  .tab{flex-direction:row;gap:8px;padding:0;min-height:0;border-radius:0;
+    font-size:13.5px;font-weight:600;color:#9a9aa6;background:none}
+  .tab.on{background:none;color:#fff}
+  .tab svg{display:none}
+  .tab:last-child{margin-left:auto}
+  .tab .pastille-nav{position:static;order:9;margin:0 0 0 4px}
+
+  /* L'image passe SOUS la barre : elle est translucide, la couverture se voit
+     à travers — c'est tout l'effet de la maquette. */
+  .herosoir{margin-top:-58px;min-height:clamp(420px,58vh,620px)}
+  .hstxt{padding:130px 40px 36px;max-width:660px}
+  .hstxt p{font-size:14px;-webkit-line-clamp:3}
+  .hsbar,.minihaut{display:none}
+  .souscontrols{padding-top:10px}
+
+  .top7{gap:16px;padding:6px 24px 18px;overflow:visible}
+  .t7c{flex:1 1 0;width:auto;padding-left:18px}
+  .t7c .chiffre{font-size:76px;left:-8px;bottom:-14px;-webkit-text-stroke:2.5px #4a4a56}
+
+  .app{padding-bottom:40px}
+  .sheet{left:0}
+  .toast{margin-left:0}
+}
+
+@media (min-width:1200px){
+  .navctx{display:flex;align-items:center;gap:20px;margin-left:6px}
+  .navctx .iconbtn{color:#9a9aa6;background:#ffffff10;border-radius:9px}
+
+  /* Découvrir sort de la barre : le logo fait ce travail. */
+  .tab.t-decouvrir{display:none}
+
+  /* Sorties et Ma liste : l'icône seule, rangée à droite avant Profil. */
+  .tab:last-child{margin-left:0}
+  .tab.t-sorties{margin-left:auto}
+  .tab.t-sorties svg,.tab.t-liste svg{display:block;width:20px;height:20px}
+  .tab.t-sorties span,.tab.t-liste span{display:none}
+  .tab.t-sorties,.tab.t-liste{color:#9a9aa6}
+  .tab.t-sorties.on,.tab.t-liste.on{color:#fff}
+
+  /* La rangée Films/Séries sous le visuel devient redondante : elle monte. */
+  .souscontrols .chips.types{display:none}
+  .souscontrols .souschips{padding-top:4px}
+  .souschips .iconbtn{margin-left:auto}
+}
+
+@media (min-width:1200px){
+  .tab.dsk{display:flex}
+  .tab{font-family:Archivo,Inter,sans-serif;font-size:14px;font-weight:600;
+    letter-spacing:.01em;text-transform:none}
+  /* Découvrir revient dans la barre (v2907t l'avait retiré), la loupe et les
+     puces Films/Séries de la barre disparaissent avec navctx. */
+  .tab.t-decouvrir{display:flex}
+  .navctx{display:none}
+  /* Sorties et Ma liste reprennent leurs mots : c'était plus sympa. */
+  .tab.t-sorties svg,.tab.t-liste svg{display:none}
+  .tab.t-sorties span,.tab.t-liste span{display:inline}
+  .tab.t-sorties{margin-left:auto}
+  .tab.t-profil{margin-left:0}
+
+  /* Le catalogue garde ses rangées à lui (l'en-tête classique) : la règle qui
+     cachait Films/Séries sous le visuel ne s'applique qu'à la couverture,
+     qui n'a plus de rangées du tout. */
+  .entrees{display:none}
+
+  body.couverture nav{background:linear-gradient(to bottom,rgba(11,11,15,.72),transparent);
+    border-bottom:0;backdrop-filter:none;-webkit-backdrop-filter:none}
+}
