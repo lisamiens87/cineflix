@@ -696,3 +696,32 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .tab.dsk{display:none}
 .entrees{display:flex;gap:10px}
 .entrees .btn{flex:1;padding:13px}
+
+
+/* ========= Films / Séries dans la barre du visuel (v2907x) =========
+   « Films et Séries à côté de Cinéflix » : les deux entrées du catalogue
+   montent dans la barre posée sur l'image, collées au logo — pas repoussées
+   au bord droit (essayé, refusé). Elles sont ÉTEINTES ici et allumées par
+   app-mobile.css : au-dessus de 860 px la rangée .entrees sous le visuel
+   fait déjà ce travail, et le bureau a sa barre. */
+.hsent{display:none;margin-left:20px;gap:16px}
+/* Casse mixte, pas de majuscules forcées : c'est la typo que la barre du
+   bureau a déjà adoptée (« Découvrir · Films · Séries »), pas celle des
+   onglets de filtre. Les deux entrées se lisent comme des liens, pas comme
+   des étiquettes. */
+.hsent button{background:none;border:0;padding:2px 0;cursor:pointer;
+  font-family:Archivo,Inter,sans-serif;font-size:13px;font-weight:600;
+  letter-spacing:.01em;text-transform:none;color:#fff}
+.hsent button:active{opacity:.55}
+
+
+/* =========== Ajouts récents · Continuer la lecture (v2907x) ===========
+   Les mêmes rangées que le Top, sans les chiffres détourés : le décalage
+   de 14 px qui leur laissait la place n'a plus lieu d'être. La jauge dit
+   où en est la lecture — c'est toute la raison d'être de la rangée. */
+.top7.plate .t7c{padding-left:0;width:98px}   /* 112 − les 14 px du chiffre :
+                                                 l'affiche garde EXACTEMENT
+                                                 la taille de celles du Top */
+.t7c .aff{position:relative}
+.jauge{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);
+  display:block}
