@@ -5,3 +5,37 @@
 
 @media (max-width:380px){ .ep{grid-template-columns:96px 1fr;gap:10px} }
 @media (max-width:520px){ .hstxt p{display:none} .hstxt{padding-bottom:16px} }
+
+
+/* ================= La couverture sur téléphone (v2907x) ==================
+   Trois corrections demandées sur capture d'un Galaxy S23 :
+   la typo trop grosse, « le choix du soir » à recaler sous le logo, et
+   Films / Séries remontés à côté de CINÉFLIX.
+   Palier 859 px : au-dessus, app-site.css tient le grand écran. */
+@media (max-width:859px){
+
+  /* ---- Films / Séries dans la barre, collés au logo ----
+     Les deux entrées vivent dans .hsbar (app-03) ; la rangée de boutons
+     cerclés qui traînait sous le Top n'a plus lieu d'être. */
+  .hsent{display:flex}
+  .entrees{display:none}
+
+  /* ---- « Le choix du soir » remonte sous CINÉFLIX ----
+     Le bloc de texte occupe maintenant TOUTE la hauteur du visuel : le
+     surtitre se cale en haut, juste sous le logo. « margin-top:auto » sur
+     le titre repousse tout le reste — titre, méta, boutons — en bas du
+     visuel, exactement là où il était. Seule la ligne rouge a bougé. */
+  .herosoir{align-items:stretch}
+  .hstxt{display:flex;flex-direction:column;width:100%;
+    padding-top:calc(42px + var(--safe-t))}
+  .hstxt h2{margin-top:auto}
+
+  /* ---- La typo d'un cran en dessous ----
+     Le titre gardait le corps d'une maquette bureau : sur 420 px de large
+     il mangeait la moitié de l'image. Tout descend d'environ 15 %. */
+  .hssur{font-size:10px;letter-spacing:.16em;margin-bottom:0}
+  .hstxt h2{font-size:clamp(19px,4.6vw,30px)}
+  .hsmeta{font-size:11.5px}
+  .hsactions .btn{font-size:11.5px;padding:10px 17px}
+  .sectitle{font-size:11.5px}
+}
