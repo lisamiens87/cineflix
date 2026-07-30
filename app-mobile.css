@@ -1,1 +1,7 @@
+/* ============================= app-mobile.css =============================
+   LES PETITS ÉCRANS — uniquement des @media (max-width:…) : les affinages
+   que seul un téléphone étroit voit. La conversation « app mobile »
+   travaille ici et dans app-base ; elle ne touche JAMAIS app-site.css. */
 
+@media (max-width:380px){ .ep{grid-template-columns:96px 1fr;gap:10px} }
+@media (max-width:520px){ .hstxt p{display:none} .hstxt{padding-bottom:16px} }
