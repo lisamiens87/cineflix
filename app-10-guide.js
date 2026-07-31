@@ -147,6 +147,10 @@ const PERIMS = [
   { id:'tout',  label:'Cinéma',      cl:'c-cinema' }
 ];
 const perimGuide = ()=> (ui.guide && ui.guide.perim) || 'flix';
+/* Les mêmes trois portées, dites en français dans le guide. Le catalogue
+   garde ses onglets colorés « Cinéflix / Plateformes / Cinéma » : là-bas
+   c'est un filtre de liste, ici c'est la phrase « je cherche … ». */
+const MOTS_PERIM = { flix:'chez toi', plats:'tes abonnements', tout:'au cinéma' };
 
 const platsProfil = ()=> {
   const g = GOUTS.d || {};
@@ -627,7 +631,31 @@ function ouvrirGuide(){
   ui.guide = { txt:'', recette:null, res:[], loading:false, err:'', charge:false,
                vus:{}, source:'', taxoG:'', taxoSel:'',
                perim:(ui.guide||{}).perim || 'flix' };
+  guideAmorce = false;
   go('guide');
+}
+/* L'onglet, lui, ne remet pas les compteurs à zéro : on revient au guide tel
+   qu'on l'avait laissé. Repartir de rien à chaque visite serait punir celui
+   qui va juste vérifier un titre ailleurs. */
+function allerGuide(){
+  if(!ui.guide) return ouvrirGuide();
+  go('guide');
+}
+
+/* ---------- Plus jamais d'écran vide ----------
+   L'app a une règle : on ne montre que ce qui est regardable ce soir, et
+   chaque vignette dit pourquoi elle est là. Un écran qui s'ouvre en demandant
+   « choisis une entrée » contredit cette règle. On rejoue donc tout de suite
+   la dernière humeur utilisée. La toute première fois — et seulement
+   celle-là — les tuiles restent seules à l'écran : imposer une humeur au
+   hasard quand on ne sait rien serait pire que de laisser choisir. */
+let guideAmorce = false;
+function assurerGuide(){
+  const g = ui.guide;
+  if(guideAmorce || !g || g.charge || g.loading || g.err || g.source) return;
+  if(!db.humeur) return;
+  guideAmorce = true;
+  setTimeout(()=>{ if(view === 'guide') guiderHumeur(db.humeur); }, 0);
 }
 /* Changer de source relance la même demande ailleurs : c'est le geste
    « et sur Netflix, ça donnerait quoi ? ». */
@@ -641,7 +669,17 @@ function setPerimGuide(id){
 function guiderHumeur(id){
   ui.guide.txt = '';
   ui.guide.taxoSel = '';
+  /* On retient la dernière humeur : c'est elle qui remplira l'écran la
+     prochaine fois. Se souvenir, ce n'est pas deviner. */
+  if(id){ db.humeur = id; saveDB(); }
   guider(id, '');
+}
+/* « Ou entrer par catégorie » : les vingt genres se déplient sous les tuiles,
+   et se replient — dépliés d'office ils repousseraient les films hors de
+   l'écran. */
+function basculerCategories(){
+  ui.guide.taxoOuvert = !ui.guide.taxoOuvert;
+  render();
 }
 function guiderEncore(){
   const g = ui.guide;
@@ -676,33 +714,46 @@ function portee(){
 
 function viewGuide(){
   const g = ui.guide || (ui.guide = { txt:'', res:[], vus:{} });
-  let h = header('Laisse-moi te guider', {back:'goBack()'});
+  assurerGuide();
 
-  /* Plus de champ libre. Il promettait de comprendre une phrase et ne faisait
-     que chercher des mots : « un film d'action simple et détendu » rendait
-     Casino Royale. Vingt genres, quarante-trois sous-catégories et dix humeurs
-     disent exactement ce qu'ils font — c'est moins flatteur et bien plus
-     honnête. */
+  /* UN SEUL ÉCRAN, sans cas particulier. Les grandes tuiles sont toujours là
+     — on répond d'un geste au lieu de lire trente étiquettes ; la catégorie
+     s'ouvre sous elles à la demande ; les propositions se rangent en dessous.
+     Et on ne tombe jamais sur un écran vide, puisque la dernière humeur est
+     rejouée à l'arrivée.
 
-  /* Les trois sources, aux mêmes couleurs que dans Découvrir : Cinéflix en
-     vert, Plateformes en rouge, Cinéma en orange. */
-  h += '<div class="wrap" style="padding-top:6px"><div class="souschips">'+
-    PERIMS.map(x=>'<button class="chip '+x.cl+' '+(perimGuide()===x.id?'on':'')+
-      '" onclick="setPerimGuide(\''+x.id+'\')">'+x.label+'</button>').join('')+
-  '</div></div>';
+     Toujours pas de champ libre : il promettait de comprendre une phrase et
+     ne faisait que chercher des mots — « un film d'action simple et détendu »
+     rendait Casino Royale. Dix envies, vingt genres et quarante-trois rayons
+     disent exactement ce qu'ils font. Moins flatteur, bien plus honnête. */
+  let h = header('Guide-moi', {back:'goBack()'});
 
-  h += '<div class="wrap" style="padding-top:4px"><div class="gchips">'+
-    HUMEURS.map(x=>'<button class="chip humeur'+
-      (g.recette && g.recette.titre === x.label ? ' on':'')+
-      '" onclick="guiderHumeur(\''+x.id+'\')">'+x.emo+' '+esc(x.label)+'</button>').join('')+
-    (aGouts() ? '<button class="chip humeur'+
-      (g.source === 'gouts' ? ' on':'')+'" onclick="guiderHumeur(\'gouts\')">'+
-      '✨ Selon mes goûts</button>' : '')+
-  '</div></div>';
+  h += '<div class="gquestion">Ce soir, tu as envie de quoi ?</div>';
+  h += '<div class="envies">'+
+    HUMEURS.map(x=>'<button class="envie'+
+      (g.recette && g.recette.titre === x.label ? ' on' : '')+
+      '" onclick="guiderHumeur(\''+x.id+'\')">'+
+      '<s>'+x.emo+'</s>'+esc(x.label)+'</button>').join('')+
+    (aGouts() ? '<button class="envie'+(g.source === 'gouts' ? ' on' : '')+
+      '" onclick="guiderHumeur(\'gouts\')"><s>✨</s>Selon mes goûts</button>' : '')+
+  '</div>';
 
-  /* La taxonomie : le meme moteur, mais on entre par le rangement plutot que
-     par l'envie. Vingt genres, puis les sous-categories du genre ouvert. */
-  h += viewTaxoChips();
+  /* L'autre porte : le rangement plutôt que l'envie. Repliée par défaut —
+     vingt genres dépliés d'office repousseraient les films hors de l'écran. */
+  h += '<div class="wrap"><button class="btn ghost block" onclick="basculerCategories()">'+
+    (g.taxoOuvert ? 'Masquer les catégories' : 'Ou entrer par catégorie')+'</button></div>';
+  if(g.taxoOuvert) h += viewTaxoChips();
+
+  /* La portée, en français plutôt qu'en jargon : « Plateformes » et
+     « Cinéma » ne disaient pas ce qu'ils font. Trois mots soulignés et non
+     trois pastilles — ce n'est pas le choix principal de l'écran, mais il
+     reste à un doigt : « et sur Netflix, ça donnerait quoi ? » est un des
+     gestes centraux du guide. */
+  h += '<div class="porteemots">'+
+    PERIMS.map(x=>'<button class="pm'+(perimGuide() === x.id ? ' on' : '')+
+      '" onclick="setPerimGuide(\''+x.id+'\')">'+
+      esc(MOTS_PERIM[x.id] || x.label)+'</button>').join('')+
+  '</div>';
 
   if(g.loading)
     return h + '<div class="empty"><span class="spin"></span>'+
@@ -712,9 +763,12 @@ function viewGuide(){
     return h + '<div class="empty">'+I.boussole+'<h3>Rien à proposer</h3>'+
       '<p>'+esc(g.err)+'</p></div>';
 
+  /* Rien encore demandé : les tuiles occupent déjà l'écran, un bloc « choisis
+     une entrée » ne ferait que répéter ce qu'elles disent. Une ligne suffit
+     pour dire OÙ on cherchera. */
   if(!g.charge)
-    return h + '<div class="empty">'+I.boussole+'<h3>Choisis une entrée</h3>'+
-      '<p>Une humeur, ou une catégorie. '+esc(portee())+'</p></div>';
+    return h + '<div class="wrap tiny muted" style="padding-bottom:26px">'+
+      esc(portee())+'</div>';
 
   if(!g.res.length)
     return h + '<div class="empty">'+I.boussole+'<h3>Rien trouvé</h3>'+
