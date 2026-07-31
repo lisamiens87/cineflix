@@ -698,21 +698,52 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .entrees .btn{flex:1;padding:13px}
 
 
-/* ========= Films / Séries dans la barre du visuel (v2907x) =========
-   « Films et Séries à côté de Cinéflix » : les deux entrées du catalogue
-   montent dans la barre posée sur l'image, collées au logo — pas repoussées
-   au bord droit (essayé, refusé). Elles sont ÉTEINTES ici et allumées par
-   app-mobile.css : au-dessus de 860 px la rangée .entrees sous le visuel
-   fait déjà ce travail, et le bureau a sa barre. */
-.hsent{display:none;margin-left:20px;gap:16px}
-/* Casse mixte, pas de majuscules forcées : c'est la typo que la barre du
-   bureau a déjà adoptée (« Découvrir · Films · Séries »), pas celle des
-   onglets de filtre. Les deux entrées se lisent comme des liens, pas comme
-   des étiquettes. */
-.hsent button{background:none;border:0;padding:2px 0;cursor:pointer;
-  font-family:Archivo,Inter,sans-serif;font-size:13px;font-weight:600;
-  letter-spacing:.01em;text-transform:none;color:#fff}
-.hsent button:active{opacity:.55}
+/* ============ La vitrine du téléphone (v2907y) ============
+   « Le design est top pour une app web, pas pour mobile » : sur un écran
+   debout c'est l'AFFICHE qui prend la place, pas l'image large du décor.
+   Trois blocs — le logo à plat, les pilules, la vitrine — ÉTEINTS ici et
+   allumés par app-mobile.css sous 860 px, qui masque en échange le bandeau
+   .herosoir. Le grand écran ne voit rien de tout ceci et garde son bandeau :
+   app-site.css n'a pas une ligne à changer. */
+.minihaut,.pilules,.vitrine{display:none}
+
+.pilules{gap:9px;padding:2px 16px 12px;overflow-x:auto;scrollbar-width:none}
+.pilules::-webkit-scrollbar{display:none}
+.pil{font-family:Archivo,Inter,sans-serif;font-size:12.5px;font-weight:700;
+  color:#c9c9d4;background:var(--surface);border:0;border-radius:999px;
+  padding:9px 16px;white-space:nowrap;cursor:pointer;flex:0 0 auto}
+.pil.on{background:var(--accent);color:#fff}
+.pil.pico{padding:0;width:36px;height:36px;display:grid;place-items:center}
+.pil.pico svg{width:16px;height:16px;display:block}
+
+.vcar{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory;
+  padding:0 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.vcar::-webkit-scrollbar{display:none}
+/* L'affiche EN ENTIER, c'est tout l'objet de la vitrine : le cadre prend
+   ses proportions (2:3) au lieu de lui imposer les siennes. Sur un écran
+   court, max-height reprend la main et recadre un peu plutôt que de tout
+   pousser sous la ligne de flottaison. */
+.vsl{position:relative;flex:0 0 calc(100% - 32px);scroll-snap-align:center;
+  aspect-ratio:2/3;max-height:min(62vh,560px);
+  border-radius:14px;overflow:hidden;background:var(--surface)}
+.vsl img{width:100%;height:100%;object-fit:cover;object-position:center 12%}
+.vgr{position:absolute;inset:0;
+  background:linear-gradient(to top,#0b0b0f 6%,rgba(11,11,15,.12) 62%)}
+.vtx{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:0 16px 14px}
+.vtx h2{font-family:'Archivo Expanded',Archivo,sans-serif;font-weight:800;
+  font-size:21px;line-height:1.06;margin:5px 0}
+.vbt{display:flex;gap:9px;margin-top:11px}
+.vbt button{font-family:Archivo,Inter,sans-serif;font-size:13px;font-weight:700;
+  border:0;border-radius:999px;padding:11px 19px;cursor:pointer}
+.vb1{background:var(--accent);color:#fff}
+.vb2{background:#ffffff1c;color:#fff}
+.vbt button:active{opacity:.7}
+/* Les points : ils disent combien de propositions restent, et où on en est.
+   Sans eux, une carte qui glisse a l'air d'un bug. */
+.vpts{display:flex;gap:6px;justify-content:center;padding:12px 0 2px}
+.vpts i{width:6px;height:6px;border-radius:3px;background:#3a3a45;
+  transition:width .2s,background .2s}
+.vpts i.on{width:17px;background:var(--accent)}
 
 
 /* =========== Ajouts récents · Continuer la lecture (v2907x) ===========
