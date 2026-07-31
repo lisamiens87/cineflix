@@ -749,19 +749,33 @@ function champRecherche(){
    dite en une image plutôt qu'en deux mille vignettes. */
 let heroTente = false;
 function assurerHeroSoir(){
-  if(ui.heroSoir || heroTente) return;
+  if(ui.heroSoirs || heroTente) return;
   const l = (CAT.items||[]).filter(i => i && i.t === 'movie' && !i.vu &&
                                         (i.noteCrit||0) >= 75);
   if(!l.length) return;
   heroTente = true;
   l.sort((a,b)=>(b.noteCrit||0)-(a.noteCrit||0));
-  const c = l[Math.floor(Math.random()*Math.min(40, l.length))];
-  tmdb('/movie/'+c.id).then(f=>{
-    let txt = (f.overview||'').split('. ').slice(0,2).join('. ');
-    if(txt && !/[.!?]$/.test(txt)) txt += '.';
-    ui.heroSoir = { id:c.id, nom:c.nom,
-      annee:String(c.sortie||'').slice(0,4), crit:c.noteCrit||0, jt:c.jt||0,
-      fond:f.backdrop_path || f.poster_path || '', txt:txt };
+  /* CINQ propositions, pas une : sur téléphone elles se balayent du doigt.
+     Tirées sans doublon dans le haut du panier, elles changent à chaque
+     session. On garde l'AFFICHE en plus du décor — c'est elle qui remplit un
+     écran debout, le décor est fait pour un écran couché. */
+  const bassin = l.slice(0, 40), choisis = [];
+  while(choisis.length < 5 && bassin.length)
+    choisis.push(bassin.splice(Math.floor(Math.random()*bassin.length), 1)[0]);
+  Promise.all(choisis.map(c => tmdb('/movie/'+c.id).catch(()=>null))).then(fs=>{
+    const prets = choisis.map((c,i)=>{
+      const f = fs[i] || {};
+      let txt = (f.overview||'').split('. ').slice(0,2).join('. ');
+      if(txt && !/[.!?]$/.test(txt)) txt += '.';
+      return { id:c.id, nom:c.nom,
+        annee:String(c.sortie||'').slice(0,4), crit:c.noteCrit||0, jt:c.jt||0,
+        fond:f.backdrop_path || f.poster_path || '',
+        aff:f.poster_path || f.backdrop_path || '',
+        date:f.release_date || c.sortie || '', txt:txt };
+    }).filter(x => x.fond || x.aff);
+    if(!prets.length) return;
+    ui.heroSoirs = prets;
+    ui.heroSoir  = prets[0];   /* le bandeau du bureau n'en montre qu'un */
     if(view === 'decouvrir') render();
   }).catch(()=>{});
 }
@@ -771,7 +785,7 @@ function heroSoirHtml(){
   const meta = [h.annee, h.crit ? 'critiques '+h.crit+' %' : '',
                 h.jt >= 2 ? 'T'.repeat(h.jt)+' Télérama' : ''].filter(Boolean).join(' · ');
   return '<div class="herosoir">'+ hsBarre() +
-    '<div class="hsfond"><img src="'+IMG(h.fond,'w1280')+'" alt=""></div>'+
+    '<div class="hsfond"><img loading="lazy" src="'+IMG(h.fond,'w1280')+'" alt=""></div>'+
     '<div class="hstxt">'+
       '<div class="hssur">Le choix du soir · jamais lancé</div>'+
       '<h2>'+esc(h.nom)+'</h2>'+
@@ -785,11 +799,76 @@ function heroSoirHtml(){
   '</div>';
 }
 
+/* ---------- La vitrine (téléphone) ----------
+   Un téléphone se tient debout : c'est l'AFFICHE qui remplit son écran, pas
+   l'image large du décor — celle-ci est cadrée pour un écran couché, et la
+   faire tenir dans un bandeau presque carré coûtait 28 % de sa largeur.
+   Cinq propositions, une par écran, qu'on balaye du doigt.
+
+   Le bureau ne voit JAMAIS ce bloc : app-base l'éteint, app-mobile l'allume
+   et masque en échange le bandeau .herosoir, qui reste tel quel au-dessus
+   pour les grands écrans. Aucune règle de app-site.css n'est touchée. */
+function vitrineHtml(){
+  const l = ui.heroSoirs;
+  if(!l || !l.length) return '';
+  return '<div class="vitrine">'+
+    '<div class="vcar" id="vcar" onscroll="vitrinePoint()">'+
+      l.map((h,i)=>{
+        const meta = [h.annee, h.crit ? 'critiques '+h.crit+' %' : '',
+                      h.jt >= 2 ? 'T'.repeat(h.jt)+' Télérama' : ''].filter(Boolean).join(' · ');
+        return '<div class="vsl">'+
+          '<img src="'+IMG(h.aff || h.fond,'w780')+'" alt="">'+
+          '<div class="vgr"></div>'+
+          '<div class="vtx">'+
+            '<div class="hssur">Le choix du soir · jamais lancé</div>'+
+            '<h2>'+esc(h.nom)+'</h2>'+
+            (meta ? '<div class="hsmeta">'+esc(meta)+'</div>' : '')+
+            '<div class="vbt">'+
+              '<button class="vb1" onclick="regarderSoir('+i+')">▶ Regarder</button>'+
+              '<button class="vb2" onclick="listerSoir('+i+')">+ Ma liste</button>'+
+            '</div>'+
+          '</div>'+
+        '</div>';
+      }).join('')+
+    '</div>'+
+    '<div class="vpts" id="vpts">'+
+      l.map((x,i)=>'<i'+(i ? '' : ' class="on"')+'></i>').join('')+
+    '</div>'+
+  '</div>';
+}
+/* Le point actif suit le doigt. On mesure le pas réel (largeur d'une carte
+   plus l'écart) : diviser par la largeur du cadre décalerait d'un cran au
+   bout de trois cartes. */
+function vitrinePoint(){
+  const c = document.getElementById('vcar'), p = document.getElementById('vpts');
+  if(!c || !p || !c.firstChild) return;
+  const pas = c.firstChild.getBoundingClientRect().width + 12;
+  const n = Math.max(0, Math.min(p.children.length - 1, Math.round(c.scrollLeft / pas)));
+  for(let i = 0; i < p.children.length; i++) p.children[i].className = i === n ? 'on' : '';
+}
+function listerSoir(i){
+  const h = (ui.heroSoirs||[])[i||0];
+  if(!h) return;
+  basculerFavori({ id:h.id, title:h.nom, poster_path:h.aff || null,
+                   release_date:h.date || '' }, 'movie');
+}
+
+/* Les pilules : où l'on est, et par où l'on sort. « Tout » est la couverture
+   elle-même — elle ne mène nulle part, elle dit seulement qu'on y est. */
+function pilulesHtml(){
+  return '<div class="pilules">'+
+    '<button class="pil pico" onclick="ouvrirChamp()" aria-label="Chercher">'+I.search+'</button>'+
+    '<button class="pil on">Tout</button>'+
+    '<button class="pil" onclick="ouvrirCatalogue(\'movie\')">Films</button>'+
+    '<button class="pil" onclick="ouvrirCatalogue(\'tv\')">Séries</button>'+
+  '</div>';
+}
+
 /* « Regarder » sur la couverture tient sa promesse : il ouvre le film DANS
    Jellyfin, par son identifiant — plus la fiche Cinéflix. Si l'identifiant
    manque (catalogue pas encore réexporté), on retombe sur la fiche. */
-function regarderSoir(){
-  const h = ui.heroSoir;
+function regarderSoir(i){
+  const h = (ui.heroSoirs||[])[i||0] || ui.heroSoir;
   if(!h) return;
   const f = ficheDe('movie', h.id);
   if(f && f.jf && typeof ouvrirJellyfin === 'function')
@@ -797,17 +876,12 @@ function regarderSoir(){
   ouvrirFiche(h.id, 'movie');
 }
 
-/* La petite barre posée sur l'image : le logo, et les deux entrées du
-   catalogue à sa droite. Sur le bureau la barre entière disparaît — la vraie
-   barre de navigation est déjà en haut. Les entrées (.hsent) sont masquées
-   par défaut dans app-base : seul le téléphone les allume (app-mobile), au
-   dessus de 860 px c'est la rangée .entrees sous le visuel qui sert. */
+/* La petite barre posée sur l'image : le logo, rien d'autre. Sur le bureau
+   elle disparaît — la vraie barre de navigation est déjà en haut. Sur
+   téléphone elle est reposée à plat (.minihaut) au-dessus des pilules :
+   depuis la vitrine, ce sont elles qui portent Films et Séries. */
 function hsBarre(){
-  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div>'+
-    '<div class="hsent">'+
-      '<button onclick="ouvrirCatalogue(\'movie\')">Films</button>'+
-      '<button onclick="ouvrirCatalogue(\'tv\')">Séries</button>'+
-    '</div></div>';
+  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div></div>';
 }
 
 /* ---------- Le Top de la bibliothèque ----------
@@ -931,7 +1005,13 @@ function viewDecouvrir(){
     '<button class="btn ghost" onclick="ouvrirCatalogue(\'movie\')">Films</button>'+
     '<button class="btn ghost" onclick="ouvrirCatalogue(\'tv\')">Séries</button>'+
   '</div>';
-  return haut + banniereCle() + banniereCatalogue() + topBibHtml() +
+  /* Le téléphone : logo à plat, pilules, vitrine. Le bureau : le bandeau
+     ci-dessus. Les deux jeux de blocs sont dans la page, la feuille de
+     style n'en montre qu'un — c'est ce qui permet de refaire l'accueil du
+     téléphone sans toucher une ligne du grand écran. */
+  const tel = '<div class="minihaut">'+hsBarre()+'</div>'+
+              pilulesHtml() + vitrineHtml();
+  return haut + tel + banniereCle() + banniereCatalogue() + topBibHtml() +
     rangeeHtml('Ajouts récents', ui.recents, false) +
     rangeeHtml('Continuer la lecture', ui.reprises, true) +
     entrees + '<div style="height:20px"></div>';
