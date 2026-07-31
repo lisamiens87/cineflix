@@ -704,12 +704,56 @@ function guiderHumeur(id){
   if(id){ db.humeur = id; saveDB(); }
   guider(id, '');
 }
-/* « Ou entrer par catégorie » : les vingt genres se déplient sous les tuiles,
-   et se replient — dépliés d'office ils repousseraient les films hors de
-   l'écran. */
-function basculerCategories(){
-  ui.guide.taxoOuvert = !ui.guide.taxoOuvert;
-  render();
+/* « Ou entrer par catégorie » ouvre un ÉCRAN, pas un dépliant : c'est une
+   autre étape — on ne choisit plus une envie, on ouvre un rangement — et une
+   étape mérite sa page, avec son titre et sa flèche de retour. */
+function ouvrirCategories(){ ui.guide.ecran = 'cat'; render(); }
+function fermerCategories(){ ui.guide.ecran = ''; render(); }
+
+/* Deux colonnes : les vingt genres à gauche, les rayons et les films à
+   droite. Chaque colonne a son propre défilement — c'est tout l'intérêt de
+   la formule : changer de genre ne doit jamais obliger à remonter la page.
+   Les affiches y sont plus GRANDES qu'ailleurs (deux par ligne dans 298 px
+   contre trois dans 388), ce qui compense la colonne perdue. */
+function viewCategories(){
+  const g = ui.guide;
+  const ouvert = taxoGenreOuvert();
+  const e = TAXO.find(x => x.id === ouvert);
+  let h = header('Par catégorie', {back:'fermerCategories()'});
+
+  h += '<div class="porteemots">'+
+    PERIMS.map(x=>'<button class="pm'+(perimGuide() === x.id ? ' on' : '')+
+      '" onclick="setPerimGuide(\''+x.id+'\')">'+
+      esc(MOTS_PERIM[x.id] || x.label)+'</button>').join('')+
+  '</div>';
+
+  let droite = '';
+  if(!e){
+    droite = '<div class="catvide">Choisis un genre à gauche.<br>'+
+      'Les rayons et les films s\'afficheront ici.</div>';
+  } else {
+    droite = '<div class="catray">'+
+      (e.sous||[]).map(s=>'<button class="chip'+(g.taxoSel === s.id ? ' on' : '')+
+        '" onclick="guiderTaxo(\''+s.id+'\')">'+esc(s.nom)+'</button>').join('')+
+      '<button class="chip'+(g.taxoSel === e.id ? ' on' : '')+
+        '" onclick="guiderTaxo(\''+e.id+'\')">Tout le genre</button>'+
+    '</div>';
+    if(g.loading)      droite += '<div class="catvide"><span class="spin"></span></div>';
+    else if(g.err)     droite += '<div class="catvide">'+esc(g.err)+'</div>';
+    else if(!g.charge) droite += '<div class="catvide">Choisis un rayon.</div>';
+    else if(!g.res.length)
+      droite += '<div class="catvide">Rien dans ce rayon. Essaie un rayon voisin, '+
+        'ou élargis la recherche au-dessus.</div>';
+    else droite += '<div class="grid">'+g.res.map(carteGuide).join('')+'</div>';
+  }
+
+  return h + '<div class="catdeux">'+
+    '<div class="catg">'+
+      TAXO.map(x=>'<button class="catgi'+(ouvert === x.id ? ' on' : '')+
+        '" onclick="setTaxoGenre(\''+x.id+'\')">'+esc(x.nom)+'</button>').join('')+
+    '</div>'+
+    '<div class="catd">'+droite+'</div>'+
+  '</div>';
 }
 function guiderEncore(){
   const g = ui.guide;
@@ -745,6 +789,7 @@ function portee(){
 function viewGuide(){
   const g = ui.guide || (ui.guide = { txt:'', res:[], vus:{} });
   assurerGuide();
+  if(g.ecran === 'cat') return viewCategories();
 
   /* UN SEUL ÉCRAN, sans cas particulier. Les grandes tuiles sont toujours là
      — on répond d'un geste au lieu de lire trente étiquettes ; la catégorie
@@ -768,11 +813,9 @@ function viewGuide(){
       '" onclick="guiderHumeur(\'gouts\')"><s>✨</s>Selon mes goûts</button>' : '')+
   '</div>';
 
-  /* L'autre porte : le rangement plutôt que l'envie. Repliée par défaut —
-     vingt genres dépliés d'office repousseraient les films hors de l'écran. */
-  h += '<div class="wrap"><button class="btn ghost block" onclick="basculerCategories()">'+
-    (g.taxoOuvert ? 'Masquer les catégories' : 'Ou entrer par catégorie')+'</button></div>';
-  if(g.taxoOuvert) h += viewTaxoChips();
+  /* L'autre porte : le rangement plutôt que l'envie. Elle mène à un écran. */
+  h += '<div class="wrap"><button class="btn ghost block" onclick="ouvrirCategories()">'+
+    'Ou entrer par catégorie</button></div>';
 
   /* La portée, en français plutôt qu'en jargon : « Plateformes » et
      « Cinéma » ne disaient pas ce qu'ils font. Trois mots soulignés et non
