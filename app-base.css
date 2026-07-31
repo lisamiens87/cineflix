@@ -746,6 +746,45 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .vpts i.on{width:17px;background:var(--accent)}
 
 
+/* ====== Profil en haut, Guide-moi en bas (v2907z) ======
+   Éteints ici, allumés par app-mobile : sur le bureau la barre du haut garde
+   ses six onglets, Profil compris, et aucun avatar n'apparaît dans les
+   en-têtes. app-site.css reste intact. */
+.avbtn{display:none;background:none;border:0;padding:0;cursor:pointer;flex:none}
+.hsbar .avbtn{margin-left:auto}
+.avbtn .av{width:32px;height:32px;font-size:13px}
+.avbtn:active{opacity:.7}
+.tab.tel{display:none}
+
+/* La grande question — première visite du guide, une seule fois. */
+.gquestion{font-family:'Archivo Expanded',Archivo,sans-serif;font-weight:800;
+  font-size:20px;line-height:1.2;padding:6px 16px 12px}
+.gquestion span{display:block;font-family:Archivo,Inter,sans-serif;font-weight:500;
+  font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:6px}
+/* Les envies : émoji ET texte sur la même ligne. En deux lignes empilées,
+   dix tuiles faisaient 480 px de haut — un mur, et les films passaient sous
+   le bord de l'écran. À plat elles tiennent en 270 px sans rien perdre de la
+   surface qu'un pouce vise. */
+.envies{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:2px 16px 12px}
+.envie{background:var(--surface);border:0;border-radius:11px;padding:12px 12px;
+  display:flex;align-items:center;gap:9px;cursor:pointer;text-align:left;
+  min-height:44px;font-family:Archivo,Inter,sans-serif;font-size:12.5px;
+  font-weight:700;line-height:1.15;color:var(--text)}
+.envie s{font-size:17px;text-decoration:none;flex:none}
+.envie:active{background:var(--surface2)}
+.envie.on{background:var(--accent);color:#fff}
+
+/* La portée en trois mots : du texte souligné, pas des pastilles — le choix
+   principal de l'écran, ce sont les envies au-dessus. */
+.porteemots{display:flex;gap:16px;padding:10px 16px 12px;overflow-x:auto;
+  scrollbar-width:none}
+.porteemots::-webkit-scrollbar{display:none}
+.pm{background:none;border:0;padding:0 0 3px;cursor:pointer;white-space:nowrap;
+  font-family:Archivo,Inter,sans-serif;font-size:12.5px;font-weight:700;
+  color:#6f6f7c;box-shadow:inset 0 -2px 0 transparent}
+.pm.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+
+
 /* =========== Ajouts récents · Continuer la lecture (v2907x) ===========
    Les mêmes rangées que le Top, sans les chiffres détourés : le décalage
    de 14 px qui leur laissait la place n'a plus lieu d'être. La jauge dit
