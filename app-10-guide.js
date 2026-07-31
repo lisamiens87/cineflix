@@ -22,9 +22,27 @@ const gLettres = s => String(s||'').toLowerCase().normalize('NFD').replace(/[^a-
    compréhension — « un film d'action simple et détendu » rendait Casino
    Royale. Une puce dit exactement ce qu'elle fait ; une phrase promettait ce
    qu'elle ne tenait pas. */
+/* ---------- Les envies ----------
+   RÈGLE APPRISE À TROIS REPRISES, sur verdicts d'Alexandre :
+
+   1. `genres` est un OU, `g` un ET. « horreur OU thriller » laissait entrer
+      Le Pont des espions dans « Me faire peur ». Quand l'envie NOMME un
+      genre, c'est `g`.
+   2. Le classement récompense les films acclamés. Sur une envie qui promet du
+      plaisir et non de la qualité, ça la retourne : « Rire un bon coup »
+      rendait The Truman Show et The Descendants. `simple` annule ces primes.
+   3. Ce qui gâche une envie, c'est presque toujours un genre VOISIN qu'on
+      n'a pas exclu : le drame dans la comédie, la guerre dans les pleurs,
+      le polar dans le suspense, la science-fiction dans le voyage.
+
+   Toute modification ici se REVÉRIFIE sur le vrai catalogue, envie par
+   envie — le 30/07, six recettes sur dix rendaient autre chose que ce
+   qu'elles promettaient, et ça ne se voit qu'en lisant les listes. */
 const HUMEURS = [
+  /* Le drame exclu (il faisait entrer Little Miss Sunshine, The Descendants,
+     Hippocrate) et `simple` posé : on veut rire, pas admirer. */
   { id:'rire', label:'Rire un bon coup', emo:'😄',
-    genres:[35], sans:[27,10752], duree:115, note:6.2 },
+    g:[35], sans:[27,10752,18], duree:115, note:6.2, simple:true },
   /* Cette humeur a été refaite après un verdict d'Alexandre : elle rendait
      Casino Royale, Inception, Le Seigneur des anneaux et Seul au monde.
      Trois fautes, aucune subtile. « genres:[28,12] » est un OU, donc une
@@ -35,20 +53,32 @@ const HUMEURS = [
   { id:'action', label:'Action, sans réfléchir', emo:'💥',
     g:[28], sans:[99,36,10752,18,9648], apres:1995, note:5.6, noteMax:7.2,
     simple:true },
+  /* L'horreur devient obligatoire : « horreur OU thriller » rendait Mystic
+     River, Le Pont des espions et Les 3 Jours du Condor. */
   { id:'peur', label:'Me faire peur', emo:'😱',
-    genres:[27,53], sans:[35,10751], note:6 },
+    g:[27], sans:[35,10751], note:6 },
+  /* Guerre, western, polar et action dehors : ils rendaient Apocalypse Now,
+     Django Unchained et Voyage au bout de l'enfer — de grands films, mais on
+     ne pleure pas devant. */
   { id:'pleurer', label:'Pleurer un bon coup', emo:'😢',
-    genres:[18,10749], sans:[27], note:7.2 },
+    genres:[18,10749], sans:[27,10752,37,80,28], note:7.2 },
   { id:'reflechir', label:'Réfléchir', emo:'🧠',
     genres:[18,878,9648], sans:[10751], note:7.3 },
+  /* La guerre dehors : La Grande Évasion n'est pas une soirée en famille. */
   { id:'famille', label:'En famille', emo:'👨‍👩‍👧',
-    genres:[16,10751,12], sans:[27,53,80], note:6.5 },
+    genres:[16,10751,12], sans:[27,53,80,10752], note:6.5 },
+  /* Thriller, polar et guerre dehors : Full Metal Jacket et Usual Suspects
+     ne sont ni beaux ni lents. */
   { id:'beau', label:'Beau et lent', emo:'🎞️',
-    genres:[18,36], sans:[27,28], note:7.4 },
+    genres:[18,36], sans:[27,28,53,80,10752], note:7.4 },
+  /* Le POLAR retiré : à lui seul il faisait entrer Pulp Fiction et Taxi
+     Driver, qui ne tiennent personne en haleine. */
   { id:'suspense', label:'Suspense', emo:'🔎',
-    genres:[53,80,9648], sans:[10751], note:6.8 },
+    genres:[53,9648], sans:[10751], note:6.8 },
+  /* La science-fiction dehors : Ready Player One et Avengers ne font pas
+     voyager, ils font décoller. */
   { id:'voyager', label:'Voyager', emo:'🌍',
-    genres:[12,99,36], sans:[27], note:6.5 },
+    genres:[12,99,36], sans:[27,878], note:6.5 },
   { id:'sure', label:'Une valeur sûre', emo:'⭐',
     genres:[], sans:[], note:7.8, votes:2000 }
 ];
