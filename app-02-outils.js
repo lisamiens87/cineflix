@@ -79,8 +79,23 @@ function header(title, opts){
   return '<header><div class="hbar">'+
     (opts.back ? '<button class="iconbtn" onclick="'+opts.back+'">'+I.back+'</button>' : '')+
     '<div class="htitle">'+esc(title)+'</div>'+
-    (opts.right||'')+
+    (opts.right||'')+ avatarBouton() +
   '</div>'+(opts.sub||'')+'</header>';
+}
+
+/* ---------- Profil, en haut à droite ----------
+   Sur téléphone, Profil a quitté la barre du bas : quatre places, et il y
+   occupait un quart de la zone que le pouce atteint sans effort pour un
+   écran qu'on ouvre trois fois par mois. Il vit maintenant ici, dans l'EN-TÊTE
+   PARTAGÉ — donc sur tous les écrans d'un coup, ce qui est la condition pour
+   qu'il reste atteignable. Le bouton est éteint dans app-base et allumé par
+   app-mobile : le bureau garde son onglet Profil, rien n'y change. */
+function avatarBouton(){
+  const p = ui.monProfil || {};
+  const av = (typeof avatarHtml === 'function')
+    ? avatarHtml(p.avatar, 'avnav', p.pseudo)
+    : '<span class="av avnav">?</span>';
+  return '<button class="avbtn" onclick="go(\'profil\')" aria-label="Profil">'+av+'</button>';
 }
 
 /* ============================ Navigation ============================ */
@@ -270,7 +285,6 @@ function renderNav(){
     : (params.from || (view === 'personne' ? ((ui.personne||{}).nav||{}).ffrom : ''));
   const cur = (view === 'fiche' || view === 'personne') ? (depuis || 'decouvrir')
             : (view === 'reglages' || view === 'file' || view === 'acces') ? 'profil'
-            : view === 'guide' ? 'decouvrir'
             : view;
   const exp = !!ui.exploration;
 
@@ -278,9 +292,15 @@ function renderNav(){
      bas d'un téléphone n'a que quatre places, et la couverture y propose ses
      propres entrées. La typo des liens est celle de la maquette — pas de
      majuscules forcées, pas de soulignement. */
+  /* Guide-moi prend la place laissée par Profil, et se range juste après
+     Découvrir : les deux répondent à la même question — qu'est-ce que je
+     regarde ce soir. La classe `tel` est l'inverse de `dsk` : allumée par
+     app-mobile seulement, elle laisse la barre du bureau intacte. */
   const items = [
     { cl:'t-decouvrir', on: cur === 'decouvrir' && !exp, act:'go2Decouvrir()',
       ic:I.boussole, lab:'Découvrir' },
+    { cl:'t-guide tel', on: cur === 'guide', act:'allerGuide()',
+      ic:I.etincelle, lab:'Guide-moi' },
     { cl:'t-films dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'movie',
       act:"ouvrirCatalogue('movie')", ic:'', lab:'Films' },
     { cl:'t-series dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'tv',
