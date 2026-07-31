@@ -881,7 +881,8 @@ function regarderSoir(i){
    téléphone elle est reposée à plat (.minihaut) au-dessus des pilules :
    depuis la vitrine, ce sont elles qui portent Films et Séries. */
 function hsBarre(){
-  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div></div>';
+  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div>'+
+    avatarBouton()+'</div>';
 }
 
 /* ---------- Le Top de la bibliothèque ----------
