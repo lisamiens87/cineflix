@@ -784,6 +784,37 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
   color:#6f6f7c;box-shadow:inset 0 -2px 0 transparent}
 .pm.on{color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
 
+/* ---- L'écran « Par catégorie » : deux colonnes ----
+   Chacune défile pour son compte. C'est la raison d'être de la formule :
+   changer de genre ne doit jamais obliger à remonter la page. La hauteur est
+   figée sur celle de l'écran moins l'en-tête, la ligne de portée et la barre
+   du bas — sinon les deux colonnes s'allongent et le double défilement
+   disparaît. */
+.catdeux{display:flex;align-items:flex-start;border-top:1px solid var(--line)}
+.catg{flex:0 0 122px;border-right:1px solid var(--line);overflow-y:auto;
+  scrollbar-width:none;height:calc(100vh - 210px)}
+.catd{flex:1;min-width:0;overflow-y:auto;scrollbar-width:none;
+  height:calc(100vh - 210px);padding-top:8px}
+@supports (height:100dvh){
+  .catg,.catd{height:calc(100dvh - 210px)}
+}
+.catg::-webkit-scrollbar,.catd::-webkit-scrollbar{display:none}
+.catgi{display:block;width:100%;background:none;border:0;cursor:pointer;
+  padding:11px 12px;text-align:left;font-family:Archivo,Inter,sans-serif;
+  font-size:12px;font-weight:600;line-height:1.15;color:var(--muted)}
+.catgi.on{background:var(--surface);color:#fff;font-weight:800;
+  box-shadow:inset 3px 0 0 var(--accent)}
+.catray{display:flex;flex-wrap:wrap;gap:7px;padding:0 12px 10px}
+.catray .chip{height:auto;padding:7px 10px;border-radius:7px;background:var(--surface);
+  border:0;text-transform:none;letter-spacing:0;font-size:11.5px;color:#c9c9d4;
+  box-shadow:none;white-space:nowrap}
+.catray .chip.on{background:#fff;color:#0b0b0f}
+/* Deux affiches par ligne : 298 px de colonne les rendent PLUS grandes que
+   les trois d'une pleine largeur. */
+.catd .grid{grid-template-columns:1fr 1fr;padding:0 12px;gap:11px}
+.catvide{padding:22px 14px;font-family:Archivo,Inter,sans-serif;font-size:12px;
+  line-height:1.5;color:var(--muted);text-align:center}
+
 
 /* =========== Ajouts récents · Continuer la lecture (v2907x) ===========
    Les mêmes rangées que le Top, sans les chiffres détourés : le décalage
