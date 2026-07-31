@@ -33,3 +33,29 @@
   .hsmeta{font-size:11.5px}
   .sectitle{font-size:11.5px}
 }
+
+
+/* ========= Profil en haut, Guide-moi en bas (v2907z) =========
+   La barre du bas n'a que quatre places, et Profil en occupait une pour un
+   écran qu'on ouvre trois fois par mois. Il monte dans l'en-tête, à droite,
+   sur TOUS les écrans — l'avatar est dans le composant `header()` partagé,
+   plus la couverture qui a le sien. La place libérée revient au guide, qui
+   n'avait plus aucune entrée visible depuis la vitrine (2907y).
+
+   Le bureau ne voit rien de tout ça : sa barre horizontale garde Profil, et
+   aucun avatar n'apparaît dans ses en-têtes. */
+@media (max-width:859px){
+  .avbtn{display:block}
+  .tab.tel{display:flex}
+  .tab.t-profil{display:none}
+
+  /* Typo du guide d'un cran en dessous : sur 420 px de large, les tuiles
+     étaient des étiquettes plus que des boutons, et le titre de section
+     pesait autant que les affiches qu'il annonce. */
+  .envie{font-size:11.5px}
+  .envie s{font-size:16px}
+  .gquestion{font-size:17px}
+  .porteemots{font-size:12px}
+  .gname{font-size:11.5px}
+  .graison{font-size:10px}
+}
