@@ -90,12 +90,29 @@ function header(title, opts){
    PARTAGÉ — donc sur tous les écrans d'un coup, ce qui est la condition pour
    qu'il reste atteignable. Le bouton est éteint dans app-base et allumé par
    app-mobile : le bureau garde son onglet Profil, rien n'y change. */
+/* L'avatar se lisait dans `ui.monProfil` SEUL, qui n'est rempli qu'une fois le
+   profil redescendu du serveur. Au premier dessin de l'écran il était vide, le
+   repli tirait alors une couleur au hasard d'un pseudo absent et affichait
+   « ? » : d'où la pastille verte fluo, vue sur capture le 01/08.
+   On prend maintenant, dans l'ordre : l'avatar du serveur, celui que
+   l'APPAREIL garde pour cette identité (`db.foyer`, la même source que
+   « Qui regarde ce soir ? »), l'initiale du pseudo, et à défaut une
+   silhouette dans la palette de l'app. Jamais de point d'interrogation, et
+   jamais une couleur tirée de rien. */
 function avatarBouton(){
   const p = ui.monProfil || {};
-  const av = (typeof avatarHtml === 'function')
-    ? avatarHtml(p.avatar, 'avnav', p.pseudo)
-    : '<span class="av avnav">?</span>';
-  return '<button class="avbtn" onclick="go(\'profil\')" aria-label="Profil">'+av+'</button>';
+  const pseudo = db.pseudo || '';
+  let av = (p.avatar && p.avatar.type) ? p.avatar : null;
+  if(!av && pseudo){
+    const e = (db.foyer||[]).find(x => String(x.pseudo||'') === pseudo);
+    if(e && e.avatar && e.avatar.type) av = e.avatar;
+  }
+  let dedans;
+  if(typeof avatarHtml === 'function' && (av || pseudo))
+    dedans = avatarHtml(av, 'avnav', pseudo);
+  else
+    dedans = '<span class="av avnav avvide">'+I.user+'</span>';
+  return '<button class="avbtn" onclick="go(\'profil\')" aria-label="Profil">'+dedans+'</button>';
 }
 
 /* ============================ Navigation ============================ */
