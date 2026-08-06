@@ -744,7 +744,7 @@ function viewCategories(){
     else if(!g.res.length)
       droite += '<div class="catvide">Rien dans ce rayon. Essaie un rayon voisin, '+
         'ou élargis la recherche au-dessus.</div>';
-    else droite += '<div class="grid">'+g.res.map(carteGuide).join('')+'</div>';
+    else droite += '<div class="grid">'+g.res.filter(c => !rejete(c.id)).map(carteGuide).join('')+'</div>';
   }
 
   return h + '<div class="catdeux">'+
@@ -760,15 +760,53 @@ function guiderEncore(){
   guider(g.source || 'gouts', g.txt || '');
 }
 
+/* ---------- Le verdict ----------
+   Le guide se trompe environ une fois sur deux, et jusqu'ici PERSONNE ne
+   savait lesquelles. Un geste par affiche — « pas pour cette envie » — et
+   deux choses arrivent : le film sort de cette envie tout de suite, et on
+   commence à constituer le seul étalon qui permettra un jour de mesurer si
+   un changement de règle améliore ou dégrade. Sans lui, tout réglage est
+   une devinette, y compris ceux que j'ai faits hier.
+
+   RÉSERVE IMPORTANTE : ces verdicts vivent dans le stockage de CET appareil.
+   Ils ne deviendront un vrai étalon que le jour où ils monteront dans
+   Supabase — c'est la suite immédiate, et tant qu'elle n'est pas faite, un
+   effacement de données du navigateur les perd. */
+const cleEnvie = ()=> (ui.guide||{}).source || '';
+function rejetes(){ return ((db.pas||{})[cleEnvie()]) || []; }
+function rejete(id){ return rejetes().indexOf(id) >= 0; }
+function pasPourCa(id){
+  const k = cleEnvie();
+  if(!k) return;
+  if(!db.pas) db.pas = {};
+  if(!db.pas[k]) db.pas[k] = [];
+  if(db.pas[k].indexOf(id) < 0) db.pas[k].push(id);
+  saveDB();
+  toast('Écarté de cette envie');
+  render();
+}
+/* Toujours réversible, et d'un seul geste : un verdict pris par erreur ne
+   doit pas polluer l'étalon pour toujours. */
+function rendreLesEcartes(){
+  const k = cleEnvie();
+  if(k && db.pas) delete db.pas[k];
+  saveDB();
+  render();
+}
+
 /* ---------- L'écran ---------- */
 function carteGuide(c){
-  return '<button class="gcard" onclick="ouvrirFiche('+c.id+',\''+c.type+'\',\'guide\')">'+
-    '<div class="wrapimg">'+ posterEl(c.poster,'w342','',c.titre)+
-      (c.flix ? '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>' : '')+
-    '</div>'+
-    '<div class="gname">'+esc(c.titre)+'</div>'+
-    '<div class="graison">'+esc(raisonDe(c, (ui.guide||{}).recette))+'</div>'+
-  '</button>';
+  return '<div class="gcard">'+
+    '<button class="gouvre" onclick="ouvrirFiche('+c.id+',\''+c.type+'\',\'guide\')">'+
+      '<div class="wrapimg">'+ posterEl(c.poster,'w342','',c.titre)+
+        (c.flix ? '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>' : '')+
+      '</div>'+
+      '<div class="gname">'+esc(c.titre)+'</div>'+
+      '<div class="graison">'+esc(raisonDe(c, (ui.guide||{}).recette))+'</div>'+
+    '</button>'+
+    (cleEnvie() ? '<button class="gnon" title="Pas pour cette envie" '+
+      'aria-label="Pas pour cette envie" onclick="pasPourCa('+c.id+')">'+I.close+'</button>' : '')+
+  '</div>';
 }
 
 /* Une phrase qui dit exactement ce qu'on cherche, et surtout ce qu'on ne
@@ -851,7 +889,14 @@ function viewGuide(){
   h += '<div class="sectitle">'+esc(r.titre || 'Pour toi')+
     (r.dits && r.dits.length ? '<span class="cnt">'+esc(r.dits.join(' · '))+'</span>' : '')+
     '</div>';
-  h += '<div class="grid">'+g.res.map(carteGuide).join('')+'</div>';
+  /* Les films écartés par un verdict ne réapparaissent pas — y compris
+     après « Autre chose », qui relance la recherche. */
+  const vus = g.res.filter(c => !rejete(c.id));
+  h += '<div class="grid">'+vus.map(carteGuide).join('')+'</div>';
+  if(rejetes().length)
+    h += '<div class="wrap tiny muted center">'+rejetes().length+
+      ' écarté(s) de cette envie · <button class="lienplat" '+
+      'onclick="rendreLesEcartes()">tout remettre</button></div>';
   h += '<div class="wrap"><button class="btn ghost block" onclick="guiderEncore()">'+
     'Autre chose</button></div>';
   return h + '<div class="wrap tiny muted center" style="padding-bottom:26px">'+
