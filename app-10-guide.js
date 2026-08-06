@@ -609,6 +609,11 @@ async function guider(source, txt){
       if(g.vus[c.type+':'+c.id]) return false;             // déjà montré cette session
       const it = item(c.type, c.id);
       if(it && (it.fav || it.req)) return false;           // déjà vu passer, déjà demandé
+      /* « Tes abonnements » sert à trouver ce qu'on N'A PAS. Un titre déjà sur
+         le serveur n'y a rien à faire : il est déjà proposé par « chez toi »,
+         et il occupait une place utile. Les recommandations des totems en
+         faisaient entrer par une autre porte — ce filtre les attrape aussi. */
+      if(perim === 'plats' && c.flix) return false;
       return true;
     });
 
