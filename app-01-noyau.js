@@ -315,31 +315,23 @@ function tlrHtml(f, mini){
     (f.jv && !mini ? '<span class="tverdict">'+esc(f.jv)+'</span>' : '')+'</span>';
 }
 
-/* Une demande dont le titre vient d'entrer au catalogue : on le dit tout de
-   suite, en plus de la notification push envoyée par le NAS — comme ça la
-   bonne nouvelle arrive aussi à ceux qui n'ont pas activé les notifications. */
-function signalerArrivees(){
-  let venus = [];
-  try{
-    venus = Object.values(db.items).filter(it =>
-      it && it.req && !it.notifie && surCineflix(it.type, it.id));
-  }catch(e){ return; }
-  if(!venus.length) return;
-  venus.forEach(it => { it.notifie = 1; });
-  saveDB();
-  try{
-    toast(venus.length === 1
-      ? 'Bonne nouvelle : « '+(venus[0].titre || 'votre demande')+' » est disponible !'
-      : 'Bonne nouvelle : '+venus.length+' de vos demandes sont arrivées !');
-  }catch(e){}
-}
+/* RETIRÉ le 01/08. Cette fonction annonçait par un bandeau qu'une demande
+   venait d'arriver au catalogue. Elle marquait le titre `notifie` pour ne le
+   dire qu'une fois — mais `notifie` est un champ LOCAL, alors que `db.items`
+   est resynchronisé depuis Supabase, qui ne le porte pas. Le drapeau était
+   donc effacé à chaque connexion et le bandeau revenait à CHAQUE démarrage
+   (« Chasse gardée », signalé par Alexandre).
+   La bonne nouvelle continue d'arriver par deux chemins : la notification
+   push envoyée par le NAS, et la section « Tes demandes qui sont arrivées »
+   en tête de Ma liste. Si on veut un jour rétablir le bandeau, il faudra que
+   `notifie` voyage jusqu'à Supabase — sans ça il se répétera à nouveau. */
 
 async function chargerCatalogue(){
   /* Supabase d'abord quand il est configuré : c'est là que le NAS pousse le
      catalogue, et l'app servie en HTTPS ne pourrait de toute façon pas lire un
      fichier sur le NAS en HTTP. Le fichier local reste le mode de secours. */
   if(typeof sbPret === 'function' && sbPret() && connecte()){
-    try{ await catalogueDepuisSupabase(); signalerArrivees(); return; }
+    try{ await catalogueDepuisSupabase(); return; }
     catch(e){ CAT.charge = true; CAT.erreur = e.message || 'lecture impossible'; return; }
   }
   const url = db.catalogueUrl || './cineflix.json';
@@ -352,7 +344,6 @@ async function chargerCatalogue(){
     CAT.items = Array.isArray(d.items) ? d.items : [];
     CAT.maj   = d.maj || d.updated || null;
     CAT.charge = true; CAT.erreur = '';
-    signalerArrivees();
   }catch(e){
     CAT.charge = true;
     CAT.erreur = e.message || 'illisible';
