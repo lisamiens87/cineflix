@@ -753,6 +753,25 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .avbtn{display:none;background:none;border:0;padding:0;cursor:pointer;flex:none}
 .hsbar .avbtn{margin-left:auto}
 .avbtn .av{width:32px;height:32px;font-size:13px}
+/* Pas encore d'identité connue : une silhouette dans la palette, plutôt
+   qu'un « ? » sur une couleur tirée au hasard. */
+.avvide{background:var(--surface2);color:var(--muted)}
+.avvide svg{width:17px;height:17px;display:block}
+
+/* ---- « Pas pour cette envie » ----
+   La carte du guide était un bouton ; elle devient un conteneur avec DEUX
+   boutons — ouvrir la fiche, et écarter. Un bouton dans un bouton n'est pas
+   du HTML valide, d'où la découpe. `.gouvre` ne fait que reprendre l'aspect
+   que `.gcard` avait. */
+.gouvre{display:block;width:100%;padding:0;border:0;background:none;
+  text-align:left;color:inherit;font:inherit;cursor:pointer}
+.gnon{position:absolute;top:6px;right:6px;width:26px;height:26px;border:0;
+  border-radius:13px;background:rgba(11,11,15,.72);color:#fff;cursor:pointer;
+  display:grid;place-items:center;padding:0}
+.gnon svg{width:13px;height:13px;display:block}
+.gnon:active{background:var(--accent)}
+.lienplat{background:none;border:0;padding:0;cursor:pointer;font:inherit;
+  color:var(--accent);text-decoration:underline}
 .avbtn:active{opacity:.7}
 .tab.tel{display:none}
 
