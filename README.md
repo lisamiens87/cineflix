@@ -215,3 +215,4 @@ node test-supabase.js             # mode compte — 21 vérifications
 
 Données films et séries fournies par [TMDB](https://www.themoviedb.org/).
 Disponibilité en streaming fournie par JustWatch via TMDB.
+
