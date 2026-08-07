@@ -845,20 +845,3 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .t7c .aff{position:relative}
 .jauge{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);
   display:block}
-
-/* ---------- Le lecteur intégré (3007h) ----------
-   Plein écran, par-dessus tout : on regarde un film, rien d'autre. Les
-   commandes sont celles du navigateur (natives, connues, accessibles). */
-.lecteur{position:fixed;inset:0;z-index:200;background:#000;display:flex;
-  flex-direction:column}
-.lecteur video{flex:1;width:100%;min-height:0;background:#000}
-.lect-haut{position:absolute;top:0;left:0;right:0;z-index:2;display:flex;
-  align-items:center;gap:10px;padding:calc(10px + env(safe-area-inset-top)) 12px 10px;
-  background:linear-gradient(rgba(0,0,0,.65),transparent);pointer-events:none}
-.lect-haut button{pointer-events:auto}
-.lect-fermer{width:36px;height:36px;border:0;border-radius:50%;flex:none;
-  background:rgba(0,0,0,.55);color:#fff;font-size:16px;cursor:pointer}
-.lect-titre{color:#fff;font-weight:700;font-size:14px;
-  text-shadow:0 1px 3px #000;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.lect-panne{position:absolute;left:0;right:0;bottom:22%;z-index:2;text-align:center;
-  color:#fff;padding:0 16px;font-size:14px}
