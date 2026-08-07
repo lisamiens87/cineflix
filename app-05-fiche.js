@@ -84,30 +84,53 @@ function ouvrirPlateforme(id){
 }
 
 /* Un seul bouton principal, qui dit exactement où on en est :
-   Demander → Demandé → En cours → Regarder. Exception : quand la fiche est
-   ouverte depuis la vue « Plateformes », demander n'a pas de sens — le titre
-   se regarde là-bas. On affiche à la place le bouton de chaque plateforme
-   qui le propose. */
+   Demander → Demandé → En cours → Regarder.
+
+   Exception : quand le titre n'est PAS sur le serveur mais qu'une plateforme
+   d'abonnement le propose, c'est elle qu'il faut montrer — « Demander » n'est
+   pas la première chose à faire d'un film qu'on peut lancer tout de suite.
+
+   Jusqu'en 3007d cette exception était conditionnée par `ui.presence`,
+   c'est-à-dire par l'ONGLET de Découvrir ouvert en dernier. Le même film,
+   avec les mêmes données, changeait donc de bouton selon la porte par
+   laquelle on arrivait : « Netflix » depuis l'onglet Plateformes, mais
+   « Demander sur Cinéflix » depuis le guide, la recherche ou l'accueil.
+   Vérifié le 06/08 sur « The Debt Collector » — sur Netflix, absent du
+   serveur, et l'app proposait de le demander. Le bouton suit désormais le
+   FILM, plus la provenance. */
 function actionsFiche(o, type){
   const st = statut(type, o.id);
   const it = item(type, o.id);
   const fav = !!(it && it.fav);
   const ref = 'ficheObjet()';
 
-  if(ui.presence === 'plats' && st !== 'obtenu'){
-    const dispo = platsDuTitre(o);
-    if(dispo.length){
-      /* Chaque bouton porte le sigle et la couleur de sa plateforme. */
-      const boutons = dispo.map(pf =>
-        '<button class="btn plat '+pf.cl+'" onclick="ouvrirPlateforme('+pf.id+')">'+
-        (pf.logo ? '<img class="plogo" src="'+IMG(pf.logo,'w92')+'" alt="">' : '')+
-        esc(pf.nom)+'</button>').join('');
-      const coeurP = '<button class="btn ghost" style="flex:0 0 54px'+(fav?';color:var(--accent)':'')+
-        '" onclick="basculerFavori('+ref+',\''+type+'\');render()" aria-label="Favori">'+
-        (fav ? I.coeurPlein : I.coeur)+'</button>';
-      return '<div class="actions plats">'+boutons+coeurP+'</div>';
-    }
-    /* Aucune des quatre ne l'a (cas limite) : on retombe sur le bouton normal. */
+  const coeur = '<button class="btn ghost" style="flex:0 0 54px'+(fav?';color:var(--accent)':'')+
+    '" onclick="basculerFavori('+ref+',\''+type+'\');render()" aria-label="Favori">'+
+    (fav ? I.coeurPlein : I.coeur)+'</button>';
+
+  /* Le posséder passe avant tout : inutile d'envoyer vers Netflix un film
+     qui est déjà chez soi, en meilleure qualité et sans abonnement. */
+  const dispo = st === 'obtenu' ? [] : platsDuTitre(o);
+  if(dispo.length){
+    /* Chaque bouton porte le sigle et la couleur de sa plateforme. */
+    const boutons = dispo.map(pf =>
+      '<button class="btn plat '+pf.cl+'" onclick="ouvrirPlateforme('+pf.id+')">'+
+      (pf.logo ? '<img class="plogo" src="'+IMG(pf.logo,'w92')+'" alt="">' : '')+
+      esc(pf.nom)+'</button>').join('');
+    /* « Demander sur Cinéflix » ne disparaît pas pour autant, il descend d'un
+       rang : être sur Netflix aujourd'hui n'empêche pas de vouloir le titre
+       chez soi pour toujours. Et si la demande est déjà partie, c'est son
+       état qu'on rappelle plutôt qu'une invitation à la refaire. */
+    const second =
+      (st === 'demande' || st === 'encours')
+        ? '<button class="lienplat" onclick="menuDemande('+o.id+',\''+type+'\')">'+
+          (st === 'demande' ? 'Déjà demandé sur Cinéflix' : 'En cours d’ajout sur Cinéflix')+'</button>'
+      : st === 'refuse'
+        ? '<button class="lienplat" onclick="menuDemande('+o.id+',\''+type+'\')">Demande refusée</button>'
+        : '<button class="lienplat" onclick="demander('+ref+',\''+type+'\');render()">'+
+          'Le demander aussi sur Cinéflix</button>';
+    return '<div class="actions plats">'+boutons+coeur+'</div>'+
+           '<div class="credit">'+second+'</div>';
   }
 
   let principal;
@@ -127,10 +150,6 @@ function actionsFiche(o, type){
     principal = '<button class="btn" onclick="demander('+ref+',\''+type+'\');render()">'+
       I.envoi+' Demander sur Cinéflix</button>';
   }
-
-  const coeur = '<button class="btn ghost" style="flex:0 0 54px'+(fav?';color:var(--accent)':'')+
-    '" onclick="basculerFavori('+ref+',\''+type+'\');render()" aria-label="Favori">'+
-    (fav ? I.coeurPlein : I.coeur)+'</button>';
 
   return '<div class="actions">'+principal+coeur+'</div>';
 }
@@ -185,13 +204,28 @@ function menuDemande(id, type){
 
 /* ---------- Où regarder (JustWatch via TMDB) ---------- */
 function blocPlateformes(o){
-  /* Sur la vue Plateformes, l'information est déjà dans les boutons
-     d'action : répéter « Aussi en streaming » ferait doublon. */
-  if(ui.presence === 'plats') return '';
   const p = ((o['watch/providers']||{}).results||{})[db.region||'FR'];
   if(!p) return '';
-  const abo = p.flatrate || [];
+  let abo = p.flatrate || [];
   if(!abo.length) return '';
+
+  /* Ne pas répéter ce que les boutons d'action montrent déjà. Deux doublons
+     à écarter, et le second n'est pas évident : TMDB liste les déclinaisons
+     d'un même service comme des fournisseurs distincts — « Netflix » ET
+     « Netflix Standard with Ads », « Canal+ » ET « Canal+ Ciné Séries ».
+     Sur Carry-On, la section affichait donc Netflix deux fois de suite
+     (signalé par Alexandre le 06/08). On filtre sur le NOM, pas seulement
+     sur l'identifiant, pour attraper aussi les déclinaisons.
+     Ce qui reste — HBO Max, chaînes tierces — garde tout son intérêt :
+     c'est justement ce que les quatre boutons ne disent pas. */
+  const enBoutons = statut(params.type, o.id) !== 'obtenu' ? platsDuTitre(o) : [];
+  if(enBoutons.length){
+    abo = abo.filter(f => !enBoutons.some(pf =>
+      f.provider_id === pf.id ||
+      (f.provider_name||'').toLowerCase().indexOf(pf.nom.toLowerCase()) >= 0));
+    if(!abo.length) return '';
+  }
+
   return '<div class="sectitle">Aussi en streaming</div><div class="plats">'+
     abo.map(f=>'<div class="plato">'+
       (f.logo_path ? '<img loading="lazy" src="'+IMG(f.logo_path,'w92')+'" alt="">' : '')+
