@@ -29,7 +29,7 @@ window.CINEFLIX = {
      et le service worker exige de toute façon un contexte sécurisé.
      L'IP Tailscale reste en secours pour un accès en HTTP simple.        */
   jellyfinHosts: [
-    // 'https://truenas87.<ton-tailnet>.ts.net:8443',   // via tailscale serve
+    'https://truenas-scale.tail000ddb.ts.net',          // tailscale serve (06/08)
     'http://100.95.13.53:30013'                         // Truenas87, IP Tailscale
   ],
 
