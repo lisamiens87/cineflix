@@ -5,7 +5,7 @@
    afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
 
    VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
-const BUILD = '3007d';
+const BUILD = '3007e';
 const CACHE = 'cineflix-' + BUILD;
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
                './app-base.css', './app-mobile.css', './app-site.css', './config.js', './app-01-noyau.js', './app-02-outils.js',
