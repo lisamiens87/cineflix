@@ -184,7 +184,172 @@ function ouvrirJellyfin(titre, jf){
 function regarder(id, type){
   const o = ficheObjet();
   const f = typeof ficheDe === 'function' ? ficheDe(type, id) : null;
-  ouvrirJellyfin(o.title || o.name || '', (f && f.jf) || '');
+  lireOuOuvrir(o.title || o.name || (f && f.nom) || '', f);
+}
+
+/* ==================== La lecture DANS Cinéflix (3007h) ====================
+   « Je veux cliquer sur le bouton et que ça fonctionne, sans recliquer sur
+   Play dans Jellyfin. » Jellyfin n'ayant AUCUNE adresse qui démarre une
+   lecture (demandé par ses utilisateurs depuis 2022, jamais fait), la seule
+   voie est notre propre lecteur : la vidéo est demandée à l'API du serveur —
+   joignable en HTTPS depuis 3007g — et jouée ici, dans un <video> plein
+   écran. L'onglet Jellyfin ne sert plus que de secours.
+
+   L'API ne sert pas une vidéo à un inconnu : à la première lecture, l'app
+   demande UNE FOIS l'identifiant et le mot de passe Jellyfin, les échange
+   contre un jeton, et ne conserve QUE le jeton. */
+
+/* L'aiguillage commun à tous les boutons « Regarder » (fiche et vitrine) :
+   lire ici quand on le peut, ouvrir Jellyfin sinon. */
+function lireOuOuvrir(titre, f){
+  const jf = (f && f.jf) || '';
+  if(jf && /^https:/.test(jellyBase || '')){
+    if(!db.jfToken) return demanderConnexionJellyfin(jf, titre, (f && f.pos) || 0);
+    return lireDansCineflix(jf, titre, (f && f.pos) || 0);
+  }
+  ouvrirJellyfin(titre, jf);
+}
+
+/* Un identifiant d'appareil stable : Jellyfin s'en sert pour distinguer les
+   sessions (et pour suivre une conversion en cours). */
+function jfDevice(){
+  if(!db.jfDevice){ db.jfDevice = 'cx-'+Math.random().toString(36).slice(2, 10); saveDB(); }
+  return db.jfDevice;
+}
+function jfEntete(){
+  return 'MediaBrowser Client="Cineflix", Device="Cineflix", DeviceId="'+jfDevice()+
+         '", Version="1.0"'+(db.jfToken ? ', Token="'+db.jfToken+'"' : '');
+}
+
+function demanderConnexionJellyfin(jf, titre, pos){
+  ui.lectureVoulue = { jf:jf, titre:titre, pos:pos || 0 };
+  const propose = (ui.monProfil && ui.monProfil.jellyfin) || (CFG.jellyfinUsers || [])[0] || '';
+  openSheet('<h3>Ton compte Jellyfin</h3>'+
+    '<p class="small muted" style="margin:0 0 8px">Une seule fois : le serveur ne lance un film '+
+    'que pour quelqu\'un qu\'il connaît. Seul un jeton est conservé — jamais le mot de passe.</p>'+
+    '<label class="fld"><span>Utilisateur</span>'+
+      '<input type="text" id="jfu" autocomplete="username" value="'+esc(propose)+'"></label>'+
+    '<label class="fld"><span>Mot de passe</span>'+
+      '<input type="password" id="jfp" autocomplete="current-password"></label>'+
+    '<div id="jferr" class="small" style="color:#e66;margin:4px 0"></div>'+
+    '<button class="opt" onclick="connexionJellyfin()">Connecter et lire</button>'+
+    '<button class="opt" onclick="closeSheet()">Annuler</button>');
+}
+
+async function connexionJellyfin(){
+  const u = (document.getElementById('jfu') || {}).value || '';
+  const p = (document.getElementById('jfp') || {}).value || '';
+  const err = document.getElementById('jferr');
+  try{
+    const r = await fetch(jellyBase+'/Users/AuthenticateByName', { method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization': jfEntete() },
+      body: JSON.stringify({ Username:u, Pw:p }) });
+    if(!r.ok){
+      if(err) err.textContent = (r.status === 401 || r.status === 403)
+        ? 'Le serveur refuse ces identifiants.'
+        : 'Le serveur a répondu '+r.status+'.';
+      return;
+    }
+    const d = await r.json();
+    db.jfToken = d.AccessToken || ''; db.jfUserId = (d.User || {}).Id || ''; saveDB();
+    closeSheet();
+    const a = ui.lectureVoulue; ui.lectureVoulue = null;
+    if(a) lireDansCineflix(a.jf, a.titre, a.pos);
+  }catch(e){
+    if(err) err.textContent = 'Serveur injoignable — cet appareil est-il sur le réseau Tailscale ?';
+  }
+}
+
+let lectureEnCours = null;
+
+async function lireDansCineflix(jf, titre, pos){
+  /* PlaybackInfo sert ici de contrôle du jeton : périmé → on redemande. */
+  try{
+    const r = await fetch(jellyBase+'/Items/'+jf+'/PlaybackInfo?UserId='+
+        encodeURIComponent(db.jfUserId || ''), { headers:{ 'Authorization': jfEntete() } });
+    if(r.status === 401 || r.status === 403){
+      db.jfToken = ''; saveDB();
+      return demanderConnexionJellyfin(jf, titre, pos);
+    }
+  }catch(e){ /* serveur muet : le <video> le dira mieux que nous */ }
+
+  /* Deux tuyaux, essayés dans l'ordre — mesuré le 07/08 :
+     1. le fichier TEL QUEL (`Static=true`) : premier paquet en ~12 ms, et
+        Chrome répond « probably » aux MKV h264/aac de la bibliothèque ;
+     2. s'il ne sait pas le lire, conversion mp4 à la volée par le serveur.
+     Et en dernier recours seulement, l'onglet Jellyfin.
+     La reprise : minutes vues (champ `pos` du NAS) → ticks Jellyfin (100 ns).
+     En direct c'est le <video> qui se place ; en conversion, le serveur. */
+  const debut = Math.max(0, Number(pos) || 0) * 60 * 10000000;
+  const srcDirect = jellyBase+'/Videos/'+jf+'/stream?Static=true&api_key='+
+      encodeURIComponent(db.jfToken);
+  const srcConv = jellyBase+'/Videos/'+jf+'/stream.mp4?api_key='+
+      encodeURIComponent(db.jfToken)+
+      '&DeviceId='+encodeURIComponent(jfDevice())+
+      '&VideoCodec=h264&AudioCodec=aac&TranscodingMaxAudioChannels=2'+
+      '&VideoBitrate=12000000&AudioBitrate=192000'+
+      (debut ? '&StartTimeTicks='+debut : '');
+
+  const boite = document.createElement('div');
+  boite.className = 'lecteur';
+  boite.innerHTML = '<div class="lect-haut">'+
+      '<button class="lect-fermer" onclick="fermerLecteur()" aria-label="Fermer">✕</button>'+
+      '<div class="lect-titre">'+esc(titre || '')+'</div></div>'+
+    '<video id="lectvid" autoplay controls playsinline></video>';
+  document.body.appendChild(boite);
+
+  const v = document.getElementById('lectvid');
+  lectureEnCours = { jf:jf, titre:titre, video:v, boite:boite,
+                     debutTicks:0, essai:'direct', minuteur:0 };
+  v.src = srcDirect;
+  if(debut) v.currentTime = debut / 10000000;
+
+  /* Le serveur est tenu au courant : c'est lui qui porte « continuer la
+     lecture » et « vu » — pour TON compte, plus celui d'un seul foyer. */
+  signalerJf('/Sessions/Playing');
+  lectureEnCours.minuteur = setInterval(()=> signalerJf('/Sessions/Playing/Progress'), 10000);
+  v.addEventListener('ended', fermerLecteur);
+  v.addEventListener('error', ()=>{
+    const l = lectureEnCours;
+    if(!l || l.video !== v) return;
+    if(l.essai === 'direct'){
+      l.essai = 'conv'; l.debutTicks = debut;
+      v.src = srcConv;
+      v.play().catch(()=>{});
+      return;
+    }
+    boite.insertAdjacentHTML('beforeend',
+      '<div class="lect-panne">La vidéo n\'a pas pu être lue dans l\'app. '+
+      '<button class="lienplat" onclick="lecteurVersJellyfin()">Ouvrir dans Jellyfin</button></div>');
+  });
+}
+
+function positionTicks(){
+  const l = lectureEnCours;
+  return l ? Math.floor(l.debutTicks + (l.video.currentTime || 0) * 10000000) : 0;
+}
+function signalerJf(chemin){
+  const l = lectureEnCours;
+  if(!l || !db.jfToken) return;
+  fetch(jellyBase + chemin, { method:'POST',
+    headers:{ 'Content-Type':'application/json', 'Authorization': jfEntete() },
+    body: JSON.stringify({ ItemId: l.jf, PositionTicks: positionTicks(),
+                           PlayMethod:'Transcode' }) }).catch(()=>{});
+}
+function fermerLecteur(){
+  const l = lectureEnCours;
+  if(!l) return;
+  signalerJf('/Sessions/Playing/Stopped');
+  clearInterval(l.minuteur);
+  lectureEnCours = null;
+  try{ l.video.pause(); l.video.removeAttribute('src'); l.video.load(); }catch(e){}
+  l.boite.remove();
+}
+function lecteurVersJellyfin(){
+  const l = lectureEnCours;
+  const a = l ? { jf:l.jf, titre:l.titre } : null;
+  fermerLecteur();
+  if(a) ouvrirJellyfin(a.titre, a.jf);
 }
 
 function menuDemande(id, type){
