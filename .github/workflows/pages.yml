@@ -3,13 +3,18 @@
 # deployment »). Un seul changement de fond, mais il est décisif :
 #
 # L'outil actions/deploy-pages attend que les serveurs Pages disent « publié ».
-# Par défaut il abandonne au bout de 10 minutes ET ANNULE la publication en
-# cours — même quand elle avançait normalement. Le 06/08 les serveurs Pages
-# ont mis plus de 10 minutes : cinq livraisons de suite ont été tuées par ce
-# minuteur alors que le paquet était bon (« Canceled deployment with ID … »
-# juste après « deployment_in_progress »).
+# Il abandonne au bout de 10 minutes ET ANNULE la publication en cours — même
+# quand elle avançait normalement. Le 06/08 les serveurs Pages ont mis plus de
+# 10 minutes : cinq livraisons de suite ont été tuées par ce minuteur alors
+# que le paquet était bon (« Canceled deployment with ID … » juste après
+# « deployment_in_progress »).
 #
-# Ici le minuteur passe à 60 minutes. On attend, on n'annule pas.
+# On ne peut PAS allonger ce minuteur : une première version de ce fichier
+# demandait 60 minutes, et le log a répondu « timeout value is greater than
+# the allowed maximum — set to the maximum of 600000 milliseconds ». Dix
+# minutes est un PLAFOND de GitHub. La parade est ailleurs : RÉESSAYER.
+# Deux tentatives de secours suivent la première — un jour lent, ça fait
+# jusqu'à trois fois dix minutes de patience au lieu d'un seul abandon.
 #
 # Second garde-fou : cancel-in-progress reste à false. Quand on pousse
 # plusieurs commits d'affilée, chaque nouveau NE tue PAS le déploiement
@@ -54,7 +59,14 @@ jobs:
       - name: Publier
         id: publication
         uses: actions/deploy-pages@v4
-        with:
-          timeout: 3600000
-          error_count: 20
-          reporting_interval: 15000
+        continue-on-error: true
+
+      - name: Publier (2e essai)
+        id: essai2
+        if: steps.publication.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        continue-on-error: true
+
+      - name: Publier (3e essai)
+        if: steps.publication.outcome == 'failure' && steps.essai2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
