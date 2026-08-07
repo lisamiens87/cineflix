@@ -871,10 +871,8 @@ function regarderSoir(i){
   const h = (ui.heroSoirs||[])[i||0] || ui.heroSoir;
   if(!h) return;
   const f = ficheDe('movie', h.id);
-  /* Même aiguillage que la fiche (3007h) : lire DANS l'app quand on le
-     peut, ouvrir Jellyfin en secours. */
-  if(f && f.jf && typeof lireOuOuvrir === 'function')
-    return lireOuOuvrir(h.nom, f);
+  if(f && f.jf && typeof ouvrirJellyfin === 'function')
+    return ouvrirJellyfin(h.nom, f.jf);
   ouvrirFiche(h.id, 'movie');
 }
 
