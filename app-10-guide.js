@@ -803,9 +803,12 @@ function rendreLesEcartes(){
 function carteGuide(c){
   return '<div class="gcard">'+
     '<button class="gouvre" onclick="ouvrirFiche('+c.id+',\''+c.type+'\',\'guide\')">'+
-      '<div class="wrapimg">'+ posterEl(c.poster,'w342','',c.titre)+
-        (c.flix ? '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>' : '')+
-      '</div>'+
+      /* Pas de coche « sur Cinéflix » ici (retirée en 3007j, demande
+         d'Alexandre) : en « chez toi » TOUT l'est — la coche était partout,
+         donc muette — et en « tes abonnements » plus rien ne l'est depuis
+         3007d. Savoir si on possède UN film précis, c'est le travail de la
+         recherche, pas du guide. */
+      '<div class="wrapimg">'+ posterEl(c.poster,'w342','',c.titre)+'</div>'+
       '<div class="gname">'+esc(c.titre)+'</div>'+
       '<div class="graison">'+esc(raisonDe(c, (ui.guide||{}).recette))+'</div>'+
     '</button>'+
