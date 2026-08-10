@@ -845,3 +845,9 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .t7c .aff{position:relative}
 .jauge{position:absolute;left:0;bottom:0;height:3px;background:var(--accent);
   display:block}
+
+/* Le quatrième onglet des sources (10/08) : « Tout », en gris neutre — les
+   trois couleurs disent un endroit, le gris dit « pas de condition ». */
+.chip.c-tout{border-color:#8b93a780}
+.chip.c-tout.on{background:#8b93a7;border-color:#8b93a7;color:#10131a}
+.souschips .chip.c-tout.on{box-shadow:inset 0 -2px 0 #aab2c5}
