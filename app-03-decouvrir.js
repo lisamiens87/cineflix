@@ -900,10 +900,12 @@ function assurerTopBib(){
      sélection change chaque matin, la qualité jamais. Le tirage est semé
      par la DATE : stable toute la journée, et identique sur le téléphone,
      la tablette et le bureau. */
-  const vivier = (CAT.items||[]).filter(i => i && i.t === 'movie' && (i.noteCrit||0) >= 80)
-    .sort((a,b)=>((b.noteCrit||0)+(b.jt||0)*5+(b.note||0)) -
-                 ((a.noteCrit||0)+(a.jt||0)*5+(a.note||0)))
-    .slice(0, 30);
+  /* Presse >= 90, sans plafond : 338 films chez Alexandre (10/08). Le
+     plafond a 30 etait arbitraire — le classement est si serre en haut que
+     le 100e portait encore une note presse de 100 ; couper a 30 ecartait
+     des chefs-d'oeuvre pour rien. La regle est desormais lisible :
+     « le top = la creme, notee 90 et plus ». */
+  const vivier = (CAT.items||[]).filter(i => i && i.t === 'movie' && (i.noteCrit||0) >= 90);
   if(vivier.length < 5) return;
   let graine = Number(todayISO().replace(/-/g, ''));
   const alea = ()=>{ graine = (graine * 1103515245 + 12345) % 2147483648;
