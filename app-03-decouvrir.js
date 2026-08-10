@@ -892,11 +892,27 @@ function hsBarre(){
 let topReq = false;
 function assurerTopBib(){
   if(ui.topBib || topReq) return;
-  const l = (CAT.items||[]).filter(i => i && i.t === 'movie' && (i.noteCrit||0) >= 80)
+  /* Le vivier : les 30 meilleurs films, toujours jugés pareil — presse à
+     80 et plus, bonus Télérama, note du public. Jusqu'en 3007j on affichait
+     éternellement les 7 premiers : un tableau d'honneur figé, la même
+     vitrine tous les matins, qu'on finit par ne plus voir. Depuis 3007k
+     (demande d'Alexandre) on pioche les 7 DU JOUR dans ce vivier : la
+     sélection change chaque matin, la qualité jamais. Le tirage est semé
+     par la DATE : stable toute la journée, et identique sur le téléphone,
+     la tablette et le bureau. */
+  const vivier = (CAT.items||[]).filter(i => i && i.t === 'movie' && (i.noteCrit||0) >= 80)
     .sort((a,b)=>((b.noteCrit||0)+(b.jt||0)*5+(b.note||0)) -
                  ((a.noteCrit||0)+(a.jt||0)*5+(a.note||0)))
-    .slice(0,7);
-  if(l.length < 5) return;
+    .slice(0, 30);
+  if(vivier.length < 5) return;
+  let graine = Number(todayISO().replace(/-/g, ''));
+  const alea = ()=>{ graine = (graine * 1103515245 + 12345) % 2147483648;
+                     return graine / 2147483648; };
+  for(let i = vivier.length - 1; i > 0; i--){
+    const j = Math.floor(alea() * (i + 1));
+    const t = vivier[i]; vivier[i] = vivier[j]; vivier[j] = t;
+  }
+  const l = vivier.slice(0, 7);
   topReq = true;
   Promise.all(l.map(c => tmdb('/movie/'+c.id).catch(()=>null))).then(fs=>{
     ui.topBib = l.map((c,i)=>({ id:c.id, nom:c.nom,
