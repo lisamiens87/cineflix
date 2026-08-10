@@ -5,17 +5,20 @@
    au repos, la couleur pleine quand il est actif. */
 const TYPES = [ {id:'movie', label:'Films', cl:'c-films'}, {id:'tv', label:'Séries', cl:'c-series'} ];
 
-/* Les trois sources, réparties sur la largeur de l'écran :
-   « Cinéma »      — tout le catalogue TMDB ;
-   « Plateformes » — ce qui est en streaming par abonnement en France
-                     (Canal+, Netflix, Prime Video, Disney+) ;
-   « Cinéflix »    — la bibliothèque du serveur, et elle seule. */
+/* Les quatre sources, du plus proche au plus large (revu le 10/08 avec
+   Alexandre — avant, « Cinéma » voulait dire « tout TMDB », et rien ne
+   montrait ce qui passe RÉELLEMENT en salle) :
+   « Cinéflix »    — la bibliothèque du serveur, et elle seule ;
+   « Plateformes » — en illimité sur les abonnements, en France ;
+   « Au cinéma »   — à l'affiche en salle EN CE MOMENT ;
+   « Tout »        — le catalogue TMDB entier, sans condition. */
 const PRESENCES = [
-  { id:'tout',  cl:'c-cinema' },                    // « Cinéma » / « Séries »
+  { id:'dispo', label:'Cinéflix',    cl:'c-flix' },
   { id:'plats', label:'Plateformes', cl:'c-plats' },
-  { id:'dispo', label:'Cinéflix',    cl:'c-flix' }
+  { id:'cine',  label:'Au cinéma',   cl:'c-cinema' },
+  { id:'tout',  label:'Tout',        cl:'c-tout' }
 ];
-const labelTout = ()=> ui.disc.type === 'movie' ? 'Cinéma' : 'Séries';
+const labelTout = ()=> 'Tout';
 
 /* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
    et l'adresse de leur recherche — pour ouvrir un titre directement chez elles. */
@@ -143,6 +146,18 @@ function discParams(){
     p.watch_region = db.region || 'FR';
     p.with_watch_providers = (d.plats && d.plats.length) ? d.plats.join('|') : FOURNISSEURS;
     p.with_watch_monetization_types = 'flatrate';
+  }
+  /* Vue « Au cinéma » : réellement à l'affiche en salle. `region` fait
+     porter le filtre sur les dates de sortie FRANÇAISES (l'entorse à la
+     règle « pas de region ici » est assumée : sur cette vue, c'est la date
+     française qui compte), et release_type 2|3 = avant-première + salle.
+     Six semaines : la durée de vie d'un film à l'affiche. Les séries ne
+     passent pas en salle — en mode Séries, le bouton n'existe pas. */
+  if(ui.presence === 'cine' && type === 'movie'){
+    p.region = db.region || 'FR';
+    p.with_release_type = '2|3';
+    p['release_date.lte'] = todayISO();
+    p['release_date.gte'] = new Date(Date.now() - 42*864e5).toISOString().slice(0,10);
   }
   const ids = d.genres.map(n => genreParNom(type, n)).filter(x => x != null);
   if(ids.length) p.with_genres = ids.join(',');
@@ -567,6 +582,8 @@ function corpsDecouverte(){
 /* ---------- Actions ---------- */
 function setType(t){
   if(ui.disc.type === t) return;
+  /* « Au cinéma » n'existe que pour les films. */
+  if(t === 'tv' && ui.presence === 'cine') ui.presence = 'tout';
   ui.disc.type = t;
   if(enRecherche()){
     clearTimeout(searchTimer); abortSearch();
@@ -1005,7 +1022,8 @@ function viewDecouvrir(){
           '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
       '</div>'+
       '<div class="souschips">'+
-        PRESENCES.map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
+        PRESENCES.filter(p => p.id !== 'cine' || ui.disc.type === 'movie')
+          .map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
           '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
       '</div>'+
       '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
