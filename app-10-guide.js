@@ -174,13 +174,16 @@ function couvertureMC(){
 const PERIMS = [
   { id:'flix',  label:'Cinéflix',    cl:'c-flix' },
   { id:'plats', label:'Plateformes', cl:'c-plats' },
-  { id:'tout',  label:'Cinéma',      cl:'c-cinema' }
+  { id:'cine',  label:'Au cinéma',   cl:'c-cinema' },
+  { id:'tout',  label:'Tout',        cl:'c-tout' }
 ];
 const perimGuide = ()=> (ui.guide && ui.guide.perim) || 'flix';
-/* Les mêmes trois portées, dites en français dans le guide. Le catalogue
-   garde ses onglets colorés « Cinéflix / Plateformes / Cinéma » : là-bas
-   c'est un filtre de liste, ici c'est la phrase « je cherche … ». */
-const MOTS_PERIM = { flix:'chez toi', plats:'tes abonnements', tout:'au cinéma' };
+/* Les mêmes quatre portées, dites en français dans le guide. Le catalogue
+   garde ses onglets colorés : là-bas c'est un filtre de liste, ici c'est la
+   phrase « je cherche … ». Depuis le 10/08, « au cinéma » veut ENFIN dire
+   l'affiche du moment — avant, c'était le nom trompeur de « tout ». */
+const MOTS_PERIM = { flix:'chez toi', plats:'tes abonnements',
+                     cine:'au cinéma', tout:'partout' };
 
 const platsProfil = ()=> {
   const g = GOUTS.d || {};
@@ -324,6 +327,8 @@ function vivierCineflix(r, revoir){
    mode « plats » restreint aux abonnements du profil (à défaut, les quatre
    plateformes connues) ; mode « tout » n'impose aucune disponibilité. */
 async function vivierTmdb(r, pages, mode){
+  /* Les séries ne passent pas en salle. */
+  if(mode === 'cine' && r.type === 'tv') return [];
   const plats = mode === 'plats'
     ? (platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id))
     : [];
@@ -339,7 +344,16 @@ async function vivierTmdb(r, pages, mode){
      Les humeurs gardent la popularité : là, la nouveauté est un plus. */
   const base = { include_adult:'false',
                  sort_by: r.taxo ? 'vote_count.desc' : 'popularity.desc' };
-  if(plats.length){
+  if(mode === 'cine'){
+    /* À l'affiche en France en ce moment — mêmes réglages que la vue
+       « Au cinéma » du catalogue. La popularité prime : sur les sorties de
+       la semaine, c'est elle qui dit ce que les salles poussent. */
+    base.sort_by = 'popularity.desc';
+    base.region = db.region || 'FR';
+    base.with_release_type = '2|3';
+    base['release_date.lte'] = todayISO();
+    base['release_date.gte'] = new Date(Date.now() - 42*864e5).toISOString().slice(0,10);
+  }else if(plats.length){
     base.watch_region = db.region || 'FR';
     base.with_watch_providers = plats.join('|');
     base.with_watch_monetization_types = 'flatrate';
@@ -418,8 +432,9 @@ async function vivierTotems(r){
   /* Celles qui sont déjà sur le serveur passent sans vérification. Pour les
      autres, on interroge les fournisseurs — mais pas indéfiniment : vingt
      titres au maximum, sinon l'écran met dix secondes à s'afficher. */
-  /* Hors Cinéflix, tout est proposable : plus rien à vérifier. */
-  if(perimGuide() === 'tout') return bruts;
+  /* Hors Cinéflix, tout est proposable : plus rien à vérifier. En mode
+     « au cinéma », TMDB a déjà restreint à l'affiche du moment. */
+  if(perimGuide() === 'tout' || perimGuide() === 'cine') return bruts;
   const dedans = bruts.filter(c => c.flix);
   const aTester = plats.length ? bruts.filter(c => !c.flix).slice(0, 20) : [];
   for(let i = 0; i < aTester.length; i += 5){
@@ -574,7 +589,10 @@ async function guider(source, txt){
     const perim = perimGuide();
     const [externes, totems] = await Promise.all([
       perim === 'flix' ? Promise.resolve([]) : vivierTmdb(r, 3, perim).catch(()=>[]),
-      source === 'gouts' ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
+      /* Les recommandations des totems piochent dans tout le cinéma : en
+         mode « au cinéma », elles feraient entrer des films qui ne sont
+         plus en salle. */
+      (source === 'gouts' && perim !== 'cine') ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
     ]);
     if(seq !== guideSeq) return;
 
@@ -828,6 +846,8 @@ function portee(){
       ? 'Ce qui est en illimité sur tes abonnements — regardable ce soir, ailleurs que sur le serveur.'
       : 'Ce qui est en illimité sur Netflix, Prime Video, Disney+ ou Canal+. '+
         'Précise tes abonnements dans « Mes goûts » pour resserrer.';
+  if(p === 'cine')
+    return 'Uniquement ce qui est à l\'affiche en salle en ce moment.';
   return 'Tout le cinéma, sans condition de disponibilité : '+
          'ce qui n\'est pas sur le serveur sera à demander.';
 }
