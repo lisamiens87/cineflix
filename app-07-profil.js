@@ -189,6 +189,10 @@ function viewReglages(){
           (jellyBase ? 'Actuellement joignable : <b>'+esc(jellyBase)+'</b>.'
                      : 'Aucune ne répond pour l\'instant — hors tailnet ?')
         : 'Utilisée par le bouton « Regarder ».')+'</em></label>'+
+    '<label class="fld"><span>Ta ville</span>'+
+      '<input type="text" id="rgville" value="'+esc(db.ville||'')+'" placeholder="ex. Limoges">'+
+      '<em>Sert au bouton « Séances près de chez moi » des films à l\'affiche. '+
+      'Reste sur cet appareil, comme les autres réglages.</em></label>'+
     '<button class="btn block" onclick="enregistrerReglages()">Enregistrer</button>'+
   '</div>';
 
@@ -216,6 +220,7 @@ function enregistrerReglages(){
   db.region = (document.getElementById('rgregion')||{}).value || 'FR';
   db.catalogueUrl = v('rgcat') || CFG.catalogue || './cineflix.json';
   db.jellyfin = v('rgjelly');
+  db.ville = v('rgville');
   saveDB();
   toast('Réglages enregistrés');
   if(db.jellyfin !== jellyAvant) choisirJellyfin().then(()=>{ if(view === 'reglages') render(); });
