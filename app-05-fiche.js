@@ -61,7 +61,39 @@ function blocSorties(dates){
   const src = dates.source && dates.source !== (db.region||'FR')
     ? '<div class="credit">Dates non renseignées pour la France : celles affichées sont '+
       'celles de '+esc(dates.source)+'.</div>' : '';
-  return '<div class="sectitle">Quand peut-on le voir</div><div class="sorties">'+corps+'</div>'+src;
+  return '<div class="sectitle">Quand peut-on le voir</div><div class="sorties">'+corps+'</div>'+src+
+    blocSeances(dates);
+}
+
+/* ---------- Séances près de chez soi ----------
+   Uniquement pour un film encore à l'affiche (sorti en salle depuis moins de
+   sept semaines). Il n'existe pas d'accès public fiable aux séances des
+   cinémas français (Allociné n'a pas d'API officielle) : plutôt que
+   d'afficher des horaires inventés, le bouton ouvre la recherche des séances
+   du film autour de la ville enregistrée dans les réglages — les horaires
+   affichés là-bas sont les vrais. */
+function blocSeances(dates){
+  const iso = dates && dates[TYPE_SALLE];
+  if(!iso) return '';
+  const t = todayISO();
+  if(iso > t) return '';
+  if((new Date(t) - new Date(iso)) / 86400000 > 49) return '';
+  return '<div class="wrap" style="padding-top:6px">'+
+    '<button class="btn ghost block" onclick="ouvrirSeances()">'+
+    I.salle+' Séances près de chez moi</button></div>';
+}
+function ouvrirSeances(){
+  const o = ficheObjet();
+  const titre = o.title || o.name || '';
+  if(!db.ville){
+    return openSheet('<h3>Ta ville ?</h3>'+
+      '<p class="small muted" style="margin:0 0 8px">Renseigne ta ville dans les réglages : '+
+      'ce bouton ouvrira alors les séances autour de chez toi.</p>'+
+      '<button class="opt" onclick="closeSheet();go(\'reglages\',{from:\'profil\'})">Ouvrir les réglages</button>'+
+      '<button class="opt" onclick="closeSheet()">Annuler</button>');
+  }
+  window.open('https://www.google.com/search?q='+
+    encodeURIComponent('séances '+titre+' '+db.ville), '_blank', 'noopener');
 }
 
 /* ---------- Boutons d'action ---------- */
