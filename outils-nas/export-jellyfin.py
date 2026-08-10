@@ -175,6 +175,38 @@ def resume(it, genre, tmdb_id):
     return fiche
 
 
+def date_dernier_fichier(base, token, user_id, serie_id):
+    """La date d'ajout du dernier ÉPISODE arrivé — pas celle de la série.
+
+    Jellyfin date une série au jour où son DOSSIER est apparu : lors de
+    l'import initial, toutes les séries ont donc reçu la même date, et la
+    rangée « Ajouts récents » de l'app les affichait par ordre alphabétique
+    (constaté par Alexandre le 08/08 — Amicalement vôtre, B.R.I.G.A.D.,
+    Baron Noir… toutes au 21/07). Ce que la rangée veut dire, c'est
+    « des FICHIERS viennent d'arriver » : on demande donc l'épisode le plus
+    récemment créé de la série, et c'est sa date qui fait foi. Une requête
+    par série, à Limit=1 — quelques dizaines d'appels locaux par export.
+    """
+    if not serie_id:
+        return ""
+    try:
+        params = {
+            "ParentId": serie_id,
+            "IncludeItemTypes": "Episode",
+            "Recursive": "true",
+            "SortBy": "DateCreated",
+            "SortOrder": "Descending",
+            "Limit": 1,
+            "Fields": "DateCreated",
+        }
+        if user_id:
+            params["userId"] = user_id
+        lot = appel(base, token, "/Items", params).get("Items", [])
+        return (lot[0].get("DateCreated") or "")[:10] if lot else ""
+    except Exception:
+        return ""   # au pire, la fiche garde la date de la série
+
+
 def recuperer(base, token, genre, user_id):
     """Parcourt la bibliothèque page par page.
 
@@ -209,7 +241,14 @@ def recuperer(base, token, genre, user_id):
                 continue
             if tmdb not in ids:
                 ids.add(tmdb)
-                fiches.append(resume(it, genre, tmdb))
+                f = resume(it, genre, tmdb)
+                # Pour une série, la date d'ajout est celle du dernier
+                # épisode arrivé — voir date_dernier_fichier ci-dessus.
+                if genre == "Series":
+                    d_ep = date_dernier_fichier(base, token, user_id, it.get("Id"))
+                    if d_ep:
+                        f["ajout"] = d_ep
+                fiches.append(f)
         debut += len(lot)
         if debut >= d.get("TotalRecordCount", debut):
             break
