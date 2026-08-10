@@ -1,5 +1,29 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="112" fill="#0f1115"/>
-  <rect x="96" y="136" width="320" height="240" rx="36" fill="none" stroke="#3b82f6" stroke-width="34"/>
-  <path d="M214 214 L326 256 L214 298 Z" fill="#3b82f6"/>
+  <!-- La tuile blanche : le système arrondit lui-même les coins sur le
+       téléphone ; on garde le plein cadre pour la version maskable. -->
+  <rect width="512" height="512" fill="#faf8f5"/>
+  <!-- La pellicule, légèrement inclinée comme sur la maquette. -->
+  <g transform="rotate(14 256 256)">
+    <rect x="181" y="76" width="150" height="360" rx="18" fill="#b3261e"/>
+    <!-- Perforations, colonne gauche -->
+    <g fill="#faf8f5">
+      <rect x="196" y="98"  width="22" height="16" rx="5"/>
+      <rect x="196" y="146" width="22" height="16" rx="5"/>
+      <rect x="196" y="194" width="22" height="16" rx="5"/>
+      <rect x="196" y="302" width="22" height="16" rx="5"/>
+      <rect x="196" y="350" width="22" height="16" rx="5"/>
+      <rect x="196" y="398" width="22" height="16" rx="5"/>
+      <!-- colonne droite -->
+      <rect x="294" y="98"  width="22" height="16" rx="5"/>
+      <rect x="294" y="146" width="22" height="16" rx="5"/>
+      <rect x="294" y="194" width="22" height="16" rx="5"/>
+      <rect x="294" y="302" width="22" height="16" rx="5"/>
+      <rect x="294" y="350" width="22" height="16" rx="5"/>
+      <rect x="294" y="398" width="22" height="16" rx="5"/>
+      <!-- La fenêtre centrale -->
+      <rect x="203" y="226" width="106" height="60" rx="8"/>
+    </g>
+    <!-- Le triangle de lecture, dans la fenêtre -->
+    <path d="M238 234 L286 256 L238 278 Z" fill="#b3261e"/>
+  </g>
 </svg>
