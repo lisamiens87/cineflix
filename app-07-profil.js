@@ -21,7 +21,7 @@ function viewProfil(){
     '<button class="btn ghost block" style="margin-bottom:8px" onclick="ouvrirGuide()">'+
       '✨ Laisse-moi te guider</button>'+
     '<div class="deuxbtn">'+
-      '<button class="btn ghost" onclick="demarrerBienvenue()">Mes goûts</button>'+
+      '<button class="btn ghost" onclick="ouvrirGouts()">Mes goûts</button>'+
       '<button class="btn ghost" onclick="changerDeProfil()">Changer de profil</button>'+
     '</div>'+
   '</div>';
