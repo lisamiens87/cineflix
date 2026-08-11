@@ -19,6 +19,18 @@ async function chargerFiche(){
        On demande donc fr, en, et celles sans langue déclarée. */
     const d = await tmdb('/'+type+'/'+id, { append_to_response: extra,
                                             include_video_language: 'fr,en,null' });
+    /* Bande-annonce en VO : la langue d'origine n'est connue qu'une fois la
+       fiche reçue. Pour un titre ni français ni anglais (coréen, japonais…),
+       la requête ci-dessus n'a donc pas pu ramener ses vidéos VO — on les
+       cherche dans une seconde, toute petite, et on remplace la liste. */
+    const lo = d && d.original_language;
+    if(lo && lo !== 'fr' && lo !== 'en'){
+      try{
+        const vids = await tmdb('/'+type+'/'+id+'/videos',
+                                { include_video_language: lo+',fr,en,null' });
+        if(vids && vids.results && vids.results.length) d.videos = vids;
+      }catch(_){ /* tant pis : on garde fr/en */ }
+    }
     if(!ui.fiche || ui.fiche.id !== id) return;
     ui.fiche = { id:id, type:type, loading:false, data:d,
                  dates: type === 'movie' ? extraireDates((d.release_dates||{}).results, db.region) : null };
@@ -269,12 +281,14 @@ function blocPlateformes(o){
 /* ---------- Bande-annonce ----------
    TMDB renvoie souvent une dizaine de vidéos : teasers, extraits, featurettes,
    parfois plusieurs bandes-annonces. On en choisit une seule, la plus utile
-   pour décider si on veut le titre : d'abord une VF, puis une vraie
-   bande-annonce plutôt qu'un teaser, puis une officielle. */
-function meilleureVideo(videos){
+   pour décider si on veut le titre : d'abord la VERSION ORIGINALE — une BA se
+   regarde en VO, sous-titrée si besoin (pour un film français, la VO est la
+   VF) — puis une VF, puis une anglaise ; ensuite une vraie bande-annonce
+   plutôt qu'un teaser, puis une officielle. */
+function meilleureVideo(videos, vo){
   const yt = ((videos||{}).results||[]).filter(v => v && v.site === 'YouTube' && v.key);
   if(!yt.length) return null;
-  const rangLangue = l => l === 'fr' ? 0 : l === 'en' ? 1 : 2;
+  const rangLangue = l => l === vo ? 0 : l === 'fr' ? 1 : l === 'en' ? 2 : 3;
   const rangType   = t => t === 'Trailer' ? 0 : t === 'Teaser' ? 1 : 2;
   return yt.slice().sort((a,b)=>
     rangLangue(a.iso_639_1) - rangLangue(b.iso_639_1) ||
@@ -288,30 +302,38 @@ function meilleureVideo(videos){
    un lecteur embarqué coûte plusieurs centaines de kilo-octets et des cookies
    tiers sur chaque fiche ouverte. */
 function blocBandeAnnonce(d){
-  const v = meilleureVideo(d.videos);
+  const v = meilleureVideo(d.videos, d.original_language);
   if(!v) return '';
   const cle = String(v.key).replace(/[^\w-]/g,'');
   if(!cle) return '';
   const img = IMG(d.backdrop_path,'w780') || IMG(d.poster_path,'w780');
+  /* Une BA qui n'est pas en français est étiquetée VOST : au clic, on
+     demandera à YouTube d'afficher les sous-titres français (voir jouerBA). */
   const vf  = v.iso_639_1 === 'fr';
   return '<div class="sectitle">Bande-annonce</div>'+
     '<div class="wrap" style="padding-top:0">'+
       '<div class="ba" role="button" tabindex="0" aria-label="Lire la bande-annonce" '+
-           'onclick="jouerBA(this,\''+cle+'\')" '+
-           'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jouerBA(this,\''+cle+'\')}">'+
+           'onclick="jouerBA(this,\''+cle+'\','+(vf?0:1)+')" '+
+           'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jouerBA(this,\''+cle+'\','+(vf?0:1)+')}">'+
         (img ? '<img loading="lazy" src="'+img+'" alt="">' : '')+
         '<span class="baplay">'+I.play+'</span>'+
-        '<span class="balbl">'+(vf ? 'VF' : 'VO')+' · '+esc(v.name || 'Bande-annonce')+'</span>'+
+        '<span class="balbl">'+(vf ? 'VF' : 'VOST')+' · '+esc(v.name || 'Bande-annonce')+'</span>'+
       '</div>'+
     '</div>';
 }
 
-function jouerBA(el, cle){
+function jouerBA(el, cle, st){
   if(el.dataset.on) return;
   el.dataset.on = '1';
   el.removeAttribute('role'); el.removeAttribute('tabindex');
+  /* st : la BA n'est pas en français — cc_load_policy=1 affiche les
+     sous-titres d'office, cc_lang_pref=fr les demande en français. YouTube ne
+     peut afficher que les sous-titres que la chaîne a fournis ; sur les
+     bandes-annonces officielles, c'est presque toujours le cas. */
   el.innerHTML = '<iframe src="https://www.youtube-nocookie.com/embed/'+cle+
-    '?autoplay=1&rel=0&playsinline=1" title="Bande-annonce" loading="lazy" '+
+    '?autoplay=1&rel=0&playsinline=1'+
+    (st ? '&cc_load_policy=1&cc_lang_pref=fr&hl=fr' : '')+
+    '" title="Bande-annonce" loading="lazy" '+
     'allow="autoplay; encrypted-media; picture-in-picture; fullscreen" '+
     'referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>';
 }
