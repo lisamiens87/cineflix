@@ -167,6 +167,44 @@ function etapesBienvenue(){
   if(!cleFournie() && !db.apiKey) l.splice(1, 0, 'cle');
   return l;
 }
+/* « Mes goûts » depuis le profil : quand ils existent déjà, on ne rejoue
+   PAS le parcours (reproche d'Alexandre du 11/08 — « il me propose de
+   refaire la manip ») : on montre les choix, plateformes modifiables SUR
+   PLACE, et une porte « Refaire mon guide » pour qui veut tout reprendre.
+   Premier passage : le parcours, comme avant. */
+function ouvrirGouts(){
+  if(!aGouts()) return demarrerBienvenue();
+  ficheGouts();
+}
+function basculerPlatGout(id){
+  const g = GOUTS.d || (GOUTS.d = {});
+  const l = g.plats || (g.plats = []);
+  const i = l.indexOf(id);
+  if(i >= 0) l.splice(i, 1); else l.push(id);
+  enregistrerGouts(g);
+  ficheGouts();
+}
+function ficheGouts(){
+  const g = GOUTS.d || {};
+  const plats = g.plats || [];
+  openSheet('<h3>Mes goûts</h3>'+
+    '<div class="fgrp">Mes plateformes'+
+      (plats.length ? ' ('+plats.length+')' : ' — aucune : le guide pioche dans les quatre')+'</div>'+
+    '<div class="fchips">'+PLATEFORMES.map(pf=>
+      '<button class="chip '+pf.cl+' '+(plats.indexOf(pf.id) >= 0 ? 'on' : '')+
+      '" onclick="basculerPlatGout('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>'+
+    '<div class="fgrp">Ce que j\'aime</div>'+
+    '<div class="small muted">'+esc((g.aimes||[]).join(' · ') || '—')+'</div>'+
+    '<div class="fgrp">Ce que je fuis</div>'+
+    '<div class="small muted">'+esc((g.fuis||[]).join(' · ') || '—')+'</div>'+
+    '<div class="fgrp">Mes films totems</div>'+
+    '<div class="small muted">'+
+      esc((g.totems||[]).map(t => t.title || t.nom || '').filter(Boolean).join(' · ') || '—')+'</div>'+
+    '<button class="opt" style="margin-top:12px" onclick="closeSheet();demarrerBienvenue()">'+
+      'Refaire mon guide (tout le parcours)</button>'+
+    '<button class="opt" onclick="closeSheet()">Fermer</button>');
+}
+
 function demarrerBienvenue(){
   const g = GOUTS.d || {};
   BROUILLON = {
@@ -308,6 +346,13 @@ function viewBienvenue(){
   if(!BROUILLON) demarrerBienvenue();
   const e = etapesBienvenue()[ui.bienv.pas] || 'fin';
   let h = '<div class="acc large">';
+  /* Relancé volontairement (les goûts existent déjà) : on peut en SORTIR
+     sans le finir — être enfermé dans le parcours forçait à tuer l'app
+     (vécu Alexandre, 11/08). Au premier passage, pas de porte : le
+     parcours se saute étape par étape, il ne s'abandonne pas. */
+  if(db.onboarde)
+    h += '<button class="iconbtn accquitte" onclick="go(\'profil\',{},\'back\')" '+
+         'aria-label="Quitter sans changer">'+I.back+'</button>';
 
   if(e === 'hello'){
     h += '<div class="acclogo">'+I.film+'</div>'+
