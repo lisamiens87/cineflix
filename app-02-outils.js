@@ -170,6 +170,7 @@ function currentBack(){
   if(view === 'saison')   return ((ui.saison||{}).nav||{}).ffrom   || 'decouvrir';
   if(view === 'fiche') return params.from || 'decouvrir';
   if(view === 'reglages') return params.from || 'profil';
+  if(view === 'bienvenue') return db.onboarde ? 'profil' : null;
   if(view === 'file') return 'profil';
   if(view === 'acces') return 'profil';
   if(view === 'guide') return params.from || 'decouvrir';
