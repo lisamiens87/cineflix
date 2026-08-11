@@ -317,7 +317,7 @@ function blocBandeAnnonce(d){
            'onkeydown="if(event.key===\'Enter\'||event.key===\' \'){event.preventDefault();jouerBA(this,\''+cle+'\','+(vf?0:1)+')}">'+
         (img ? '<img loading="lazy" src="'+img+'" alt="">' : '')+
         '<span class="baplay">'+I.play+'</span>'+
-        '<span class="balbl">'+(vf ? 'VF' : 'VOST')+' · '+esc(v.name || 'Bande-annonce')+'</span>'+
+        '<span class="balbl">'+(vf ? 'VF' : 'VOST FR')+' · '+esc(v.name || 'Bande-annonce')+'</span>'+
       '</div>'+
     '</div>';
 }
