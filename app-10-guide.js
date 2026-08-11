@@ -5,14 +5,17 @@
    déclarés. Le champ de texte libre a été retiré — il prétendait comprendre
    une phrase et ne faisait que repérer des mots.
 
-   Un seul périmètre, qui reste la règle d'or de cet écran :
+   Un seul périmètre, la règle d'or de cet écran :
 
      on ne propose que ce que cette personne peut regarder CE SOIR,
      c'est-à-dire la bibliothèque du serveur et les plateformes
      auxquelles ELLE est abonnée.
 
    Proposer un chef-d'œuvre qu'on ne peut pas lancer, c'est une frustration,
-   pas une suggestion. */
+   pas une suggestion. Cette règle a été relâchée le 30/07 (portées « au
+   cinéma » et « partout ») puis RESTAURÉE le 10/08 par Alexandre : « le
+   guide, c'est choisir le film du soir ». Explorer le reste, c'est le
+   travail de Découvrir et de ses quatre onglets — pas du guide. */
 
 const gLettres = s => String(s||'').toLowerCase().normalize('NFD').replace(/[^a-z]/g,'');
 
@@ -171,19 +174,9 @@ function couvertureMC(){
    Découvrir s'appliquent tout aussi bien ici — avec une conséquence assumée :
    hors Cinéflix, une suggestion n'est pas regardable ce soir, elle devient
    une demande. L'écran le dit plutôt que de le cacher. */
-const PERIMS = [
-  { id:'flix',  label:'Cinéflix',    cl:'c-flix' },
-  { id:'plats', label:'Plateformes', cl:'c-plats' },
-  { id:'cine',  label:'Au cinéma',   cl:'c-cinema' },
-  { id:'tout',  label:'Tout',        cl:'c-tout' }
-];
-const perimGuide = ()=> (ui.guide && ui.guide.perim) || 'flix';
-/* Les mêmes quatre portées, dites en français dans le guide. Le catalogue
-   garde ses onglets colorés : là-bas c'est un filtre de liste, ici c'est la
-   phrase « je cherche … ». Depuis le 10/08, « au cinéma » veut ENFIN dire
-   l'affiche du moment — avant, c'était le nom trompeur de « tout ». */
-const MOTS_PERIM = { flix:'chez toi', plats:'tes abonnements',
-                     cine:'au cinéma', tout:'partout' };
+/* Plus de choix de portée ici (10/08) : la banque du guide est UNE, et
+   c'est la réunion de la bibliothèque et des plateformes cochées dans
+   « Mes goûts » (les quatre connues si rien n'est coché). */
 
 const platsProfil = ()=> {
   const g = GOUTS.d || {};
@@ -327,12 +320,7 @@ function vivierCineflix(r, revoir){
    mode « plats » restreint aux abonnements du profil (à défaut, les quatre
    plateformes connues) ; mode « tout » n'impose aucune disponibilité. */
 async function vivierTmdb(r, pages, mode){
-  /* Les séries ne passent pas en salle. */
-  if(mode === 'cine' && r.type === 'tv') return [];
-  const plats = mode === 'plats'
-    ? (platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id))
-    : [];
-  if(mode === 'plats' && !plats.length) return [];
+  const plats = platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id);
   const champ = r.type === 'movie' ? 'primary_release_date' : 'first_air_date';
   const dem = r.genres.concat(r.g, r.gUn);
   const veutAnim = dem.indexOf(16) >= 0 || dem.indexOf(10751) >= 0;
@@ -344,16 +332,7 @@ async function vivierTmdb(r, pages, mode){
      Les humeurs gardent la popularité : là, la nouveauté est un plus. */
   const base = { include_adult:'false',
                  sort_by: r.taxo ? 'vote_count.desc' : 'popularity.desc' };
-  if(mode === 'cine'){
-    /* À l'affiche en France en ce moment — mêmes réglages que la vue
-       « Au cinéma » du catalogue. La popularité prime : sur les sorties de
-       la semaine, c'est elle qui dit ce que les salles poussent. */
-    base.sort_by = 'popularity.desc';
-    base.region = db.region || 'FR';
-    base.with_release_type = '2|3';
-    base['release_date.lte'] = todayISO();
-    base['release_date.gte'] = new Date(Date.now() - 42*864e5).toISOString().slice(0,10);
-  }else if(plats.length){
+  if(plats.length){
     base.watch_region = db.region || 'FR';
     base.with_watch_providers = plats.join('|');
     base.with_watch_monetization_types = 'flatrate';
@@ -410,9 +389,7 @@ async function vivierTotems(r){
   const g = GOUTS.d || {};
   const totems = (g.totems||[]).slice(0,3);
   if(!totems.length || r.type !== 'movie') return [];
-  const plats = perimGuide() === 'plats'
-    ? (platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id))
-    : platsProfil();
+  const plats = platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id);
   const lots = await Promise.all(totems.map(t =>
     tmdb('/movie/'+t.id+'/recommendations', {page:'1'})
       .then(d => ({ src:t.titre, l:(d.results||[]) }))
@@ -432,9 +409,6 @@ async function vivierTotems(r){
   /* Celles qui sont déjà sur le serveur passent sans vérification. Pour les
      autres, on interroge les fournisseurs — mais pas indéfiniment : vingt
      titres au maximum, sinon l'écran met dix secondes à s'afficher. */
-  /* Hors Cinéflix, tout est proposable : plus rien à vérifier. En mode
-     « au cinéma », TMDB a déjà restreint à l'affiche du moment. */
-  if(perimGuide() === 'tout' || perimGuide() === 'cine') return bruts;
   const dedans = bruts.filter(c => c.flix);
   const aTester = plats.length ? bruts.filter(c => !c.flix).slice(0, 20) : [];
   for(let i = 0; i < aTester.length; i += 5){
@@ -586,25 +560,17 @@ async function guider(source, txt){
   render();
 
   try{
-    const perim = perimGuide();
     const [externes, totems] = await Promise.all([
-      perim === 'flix' ? Promise.resolve([]) : vivierTmdb(r, 3, perim).catch(()=>[]),
-      /* Les recommandations des totems piochent dans tout le cinéma : en
-         mode « au cinéma », elles feraient entrer des films qui ne sont
-         plus en salle. */
-      (source === 'gouts' && perim !== 'cine') ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
+      vivierTmdb(r, 3, 'plats').catch(()=>[]),
+      source === 'gouts' ? vivierTotems(r).catch(()=>[]) : Promise.resolve([])
     ]);
     if(seq !== guideSeq) return;
 
     /* Sur la bibliothèque, on n'exhume que ce qui n'a jamais été lancé — c'est
        tout l'intérêt d'un guide posé sur SA collection. Si la moisson est trop
-       maigre, on rouvre aux films déjà vus plutôt que de rendre une page vide.
-       Hors Cinéflix, la bibliothèque ne sert qu'à repérer ce qu'on a déjà. */
-    let cine = [];
-    if(perim === 'flix'){
-      cine = vivierCineflix(r, false);
-      if(cine.length < 12) cine = vivierCineflix(r, true);
-    }
+       maigre, on rouvre aux films déjà vus plutôt que de rendre une page vide. */
+    let cine = vivierCineflix(r, false);
+    if(cine.length < 12) cine = vivierCineflix(r, true);
     const tout = totems.concat(cine, externes);
 
     /* Dédoublonnage : un même titre peut venir des trois viviers. On garde la
@@ -627,12 +593,9 @@ async function guider(source, txt){
       if(g.vus[c.type+':'+c.id]) return false;             // déjà montré cette session
       const it = item(c.type, c.id);
       if(it && (it.fav || it.req)) return false;           // déjà vu passer, déjà demandé
-      /* « Tes abonnements » sert à trouver ce qu'on N'A PAS. Un titre déjà sur
-         le serveur n'y a rien à faire : il est déjà proposé par « chez toi »,
-         et il occupait une place utile. Les recommandations des totems en
-         faisaient entrer par une autre porte — ce filtre les attrape aussi. */
-      if(perim === 'plats' && c.flix) return false;
-      return true;
+      /* La règle d'or : regardable CE SOIR — chez soi, ou sur un
+         abonnement. Tout le reste appartient à Découvrir. */
+      return c.flix || !!c.plat;
     });
 
     /* La note Télérama, récupérée après coup : elle pèse dans le score et
@@ -682,8 +645,7 @@ async function guider(source, txt){
 
 function ouvrirGuide(){
   ui.guide = { txt:'', recette:null, res:[], loading:false, err:'', charge:false,
-               vus:{}, source:'', taxoG:'', taxoSel:'',
-               perim:(ui.guide||{}).perim || 'flix' };
+               vus:{}, source:'', taxoG:'', taxoSel:'' };
   guideAmorce = false;
   go('guide');
 }
@@ -710,15 +672,6 @@ function assurerGuide(){
   guideAmorce = true;
   setTimeout(()=>{ if(view === 'guide') guiderHumeur(db.humeur); }, 0);
 }
-/* Changer de source relance la même demande ailleurs : c'est le geste
-   « et sur Netflix, ça donnerait quoi ? ». */
-function setPerimGuide(id){
-  if(perimGuide() === id) return;
-  ui.guide.perim = id;
-  ui.guide.vus = {};
-  if(ui.guide.source) return guider(ui.guide.source, ui.guide.txt || '');
-  render();
-}
 function guiderHumeur(id){
   ui.guide.txt = '';
   ui.guide.taxoSel = '';
@@ -743,12 +696,6 @@ function viewCategories(){
   const ouvert = taxoGenreOuvert();
   const e = TAXO.find(x => x.id === ouvert);
   let h = header('Par catégorie', {back:'fermerCategories()'});
-
-  h += '<div class="porteemots">'+
-    PERIMS.map(x=>'<button class="pm'+(perimGuide() === x.id ? ' on' : '')+
-      '" onclick="setPerimGuide(\''+x.id+'\')">'+
-      esc(MOTS_PERIM[x.id] || x.label)+'</button>').join('')+
-  '</div>';
 
   let droite = '';
   if(!e){
@@ -838,18 +785,10 @@ function carteGuide(c){
 /* Une phrase qui dit exactement ce qu'on cherche, et surtout ce qu'on ne
    trouvera pas. Rien n'agace plus qu'un guide dont on ignore la portée. */
 function portee(){
-  const p = perimGuide();
-  if(p === 'flix')
-    return 'Uniquement ce qui est déjà sur ton serveur, et que tu peux lancer maintenant.';
-  if(p === 'plats')
-    return platsProfil().length
-      ? 'Ce qui est en illimité sur tes abonnements — regardable ce soir, ailleurs que sur le serveur.'
-      : 'Ce qui est en illimité sur Netflix, Prime Video, Disney+ ou Canal+. '+
-        'Précise tes abonnements dans « Mes goûts » pour resserrer.';
-  if(p === 'cine')
-    return 'Uniquement ce qui est à l\'affiche en salle en ce moment.';
-  return 'Tout le cinéma, sans condition de disponibilité : '+
-         'ce qui n\'est pas sur le serveur sera à demander.';
+  return platsProfil().length
+    ? 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, et tes abonnements.'
+    : 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, plus Netflix, Prime Video, '+
+      'Disney+ et Canal+ — coche tes abonnements dans « Mes goûts » pour resserrer.';
 }
 
 function viewGuide(){
@@ -883,16 +822,6 @@ function viewGuide(){
   h += '<div class="wrap"><button class="btn ghost block" onclick="ouvrirCategories()">'+
     'Ou entrer par catégorie</button></div>';
 
-  /* La portée, en français plutôt qu'en jargon : « Plateformes » et
-     « Cinéma » ne disaient pas ce qu'ils font. Trois mots soulignés et non
-     trois pastilles — ce n'est pas le choix principal de l'écran, mais il
-     reste à un doigt : « et sur Netflix, ça donnerait quoi ? » est un des
-     gestes centraux du guide. */
-  h += '<div class="porteemots">'+
-    PERIMS.map(x=>'<button class="pm'+(perimGuide() === x.id ? ' on' : '')+
-      '" onclick="setPerimGuide(\''+x.id+'\')">'+
-      esc(MOTS_PERIM[x.id] || x.label)+'</button>').join('')+
-  '</div>';
 
   if(g.loading)
     return h + '<div class="empty"><span class="spin"></span>'+
