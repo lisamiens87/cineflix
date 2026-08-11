@@ -306,8 +306,9 @@ function viewTaxoChips(){
   }
   /* Deux genres ne viennent pas de TMDB mais de Jellyfin : hors du serveur,
      on ne peut pas les chercher honnêtement. On le dit plutôt que de rendre
-     une page vide. */
-  if(e && (e.locNoms||[]).length && perimGuide() !== 'flix')
+     une page vide. (Depuis le 10/08 la banque du guide inclut toujours les
+     plateformes : l'avertissement vaut donc en permanence pour ces genres.) */
+  if(e && (e.locNoms||[]).length)
     h += '<div class="tiny muted" style="margin-top:6px">'+
          esc(e.nom)+' est un genre de ton serveur : hors Cinéflix, '+
          'les résultats seront approximatifs.</div>';
