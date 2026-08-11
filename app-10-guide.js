@@ -612,7 +612,23 @@ async function guider(source, txt){
     });
 
     liste.forEach(c => { c._s = scorerCandidat(c, r); });
-    liste = choisirSuggestions(liste, 20);
+    /* Moitié-moitié (10/08, choix d'Alexandre) : sans quota, la bibliothèque
+       raflait TOUTES les places — ses fiches portent la presse et Télérama,
+       les candidats plateformes n'ont que la note du public, ils perdaient à
+       chaque fois. Dix places pour chaque monde ; si l'un manque de matière,
+       l'autre complète, et l'écran reste plein. Le passage final par
+       choisirSuggestions mélange les deux moitiés en un seul classement et
+       écarte les doublons de saga. */
+    const duServeur = liste.filter(c => c.flix);
+    const desPlats  = liste.filter(c => !c.flix && c.plat);
+    const s10 = choisirSuggestions(duServeur, 10);
+    const p10 = choisirSuggestions(desPlats, 10);
+    const manque = 20 - s10.length - p10.length;
+    const complement = manque <= 0 ? []
+      : s10.length < 10
+        ? choisirSuggestions(desPlats.filter(c => p10.indexOf(c) < 0), manque)
+        : choisirSuggestions(duServeur.filter(c => s10.indexOf(c) < 0), manque);
+    liste = choisirSuggestions(s10.concat(p10, complement), 20);
 
     /* Les titres venus de la bibliothèque n'ont pas d'affiche : le NAS
        n'envoie que des identifiants. On va la chercher. */
