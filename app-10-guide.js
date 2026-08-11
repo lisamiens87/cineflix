@@ -256,6 +256,11 @@ function fiche2candidat(i, t){
            /* Les NOMS de genres, tels que Jellyfin les ecrit : Concert et
               Theatre n'existent pas chez TMDB et ne se retrouvent que la. */
            nomsG: noms.map(x => gLettres(x)),
+           /* Cette fiche VIENT de la bibliothèque : elle est chez soi par
+              construction. Sans cette étiquette, la règle d'or « regardable
+              ce soir » (3007o) jetait toute la bibliothèque — vécu, guide
+              vide dès la première vérification. */
+           flix: true,
            pays: i.pays || [], vu: i.vu || 0, ajout: i.ajout || '',
            mc: i.mc || null,
            noteCrit: i.noteCrit || 0, cert: i.cert || '',
