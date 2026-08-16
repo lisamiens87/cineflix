@@ -261,8 +261,10 @@
 /* ---- La jaquette répond à la souris (16/08) ----
    Une souris n'a pas de doigt : elle survole avant de cliquer, et un
    catalogue qui ne réagit pas au survol donne l'impression d'une image, pas
-   d'un bouton. L'affiche grandit de 8 %, prend le rouge signature en liseré
-   et une ombre portée ; l'image s'éclaircit d'un cran.
+   d'un bouton. L'affiche grandit de 8 %, se détache par une ombre
+   portée, et l'image s'éclaircit d'un cran. Pas de liseré coloré : essayé en
+   3007w, retiré aussitôt — l'agrandissement désigne déjà la jaquette visée,
+   le trait rouge par-dessus faisait bruyant.
 
    Le piège, vécu à l'essai : la rangée défile désormais en horizontal, donc
    son débordement vertical est masqué — une affiche qui grandit se faisait
@@ -274,11 +276,10 @@
 @media (min-width:1200px){
   .top7{padding-top:26px;padding-bottom:46px}
 
-  .t7c .aff,.gcard .aff{outline:2px solid transparent;
-    transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s,outline-color .18s}
+  .t7c .aff,.gcard .aff{transition:transform .18s cubic-bezier(.2,.7,.3,1),box-shadow .18s}
   .t7c:hover,.gcard:hover{z-index:5}
   .t7c:hover .aff,.gcard:hover .aff{transform:scale(1.08);
-    outline-color:var(--accent);box-shadow:0 18px 40px rgba(0,0,0,.7)}
+    box-shadow:0 18px 40px rgba(0,0,0,.7)}
 
   .t7c .aff img,.gcard .aff img{transition:filter .18s}
   .t7c:hover .aff img,.gcard:hover .aff img{filter:brightness(1.1)}
