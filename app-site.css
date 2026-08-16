@@ -187,3 +187,60 @@
   body.couverture nav{background:linear-gradient(to bottom,rgba(11,11,15,.72),transparent);
     border-bottom:0;backdrop-filter:none;-webkit-backdrop-filter:none}
 }
+
+/* ---- Le format du bureau : « plein cadre » (16/08) ----
+   Constat sur captures, à 1800 px : le titre du choix du soir était calé à
+   40 px du bord de la FENÊTRE pendant que les rangées commençaient à la
+   gouttière d'une colonne centrée de 1440 px. 180 px d'écart — plus rien
+   n'était aligné sur rien, et c'est ça qui donnait l'impression d'une page
+   mal fichue avant même de regarder le détail.
+
+   Deuxième défaut, plus sournois : `.t7c{flex:1 1 0}` a été écrit quand
+   `.top7` désignait UNE rangée, celle du Top. Depuis que `rangeeHtml()`
+   réutilise la classe (Ajouts récents, Continuer la lecture), chaque rangée
+   s'étirait sur toute la largeur — donc la taille des affiches dépendait du
+   NOMBRE de films dans la rangée. Sept affiches énormes, dix moyennes.
+
+   Direction retenue par Alexandre : plein cadre. Le bureau sort de sa colonne
+   de 1440, UNE gouttière de 48 px pour tout le monde — héros compris — et UNE
+   taille d'affiche, quelle que soit la rangée. Bloc en fin de fichier : il
+   surcharge sans réécrire, le retirer rend l'état d'avant. */
+@media (min-width:1200px){
+  .app{max-width:none;padding-bottom:40px}
+
+  /* La gouttière du bureau, tenue à un seul endroit. */
+  .wrap,.grid,.chips,.souschips,.sectitle,.resume,.hbar,.top7{
+    padding-left:48px;padding-right:48px}
+  /* Les titres de section portaient une marge de 16 px qui s'ajoutait à la
+     gouttière : ils étaient décalés de 16 px vers la droite par rapport aux
+     affiches qu'ils annoncent — depuis toujours, et ça se voyait. */
+  .sectitle{margin-left:0;margin-right:0}
+
+  /* Le texte du héros prend la même gouttière que les rangées. Sa largeur de
+     lecture reste bornée : sans plafond, le synopsis filerait sur 1 700 px. */
+  .hstxt{padding:130px 48px 38px;max-width:none}
+  .hstxt .hssur,.hstxt h2,.hstxt .hsmeta,.hstxt p,.hstxt .hsactions{max-width:680px}
+  .hstxt h2{font-size:50px}
+  .herosoir{min-height:clamp(420px,54vh,620px)}
+
+  /* Les affiches ne s'étirent plus : largeur fixe, la rangée défile quand elle
+     déborde — le comportement qu'elle a toujours eu sur téléphone. */
+  .t7c{flex:0 0 auto;width:168px;padding-left:20px}
+  .top7.plate .t7c{width:168px;padding-left:0}
+  .t7c .chiffre{font-size:72px;left:-7px;bottom:-13px;-webkit-text-stroke:2.5px #4a4a56}
+}
+
+/* La barre du haut sur la couverture : elle était transparente à 72 % en haut
+   et NULLE en bas. Tant qu'on ne défile pas, c'est l'effet voulu — l'image
+   passe dessous. Dès qu'on défile, le titre et les boutons du héros se lisent
+   AU TRAVERS de la barre et se mélangent aux onglets (vu en capture : le
+   bouton « Regarder » posé sur le logo). Le dégradé tient donc jusqu'en bas,
+   assez pour que rien ne se lise à travers, assez peu pour qu'on devine
+   toujours l'image. */
+@media (min-width:1200px){
+  body.couverture nav{
+    background:linear-gradient(to bottom,rgba(11,11,15,.94) 0%,
+                                          rgba(11,11,15,.86) 55%,
+                                          rgba(11,11,15,.55) 100%);
+    backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+}
