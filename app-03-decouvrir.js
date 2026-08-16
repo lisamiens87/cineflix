@@ -902,6 +902,27 @@ function hsBarre(){
     avatarBouton()+'</div>';
 }
 
+/* ---------- Combien d'affiches dans une rangée ? ----------
+   Sur téléphone, les nombres historiques : la rangée DÉFILE, sept ou dix
+   suffisent, le reste se découvre au doigt. Sur grand écran elle ne défile
+   pas, elle s'étale — et une rangée de sept sur un écran de 3 440 px, c'est
+   deux tiers de vide à droite.
+
+   `pas` = la place qu'occupe une carte, gouttière comprise : 184 px, soit
+   l'affiche de 168 (les 20 px du chiffre sont DANS cette largeur, la boîte
+   est en border-box) plus 16 de gouttière. Plafond à 20 : au-delà on
+   demanderait vingt fiches à TMDB juste pour meubler l'écran.
+
+   Sous 1200 px la fonction rend le nombre d'origine, au caractère près : le
+   téléphone ne voit RIEN de cette règle, et app-mobile.css n'a pas à savoir
+   qu'elle existe. */
+function parRangee(n, pas){
+  try{
+    if(!matchMedia('(min-width:1200px)').matches) return n;
+    return Math.max(n, Math.min(20, Math.floor((innerWidth - 96 + 16) / (pas || 184))));
+  }catch(e){ return n; }
+}
+
 /* ---------- Le Top de la bibliothèque ----------
    Sept affiches numérotées, façon couverture de magazine. Le classement est
    celui des critiques et de Télérama — pas le mien. Les affiches manquent aux
@@ -931,7 +952,7 @@ function assurerTopBib(){
     const j = Math.floor(alea() * (i + 1));
     const t = vivier[i]; vivier[i] = vivier[j]; vivier[j] = t;
   }
-  const l = vivier.slice(0, 7);
+  const l = vivier.slice(0, parRangee(7, 184));
   topReq = true;
   Promise.all(l.map(c => tmdb('/movie/'+c.id).catch(()=>null))).then(fs=>{
     ui.topBib = l.map((c,i)=>({ id:c.id, nom:c.nom,
@@ -977,7 +998,7 @@ function assurerRecents(){
   assurerRangee('recents', ()=> (CAT.items||[])
     .filter(i => i && i.ajout)
     .sort((a,b)=> String(b.ajout).localeCompare(String(a.ajout)))
-    .slice(0,10));
+    .slice(0, parRangee(10, 184)));
 }
 function assurerReprises(){
   /* « En cours » = commencé, pas fini. On laisse deux minutes de marge au
@@ -985,7 +1006,7 @@ function assurerReprises(){
   assurerRangee('reprises', ()=> (CAT.items||[])
     .filter(i => i && (i.pos||0) > 0 && (i.duree||0) > 0 && i.pos < i.duree - 2)
     .sort((a,b)=> String(b.lu||'').localeCompare(String(a.lu||'')))
-    .slice(0,10));
+    .slice(0, parRangee(10, 184)));
 }
 function rangeeHtml(titre, l, jauge){
   if(!l || !l.length) return '';

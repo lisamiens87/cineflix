@@ -244,3 +244,16 @@
                                           rgba(11,11,15,.55) 100%);
     backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 }
+
+/* Une rangée trop longue doit DÉFILER, pas disparaître (16/08).
+   `.top7{overflow:visible}` plus haut protégeait le chiffre du Top, qui
+   déborde de l'affiche par le bas. Effet de bord jamais vu jusqu'ici : sur un
+   écran de 1280 px, les dix « Ajouts récents » dépassent la fenêtre et
+   `body{overflow-x:clip}` les coupe — les quatre derniers n'étaient
+   atteignables par AUCUN geste. On rend le défilement horizontal, et on
+   descend le plancher de la rangée pour que le chiffre reste dans la boîte
+   au lieu d'être rogné. */
+@media (min-width:1200px){
+  .top7{overflow-x:auto;overflow-y:hidden;padding-bottom:26px;scrollbar-width:none}
+  .top7::-webkit-scrollbar{display:none}
+}
