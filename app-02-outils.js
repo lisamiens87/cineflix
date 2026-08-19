@@ -337,7 +337,9 @@ function renderNav(){
     /* Sorties a rejoint Ma liste sur téléphone (volet, 3007y) : l'onglet ne
        subsiste que sur le bureau — la classe dsk le retire de la barre. */
     { cl:'t-sorties dsk', on: cur === 'sorties', act:"go('sorties')", ic:I.cal, lab:'Sorties' },
-    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, emo:'❤️', lab:'Ma liste', badge:n },
+    /* « Pour moi » (3008d) : « Ma liste » vivait en double — l'onglet du bas
+       ET le premier volet de l'écran portaient le même nom. */
+    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, emo:'❤️', lab:'Pour moi', badge:n },
     { cl:'t-profil', on: cur === 'profil', act:"go('profil')", ic:I.user, lab:'Profil' }
   ];
   document.getElementById('nav').innerHTML =
