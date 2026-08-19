@@ -58,6 +58,22 @@ def appel(base, token, chemin, params):
         return json.loads(r.read().decode("utf-8"))
 
 
+def appel_post(base, token, chemin, corps):
+    """Écrire sur Jellyfin — création de compte. La clé API a les droits
+    d'administration : à n'utiliser que pour ce que l'app a explicitement
+    demandé, jamais en balayage automatique."""
+    req = urllib.request.Request(
+        base.rstrip("/") + chemin,
+        data=json.dumps(corps, ensure_ascii=False).encode("utf-8"),
+        method="POST",
+        headers={"Authorization": 'MediaBrowser Token="%s"' % token,
+                 "Content-Type": "application/json",
+                 "Accept": "application/json"})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:
+        brut = r.read().decode("utf-8")
+    return json.loads(brut) if brut.strip() else {}
+
+
 def utilisateur_principal(base, token):
     """L'identifiant d'utilisateur à joindre aux requêtes.
 
@@ -138,7 +154,7 @@ def pays_codes(it):
     return codes
 
 
-def resume(it, genre, tmdb_id):
+def resume(it, genre, tmdb_id, moi=""):
     """La fiche compacte d'un titre — ce que l'app trie sans appeler personne."""
     ud = it.get("UserData") or {}
     fiche = {
@@ -166,12 +182,15 @@ def resume(it, genre, tmdb_id):
     # « Continuer la lecture » de la couverture. Le champ n'est écrit que
     # s'il y a vraiment quelque chose à reprendre — inutile d'alourdir
     # 2 300 fiches d'un zéro, et l'app sait lire son absence.
-    # ATTENTION : cette progression est celle du SEUL compte Jellyfin avec
-    # lequel l'export se connecte (JELLYFIN_USER, sinon le premier admin).
-    # Tant que le lot 2 n'est pas fait, tout le foyer voit la même reprise.
+    #
+    # Depuis le 19/08, `pos` est un DICTIONNAIRE { "Dad": 42, … } : la
+    # progression est propre à chaque compte Jellyfin, et l'app n'affiche
+    # que celle du compte relié au profil. Ce que l'on pose ici est la
+    # progression du compte qui exécute l'export ; reprises_par_compte()
+    # complète ensuite avec celle de tout le monde.
     pos = int(round((ud.get("PlaybackPositionTicks") or 0) / 600000000))
-    if pos > 0:
-        fiche["pos"] = pos
+    if pos > 0 and moi:
+        fiche["pos"] = {moi: pos}
     return fiche
 
 
@@ -207,7 +226,7 @@ def date_dernier_fichier(base, token, user_id, serie_id):
         return ""   # au pire, la fiche garde la date de la série
 
 
-def recuperer(base, token, genre, user_id):
+def recuperer(base, token, genre, user_id, moi=""):
     """Parcourt la bibliothèque page par page.
 
     On demande explicitement ProviderIds : sans ce champ Jellyfin renvoie une
@@ -241,7 +260,7 @@ def recuperer(base, token, genre, user_id):
                 continue
             if tmdb not in ids:
                 ids.add(tmdb)
-                f = resume(it, genre, tmdb)
+                f = resume(it, genre, tmdb, moi)
                 # Pour une série, la date d'ajout est celle du dernier
                 # épisode arrivé — voir date_dernier_fichier ci-dessus.
                 if genre == "Series":
@@ -674,6 +693,107 @@ def _pousser_profil(base, key, uid, champs):
                  "Content-Type": "application/json",
                  "Prefer": "return=minimal"})
     urllib.request.urlopen(req, timeout=TIMEOUT).read()
+
+
+# ============================ Comptes du serveur ============================
+# Le lien entre un profil Cinéflix et un compte Jellyfin vit dans la colonne
+# `profils.jellyfin`, et quatre valeurs suffisent à tout dire :
+#
+#   ""        l'administrateur n'a pas encore tranché — on ne touche à rien
+#   "*"       « crée-lui un compte » (posé par l'app au moment de valider)
+#   "-"       « pas de compte serveur » — choix explicite, donc pas de
+#             rangée « Continuer la lecture » pour cette personne
+#   "Dad"     le nom du compte Jellyfin qui lui appartient
+#
+# C'est l'app qui décide (l'administrateur seul sait que « Dad » est son
+# père) ; ce script ne fait qu'exécuter, et seulement pour les profils
+# VALIDÉS. Le compte est créé sans mot de passe : le serveur n'est joignable
+# que par le tailnet, et un mot de passe se pose ensuite dans Jellyfin.
+
+def _nom_jellyfin_libre(existants, souhaite):
+    """Un nom de compte qui n'est pas déjà pris. Jellyfin refuse les
+    doublons ; plutôt que d'échouer, on suffixe."""
+    base = re.sub(r"[^A-Za-zÀ-ÿ0-9 ._-]", "", (souhaite or "").strip()) or "Invite"
+    bas = {str(n).lower() for n in existants}
+    if base.lower() not in bas:
+        return base
+    for i in range(2, 50):
+        essai = "%s %d" % (base, i)
+        if essai.lower() not in bas:
+            return essai
+    return base + " " + str(int(len(bas)) + 1)
+
+
+def comptes_jellyfin(base, key, jf_url, jf_token):
+    """Crée les comptes serveur demandés par l'app, et publie la liste des
+    comptes existants pour que l'app puisse proposer un rattachement."""
+    users = appel(jf_url, jf_token, "/Users", {}) or []
+    noms = [u.get("Name") or "" for u in users]
+    # La liste des comptes vit dans le journal, sous une clé qui ne porte QUE
+    # ça : l'app la lit au lieu d'une liste écrite en dur dans config.js.
+    # (Le compte rendu de l'étape va sous « comptes_jf_bilan » — sinon il
+    # écraserait la liste au passage suivant.)
+    journal(base, key, "comptes_jf", " · ".join(sorted(noms)))
+
+    profils = lire_tout(base, key,
+        "/rest/v1/profils?select=user_id,pseudo,statut,jellyfin") or []
+    a_creer = [p for p in profils
+               if (p.get("statut") == "valide") and (p.get("jellyfin") or "").strip() == "*"]
+    if not a_creer:
+        return "%d compte(s), rien à créer" % len(noms)
+
+    faits = []
+    for p in a_creer:
+        nom = _nom_jellyfin_libre(noms, p.get("pseudo"))
+        try:
+            appel_post(jf_url, jf_token, "/Users/New", {"Name": nom})
+        except urllib.error.HTTPError as e:
+            # On laisse le "*" en place : le passage suivant réessaiera, et
+            # l'échec est lisible dans le journal plutôt que silencieux.
+            journal(base, key, "comptes_jf_bilan",
+                    "échec création « %s » : HTTP %s" % (nom, e.code))
+            continue
+        noms.append(nom)
+        _pousser_profil(base, key, p["user_id"], {"jellyfin": nom})
+        faits.append(nom)
+    return "%d compte(s) ; créés : %s" % (len(noms), ", ".join(faits) or "aucun")
+
+
+# ---------------------------------------------------------------------------
+# Où chacun en est dans ses films, compte par compte.
+#
+# L'export principal ne connaît la progression que d'UN compte (celui qui
+# l'exécute) : tout le foyer voyait donc la même reprise, et personne la
+# sienne. `/Users/{id}/Items/Resume` rend exactement les titres à reprendre
+# d'une personne — bien moins cher qu'un second parcours complet.
+def reprises_par_compte(jf_url, jf_token):
+    """{ identifiant TMDB : { "Dad": minutes, … } }"""
+    users = appel(jf_url, jf_token, "/Users", {}) or []
+    par_titre = {}
+    for u in users:
+        uid, nom = u.get("Id"), u.get("Name") or ""
+        if not uid or not nom:
+            continue
+        try:
+            d = appel(jf_url, jf_token, "/Users/%s/Items/Resume" % uid, {
+                "Limit": 60,
+                "MediaTypes": "Video",
+                "Fields": "ProviderIds,RunTimeTicks",
+                "Recursive": "true",
+            })
+        except Exception:
+            continue
+        for it in (d.get("Items") or []):
+            tmdb = (it.get("ProviderIds") or {}).get("Tmdb")
+            try:
+                tmdb = int(tmdb)
+            except (TypeError, ValueError):
+                continue
+            ticks = ((it.get("UserData") or {}).get("PlaybackPositionTicks")) or 0
+            mn = int(round(ticks / 600000000))
+            if mn > 0:
+                par_titre.setdefault(tmdb, {})[nom] = mn
+    return par_titre
 
 
 def _abos_de(base, key, users):
@@ -1236,8 +1356,16 @@ def main():
 
     try:
         uid = utilisateur_principal(a.url, a.token)
-        films, fiches_f, films_ko = recuperer(a.url, a.token, "Movie", uid)
-        series, fiches_s, series_ko = recuperer(a.url, a.token, "Series", uid)
+        moi = ""
+        try:
+            for u in (appel(a.url, a.token, "/Users", {}) or []):
+                if u.get("Id") == uid:
+                    moi = u.get("Name") or ""
+                    break
+        except Exception:
+            pass
+        films, fiches_f, films_ko = recuperer(a.url, a.token, "Movie", uid, moi)
+        series, fiches_s, series_ko = recuperer(a.url, a.token, "Series", uid, moi)
     except urllib.error.HTTPError as e:
         sys.exit("Jellyfin a répondu %s — vérifie la clé API." % e.code)
     except urllib.error.URLError as e:
@@ -1267,10 +1395,36 @@ def main():
             print("Mots-clés sautés : %s" % e)
             journal(a.supabase_url, a.supabase_key, "motscles", "ÉCHEC : %s" % e)
         try:
+            bilan = comptes_jellyfin(a.supabase_url, a.supabase_key, a.url, a.token)
+            journal(a.supabase_url, a.supabase_key, "comptes_jf_bilan", bilan)
+        except Exception as e:
+            print("Comptes serveur sautés : %s" % e)
+            journal(a.supabase_url, a.supabase_key, "comptes_jf_bilan", "ÉCHEC : %s" % e)
+        try:
             collecter_sorties(a.supabase_url, a.supabase_key)
         except Exception as e:
             print("Sorties physiques sautées : %s" % e)
             journal(a.supabase_url, a.supabase_key, "sorties", "ÉCHEC : %s" % e)
+
+    # La progression de chacun : une passe légère par compte, greffée sur les
+    # fiches déjà construites. Un échec ici ne coûte que la rangée
+    # « Continuer la lecture » — le catalogue, lui, part quand même.
+    try:
+        par_titre = reprises_par_compte(a.url, a.token)
+        if par_titre:
+            for f in fiches_f + fiches_s:
+                d = par_titre.get(f.get("id"))
+                if d:
+                    p = f.get("pos")
+                    f["pos"] = dict(p) if isinstance(p, dict) else {}
+                    f["pos"].update(d)
+            if a.supabase:
+                journal(a.supabase_url, a.supabase_key, "reprises",
+                        "%d titre(s) en cours, tous comptes confondus" % len(par_titre))
+    except Exception as e:
+        print("Reprises par compte sautées : %s" % e)
+        if a.supabase:
+            journal(a.supabase_url, a.supabase_key, "reprises", "ÉCHEC : %s" % e)
 
     contenu = {
         "maj": date.today().isoformat(),
