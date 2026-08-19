@@ -31,11 +31,23 @@ const labelTout = ()=> 'Tout';
 
 /* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
    et l'adresse de leur recherche — pour ouvrir un titre directement chez elles. */
+/* Les plateformes proposées au foyer. Les identifiants sont ceux de TMDB
+   (JustWatch) ; chaque lien de recherche a été ouvert et vérifié le 19/08
+   depuis la France. Ordre : les abonnements d'abord, les gratuites ensuite —
+   c'est l'ordre dans lequel on se demande « où je peux le voir ce soir ». */
 const PLATEFORMES = [
-  { id:8,   nom:'Netflix',     cl:'p-netflix', lien:t=>'https://www.netflix.com/search?q='+encodeURIComponent(t) },
-  { id:119, nom:'Prime Video', cl:'p-prime',   lien:t=>'https://www.primevideo.com/search/?phrase='+encodeURIComponent(t) },
-  { id:337, nom:'Disney+',     cl:'p-disney',  lien:t=>'https://www.disneyplus.com/search?q='+encodeURIComponent(t) },
-  { id:381, nom:'Canal+',      cl:'p-canal',   lien:t=>'https://www.canalplus.com/recherche?q='+encodeURIComponent(t) }
+  { id:8,    nom:'Netflix',     cl:'p-netflix',   lien:t=>'https://www.netflix.com/search?q='+encodeURIComponent(t) },
+  { id:119,  nom:'Prime Video', cl:'p-prime',     lien:t=>'https://www.primevideo.com/search/?phrase='+encodeURIComponent(t) },
+  { id:337,  nom:'Disney+',     cl:'p-disney',    lien:t=>'https://www.disneyplus.com/search?q='+encodeURIComponent(t) },
+  { id:381,  nom:'Canal+',      cl:'p-canal',     lien:t=>'https://www.canalplus.com/recherche?q='+encodeURIComponent(t) },
+  /* « Max » est redevenu HBO Max en 2025 — c'est le nom que TMDB emploie. */
+  { id:1899, nom:'HBO Max',     cl:'p-max',       lien:t=>'https://play.max.com/search?q='+encodeURIComponent(t) },
+  { id:531,  nom:'Paramount+',  cl:'p-paramount', lien:t=>'https://www.paramountplus.com/fr/search/?query='+encodeURIComponent(t) },
+  { id:350,  nom:'Apple TV+',   cl:'p-apple',     lien:t=>'https://tv.apple.com/fr/search?term='+encodeURIComponent(t) },
+  { id:1754, nom:'TF1+',        cl:'p-tf1',       lien:t=>'https://www.tf1.fr/recherche?q='+encodeURIComponent(t) },
+  { id:147,  nom:'M6+',         cl:'p-m6',        lien:t=>'https://www.6play.fr/recherche?q='+encodeURIComponent(t) },
+  { id:234,  nom:'Arte',        cl:'p-arte',      lien:t=>'https://www.arte.tv/fr/search/?q='+encodeURIComponent(t) },
+  { id:1967, nom:'Molotov',     cl:'p-molotov',   lien:t=>'https://app.molotov.tv/search?q='+encodeURIComponent(t) }
 ];
 const FOURNISSEURS = PLATEFORMES.map(p=>p.id).join('|');
 
@@ -714,13 +726,13 @@ function setPresence(p){
 function bascPlateforme(id){
   const g = GOUTS.d || (GOUTS.d = {});
   let l = (g.plats||[]).slice();
-  /* Liste vide = « les quatre » : avant d'en retirer une, on rend ce
+  /* Liste vide = « toutes » : avant d'en retirer une, on rend ce
      « toutes » explicite, sinon décocher Netflix l'aurait AJOUTÉ seul. */
   if(!l.length) l = PLATEFORMES.map(p=>p.id);
   const k = l.indexOf(id);
   if(k < 0) l.push(id); else l.splice(k,1);
   g.plats = l;
-  if(!l.length) toast('Aucune cochée : les quatre seront proposées');
+  if(!l.length) toast('Aucune cochée : toutes seront proposées');
   enregistrerGouts(g);
   ouvrirFiltres(); chargerDecouverte();
 }
@@ -799,7 +811,7 @@ function ouvrirFiltres(){
     (d.type === 'movie' ? 'films' : 'séries')+'.</div>';
   /* Sur « Ce soir » : les plateformes du PROFIL, modifiables ici même.
      Décocher = « je n'ai plus cet abonnement » — l'app entière suit,
-     guide compris. Rien de coché = les quatre. */
+     guide compris. Rien de coché = toutes. */
   if(ui.presence === 'soir'){
     const actives = platsFilms();
     h += '<div class="fgrp">Mes plateformes</div><div class="fchips">'+
