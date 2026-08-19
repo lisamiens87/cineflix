@@ -81,6 +81,11 @@ function viewProfil(){
       '<button class="btn '+(nAcces ? '' : 'ghost ')+'block" style="margin-top:8px" '+
         'onclick="go(\'acces\');chargerAcces()">'+I.user+
         ' Demandes d\'accès'+(nAcces ? ' ('+nAcces+')' : '')+'</button>'+
+      /* Les membres déjà validés : attribuer leur compte serveur, retirer un
+         accès, supprimer un profil (3008j). */
+      '<button class="btn ghost block" style="margin-top:8px" '+
+        'onclick="go(\'membres\');chargerMembres()">'+I.user+
+        ' Membres du foyer</button>'+
       /* Inviter quelqu'un : tout le début de la procédure (envoyer le lien
          et les trois étapes) tient dans un message WhatsApp prérempli.
          Il ne reste à l'admin que la validation, dans Demandes d'accès. */
@@ -162,23 +167,24 @@ function viewReglages(){
       '<input type="text" id="rgpseudo" value="'+esc(db.pseudo||'')+'" placeholder="Ton prénom" '+
       'autocomplete="given-name">'+
       '<em>Sert à signer tes demandes.</em></label>'+
-    /* Le compte Jellyfin ne sert encore à rien — d'où sa place ici, et pas
-       dans le parcours d'accueil où il n'aurait fait qu'embrouiller. */
-    ((CFG.jellyfinUsers||[]).length
-      ? '<div class="rgbloc" style="margin-top:4px">'+
-          '<div class="rglbl" style="text-align:left">Mon compte sur le serveur</div>'+
-          '<div class="gchips" style="justify-content:flex-start">'+
-            (CFG.jellyfinUsers||[]).map(u =>
-              '<button class="chip '+(mp.jellyfin === u ? 'on':'')+
-              '" onclick="lierJellyfin(\''+esc(u)+'\')">'+esc(u)+'</button>').join('')+
-            '<button class="chip '+(!mp.jellyfin ? 'on':'')+
-            '" onclick="lierJellyfin(\'\')">Aucun</button>'+
-          '</div>'+
-          '<div class="tiny muted" style="margin-top:6px">C\'est ce compte qui '+
-            'sert à reprendre un film là où tu l\'avais laissé, et c\'est lui '+
-            'que tu choisis dans Swiftfin ou Jellyfin sur ta télé.</div>'+
-        '</div>'
-      : '')+
+    /* ⚠️ LE COMPTE SERVEUR NE SE CHOISIT PAS SOI-MÊME (3008j). Jusqu'ici
+       chacun pouvait cocher n'importe lequel — Caroline pouvait se déclarer
+       « Dad » et hériter de ses reprises. C'est l'administrateur qui
+       attribue, au moment d'ouvrir l'accès ; ici on ne fait que le dire. */
+    '<div class="rgbloc" style="margin-top:4px">'+
+      '<div class="rglbl" style="text-align:left">Mon compte sur le serveur</div>'+
+      '<div class="card" style="padding:12px;margin-top:6px">'+
+        (mp.jellyfin
+          ? '<div style="font-weight:660">'+esc(mp.jellyfin)+'</div>'+
+            '<div class="tiny muted" style="margin-top:4px">C\'est ce compte qui '+
+              'reprend un film là où tu l\'avais laissé, et c\'est lui que tu '+
+              'choisis dans Swiftfin ou Jellyfin sur ta télé.</div>'
+          : '<div style="font-weight:660">Aucun</div>'+
+            '<div class="tiny muted" style="margin-top:4px">Tout Cinéflix '+
+              'fonctionne, sauf « Continuer la lecture ». Demande à '+
+              'l\'administrateur du foyer s\'il t\'en faut un.</div>')+
+      '</div>'+
+    '</div>'+
   '</div>';
 
   html += '<div class="sectitle">Connexion TMDB</div><div class="wrap" style="padding-top:0">'+
