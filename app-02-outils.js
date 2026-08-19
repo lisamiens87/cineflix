@@ -131,6 +131,8 @@ let ui = {
   searchQ:'', searchRes:null, searchPers:null, searching:false, searchErr:'',
   sorties:{ mode:'bluray', res:[], loading:false, err:'', charge:false },
   listeTab:'favoris',
+  listeVolet:'liste',                    // Ma liste | Sorties | Suggestions (3007y)
+  sugg:{ l:[], plie:{}, loading:false, err:'', charge:false },
   fiche:null,
   saison:null,
   auth:{ mode:'connexion', err:'', occupe:false },
@@ -276,6 +278,12 @@ function render(){
     if(!ui.disc.charge && !ui.disc.loading && db.apiKey) chargerDecouverte();
   }
   if(view === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
+  /* Ma liste porte désormais les volets Sorties et Suggestions (3007y) :
+     revenir sur l'écran doit relancer le chargement qui manque. */
+  if(view === 'liste'){
+    if(ui.listeVolet === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
+    if(ui.listeVolet === 'sugg' && !ui.sugg.charge && !ui.sugg.loading) chargerSuggestions();
+  }
 }
 
 /* La page principale est une COUVERTURE (le grand visuel, rien d'autre) ;
@@ -323,7 +331,9 @@ function renderNav(){
       act:"ouvrirCatalogue('movie')", ic:'', lab:'Films' },
     { cl:'t-series dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'tv',
       act:"ouvrirCatalogue('tv')", ic:'', lab:'Séries' },
-    { cl:'t-sorties', on: cur === 'sorties', act:"go('sorties')", ic:I.cal, lab:'Sorties' },
+    /* Sorties a rejoint Ma liste sur téléphone (volet, 3007y) : l'onglet ne
+       subsiste que sur le bureau — la classe dsk le retire de la barre. */
+    { cl:'t-sorties dsk', on: cur === 'sorties', act:"go('sorties')", ic:I.cal, lab:'Sorties' },
     { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, lab:'Ma liste', badge:n },
     { cl:'t-profil', on: cur === 'profil', act:"go('profil')", ic:I.user, lab:'Profil' }
   ];
