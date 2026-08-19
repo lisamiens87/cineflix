@@ -175,6 +175,7 @@ function currentBack(){
   if(view === 'bienvenue') return db.onboarde ? 'profil' : null;
   if(view === 'file') return 'profil';
   if(view === 'acces') return 'profil';
+  if(view === 'membres') return 'profil';
   if(view === 'guide') return params.from || 'decouvrir';
   return null;
 }
@@ -243,6 +244,7 @@ function render(){
   else if(view === 'bienvenue') html = viewBienvenue();
   else if(view === 'attente')   html = viewAttente();
   else if(view === 'acces')     html = viewAcces();
+  else if(view === 'membres')   html = viewMembres();
   else if(view === 'guide')     html = viewGuide();
   else if(view === 'file')      html = viewFile();
   else if(view === 'decouvrir') html = viewDecouvrir();
@@ -310,7 +312,8 @@ function renderNav(){
     : params.from === 'guide' ? 'decouvrir'
     : (params.from || (view === 'personne' ? ((ui.personne||{}).nav||{}).ffrom : ''));
   const cur = (view === 'fiche' || view === 'personne') ? (depuis || 'decouvrir')
-            : (view === 'reglages' || view === 'file' || view === 'acces') ? 'profil'
+            : (view === 'reglages' || view === 'file' || view === 'acces' ||
+               view === 'membres') ? 'profil'
             : view;
   const exp = !!ui.exploration;
 
