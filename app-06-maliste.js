@@ -36,7 +36,9 @@ function voletsListe(){
   if(typeof estAdmin !== 'undefined' && estAdmin)
     volets.push({id:'sugg', label:'Suggestions'});
   if(!volets.some(v => v.id === ui.listeVolet)) ui.listeVolet = 'liste';
-  return '<div class="chips">'+volets.map(v=>
+  /* `volets` : trois parts égales, pleine largeur — les puces flottaient à
+     gauche et Alexandre les voulait alignées (3008d). */
+  return '<div class="chips volets">'+volets.map(v=>
     '<button class="chip '+(ui.listeVolet===v.id?'on':'')+'" onclick="setListeVolet(\''+v.id+'\')">'+
     v.label+'</button>').join('')+'</div>';
 }
@@ -52,15 +54,15 @@ function setListeVolet(id){
 function viewListe(){
   const volets = voletsListe();
 
-  /* ---- Volet Sorties : le calendrier d'app-04, sous nos volets ---- */
+  /* ---- Volet Sorties : le calendrier d'app-04, en grille d'affiches ---- */
   if(ui.listeVolet === 'sorties'){
-    return header('Ma liste', {sub: volets + chipsModes(true)}) +
-      banniereCle() + corpsSorties();
+    return header('Pour moi', {sub: volets + chipsModes(true)}) +
+      banniereCle() + corpsSortiesGrille();
   }
 
   /* ---- Volet Suggestions ---- */
   if(ui.listeVolet === 'sugg'){
-    return header('Ma liste', {sub: volets}) + corpsSuggestions();
+    return header('Pour moi', {sub: volets}) + corpsSuggestions();
   }
 
   /* ---- Volet Ma liste : l'écran historique ---- */
@@ -72,7 +74,10 @@ function viewListe(){
     '<button class="chip '+(ui.listeTab===o.id?'on':'')+'" onclick="setListeTab(\''+o.id+'\')">'+
     o.label+' <span style="opacity:.65">'+compte[o.id]+'</span></button>').join('')+'</div>';
 
-  let html = header('Ma liste', {sub:sub,
+  /* « Pour moi » en titre d'écran (3008d) : « Ma liste » vivait en double —
+     dans la barre du bas ET sur le premier volet. L'onglet et l'écran disent
+     désormais l'espace personnel, le volet garde son nom. */
+  let html = header('Pour moi', {sub:sub,
     right:'<button class="iconbtn" onclick="menuListe()">'+I.dots+'</button>'});
 
   if(ui.listeTab === 'favoris'){
@@ -208,10 +213,11 @@ function suggVisibles(){
     !surCineflix('movie', f.id) && acquis.indexOf(f.id) < 0);
 }
 
-function basculerCatSugg(nom){
-  ui.sugg.plie[nom] = !ui.sugg.plie[nom];
-  render();
-}
+/* L'émoji de chaque catégorie — ceux de la maquette validée. */
+const EMO_CAT = { 'Crime & Mafia':'🕴️', 'Action':'💥', 'Comédie':'🎭',
+  'Guerre':'🪖', 'Science-fiction':'🚀', 'Thriller':'🔪', 'Western':'🤠',
+  'Drame & Biopic':'🏆', 'Animation':'🎨', 'Américains années 90':'📼',
+  'Comédies françaises':'🇫🇷' };
 
 function marquerAcquis(id){
   db.acquis = db.acquis || [];
@@ -255,44 +261,22 @@ function corpsSuggestions(){
       (masquesAcquis ? '<button class="btn ghost" onclick="retablirAcquis()">Rétablir les films marqués acquis</button>' : '')+
       '</div>';
 
-  /* Regroupé catégorie → sous-rayon, dans l'ordre du fichier (voulu :
-     il va des évidences vers les curiosités). Les catégories se replient,
-     la première arrive ouverte. */
-  const cats = [];
+  /* Une rangée horizontale PAR SOUS-RAYON, façon Netflix — maquette validée
+     le 19/08 (3008d) : l'affiche d'abord, le « pourquoi » en deux lignes
+     dessous, et les deux gestes (acquis, cœur) posés sur l'affiche. */
+  const rayons = [];
   vis.forEach(f=>{
-    let c = cats.find(x => x.nom === f.cat);
-    if(!c){ c = { nom:f.cat, films:[] }; cats.push(c); }
-    c.films.push(f);
+    let r = rayons.find(x => x.cat === f.cat && x.sous === f.sous);
+    if(!r){ r = { cat:f.cat, sous:f.sous, films:[] }; rayons.push(r); }
+    r.films.push(f);
   });
 
   let html = '<div class="wrap sgintro">'+vis.length+' idées pour la vidéothèque, '+
     'd\'après l\'analyse du N4 du 18/08. Un film acquis disparaît au scan suivant.</div>';
-
-  /* L'émoji de chaque rayon — ceux de la maquette validée (3007z). */
-  const EMO_CAT = { 'Crime & Mafia':'🕴️', 'Action':'💥', 'Comédie':'🎭',
-    'Guerre':'🪖', 'Science-fiction':'🚀', 'Thriller':'🔪', 'Western':'🤠',
-    'Drame & Biopic':'🏆', 'Animation':'🎨', 'Américains années 90':'📼',
-    'Comédies françaises':'🇫🇷' };
-
-  cats.forEach((c,i)=>{
-    if(!(c.nom in s.plie)) s.plie[c.nom] = i > 0;
-    const plie = s.plie[c.nom];
-    /* Le nom passe encodé dans l'attribut : « Crime & Mafia » ou un futur
-       rayon avec apostrophe ne doivent pas casser l'onclick. */
-    html += '<button class="sgcat" onclick="basculerCatSugg(decodeURIComponent(\''+
-      encodeURIComponent(c.nom)+'\'))">'+
-      '<span>'+(EMO_CAT[c.nom] ? EMO_CAT[c.nom]+'  ' : '')+esc(c.nom)+'</span>'+
-      '<span class="sgn">'+c.films.length+' film'+(c.films.length>1?'s':'')+
-      ' <i class="sgfl'+(plie?'':' ouv')+'">'+I.back+'</i></span></button>';
-    if(plie) return;
-    let sous = '';
-    c.films.forEach(f=>{
-      if(f.sous !== sous){
-        sous = f.sous;
-        html += '<div class="sgsous">'+esc(sous)+'</div>';
-      }
-      html += carteSugg(f);
-    });
+  rayons.forEach(r=>{
+    html += '<div class="sgrt"><span>'+(EMO_CAT[r.cat] ? EMO_CAT[r.cat]+' ' : '')+
+      esc(r.sous)+'</span><i>'+esc(r.cat)+'</i></div>'+
+      '<div class="sgrow">'+r.films.map(carteSugg).join('')+'</div>';
   });
 
   const nMasques = masquesAcquis + Math.max(0, masquesCat);
@@ -307,18 +291,16 @@ function corpsSuggestions(){
 function carteSugg(f){
   const it = item('movie', f.id);
   const fav = !!(it && it.fav);
-  return '<div class="sgfilm">'+
-    '<button class="sgaff" onclick="ouvrirFiche('+f.id+',\'movie\',\'liste\')" aria-label="'+esc(f.titre)+'">'+
-      posterEl(f.poster,'w154','',f.titre)+'</button>'+
-    '<div class="sginfo" onclick="ouvrirFiche('+f.id+',\'movie\',\'liste\')">'+
-      '<div class="sgt">'+esc(f.titre)+' <span class="sgy">'+esc(String(f.annee||''))+'</span></div>'+
-      '<div class="sgwhy">'+esc(f.pourquoi)+'</div>'+
+  return '<div class="sgc" onclick="ouvrirFiche('+f.id+',\'movie\',\'liste\')">'+
+    '<div class="wrapimg">'+posterEl(f.poster,'w342','',f.titre)+
+      '<div class="sgact">'+
+        '<button onclick="event.stopPropagation();marquerAcquis('+f.id+')" aria-label="Marquer acquis">✓</button>'+
+        '<button class="'+(fav?'on':'')+'" onclick="event.stopPropagation();coeurSugg('+f.id+')" aria-label="Favori">'+
+          (fav ? '♥' : '♡')+'</button>'+
+      '</div>'+
     '</div>'+
-    '<div class="sgbt">'+
-      '<button class="sgb" onclick="marquerAcquis('+f.id+')">Acquis ✓</button>'+
-      '<button class="sgb'+(fav?' sgbon':'')+'" onclick="coeurSugg('+f.id+')" aria-label="Favori">'+
-        (fav ? I.coeurPlein : I.coeur)+'</button>'+
-    '</div>'+
+    '<div class="sgnom">'+esc(f.titre)+' <span class="sgy">'+esc(String(f.annee||''))+'</span></div>'+
+    '<div class="sgwhy2">'+esc(f.pourquoi)+'</div>'+
   '</div>';
 }
 
