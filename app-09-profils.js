@@ -184,6 +184,9 @@ function basculerPlatGout(id){
   const l = g.plats || (g.plats = []);
   const i = l.indexOf(id);
   if(i >= 0) l.splice(i, 1); else l.push(id);
+  /* Toucher une pastille EST une réponse : zéro coché veut alors dire
+     « aucun abonnement », pas « je n'ai rien dit » (3008h). */
+  g.platsDit = true;
   enregistrerGouts(g);
   ficheGouts();
 }
@@ -191,9 +194,13 @@ function ficheGouts(){
   const g = GOUTS.d || {};
   const plats = g.plats || [];
   openSheet('<h3>Mes goûts</h3>'+
-    '<div class="fgrp">Mes plateformes'+
-      (plats.length ? ' ('+plats.length+')' : ' — aucune : le guide pioche dans toutes')+'</div>'+
-    '<div class="fchips">'+PLATEFORMES.map(pf=>
+    '<div class="fgrp">Où je peux regarder'+
+      (plats.length ? ' — Cinéflix + '+plats.length
+        : (g.platsDit ? ' — Cinéflix seul' : ' — Cinéflix + toutes les plateformes'))+'</div>'+
+    '<div class="fchips">'+
+      '<button class="chip c-flix on" onclick="toast(\'Ta bibliothèque Cinéflix est toujours incluse.\')">'+
+        'Cinéflix ✓</button>'+
+      PLATEFORMES.map(pf=>
       '<button class="chip '+pf.cl+' '+(plats.indexOf(pf.id) >= 0 ? 'on' : '')+
       '" onclick="basculerPlatGout('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>'+
     '<div class="fgrp">Ce que j\'aime</div>'+
@@ -297,7 +304,10 @@ async function finirBienvenue(guider){
   try{ await majProfil(); }catch(e){}
   await enregistrerGouts({
     aimes: BROUILLON.aimes, fuis: BROUILLON.fuis, totems: BROUILLON.totems,
-    plats: BROUILLON.plats, vo: BROUILLON.vo, duree: BROUILLON.duree,
+    /* platsDit : la personne EST passée par l'écran des abonnements, donc
+       « aucun coché » est une réponse, pas un silence (3008h). */
+    plats: BROUILLON.plats, platsDit: true,
+    vo: BROUILLON.vo, duree: BROUILLON.duree,
     vieux: BROUILLON.vieux
   });
   ui.bienv.occupe = false;
@@ -434,7 +444,10 @@ function viewBienvenue(){
     h += '<h1>Tes abonnements</h1>'+
       '<p class="accsub">On ne te proposera que ce que tu peux regarder ce soir : '+
       'la bibliothèque du serveur, et ces plateformes-là.</p>'+
-      '<div class="gchips">'+PLATEFORMES.map(p=>
+      '<div class="gchips">'+
+        '<button class="chip plat c-flix on" onclick="toast(\'Ta bibliothèque Cinéflix est toujours incluse.\')">'+
+          'Cinéflix ✓</button>'+
+        PLATEFORMES.map(p=>
         /* Aux couleurs de marque, comme dans les filtres et Mes goûts :
            onze pastilles grises se ressemblent toutes (3008f). */
         '<button class="chip plat '+p.cl+' '+(BROUILLON.plats.indexOf(p.id)>=0?'on':'')+
