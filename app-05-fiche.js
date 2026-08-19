@@ -158,7 +158,15 @@ function actionsFiche(o, type){
 
   /* Le posséder passe avant tout : inutile d'envoyer vers Netflix un film
      qui est déjà chez soi, en meilleure qualité et sans abonnement. */
-  const dispo = st === 'obtenu' ? [] : platsDuTitre(o);
+  const toutes = st === 'obtenu' ? [] : platsDuTitre(o);
+  /* Mes abonnements d'abord (3008g). Un gros bouton « Canal+ » sur un film
+     qu'on ne peut pas lancer, faute d'abonnement, est une fausse promesse :
+     Alexandre l'a dit le 19/08. Les plateformes qu'il A passent en tête ;
+     les autres redescendent en une ligne d'information, sous le bouton
+     « Demander sur Cinéflix » qui redevient l'action principale. */
+  const miennes = platsFilms();
+  const dispo  = toutes.filter(pf => miennes.indexOf(pf.id) >= 0);
+  const ailleurs = toutes.filter(pf => miennes.indexOf(pf.id) < 0);
   if(dispo.length){
     /* Chaque bouton porte le sigle et la couleur de sa plateforme. */
     const boutons = dispo.map(pf =>
@@ -199,7 +207,15 @@ function actionsFiche(o, type){
       I.envoi+' Demander sur Cinéflix</button>';
   }
 
-  return '<div class="actions">'+principal+coeur+'</div>';
+  /* « Sinon, il existe ailleurs » — une phrase, pas des boutons : c'est une
+     information, pas une invitation à s'abonner. Chaque nom reste cliquable
+     pour qui voudrait quand même aller voir. */
+  const note = ailleurs.length
+    ? '<div class="credit">Pas sur tes plateformes — dispo sur '+
+      ailleurs.map(pf => '<button class="lienplat enligne" onclick="ouvrirPlateforme('+
+        pf.id+')">'+esc(pf.nom)+'</button>').join(', ')+'.</div>'
+    : '';
+  return '<div class="actions">'+principal+coeur+'</div>'+note;
 }
 
 /* Le bouton « Demander » a besoin de l'objet complet pour retenir titre et
