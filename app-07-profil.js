@@ -174,8 +174,9 @@ function viewReglages(){
             '<button class="chip '+(!mp.jellyfin ? 'on':'')+
             '" onclick="lierJellyfin(\'\')">Aucun</button>'+
           '</div>'+
-          '<div class="tiny muted" style="margin-top:6px">Pas encore utilisé : '+
-            'servira à reprendre un film là où tu l\'avais laissé.</div>'+
+          '<div class="tiny muted" style="margin-top:6px">C\'est ce compte qui '+
+            'sert à reprendre un film là où tu l\'avais laissé, et c\'est lui '+
+            'que tu choisis dans Swiftfin ou Jellyfin sur ta télé.</div>'+
         '</div>'
       : '')+
   '</div>';
