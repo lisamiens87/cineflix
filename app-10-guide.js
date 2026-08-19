@@ -704,8 +704,19 @@ function guiderHumeur(id){
 /* « Ou entrer par catégorie » ouvre un ÉCRAN, pas un dépliant : c'est une
    autre étape — on ne choisit plus une envie, on ouvre un rangement — et une
    étape mérite sa page, avec son titre et sa flèche de retour. */
-function ouvrirCategories(){ ui.guide.ecran = 'cat'; render(); }
-function fermerCategories(){ ui.guide.ecran = ''; render(); }
+/* Passer de « Guide-moi » à « Par catégorie » et revenir, c'est changer de
+   page sans changer de vue : on note la hauteur de lecture qu'on quitte et
+   on rend celle qu'on retrouve (3008n). */
+function ouvrirCategories(){
+  noterDefil('guide');
+  ui.guide.ecran = 'cat'; render();
+  rendreDefil('guide:cat');
+}
+function fermerCategories(){
+  noterDefil('guide:cat');
+  ui.guide.ecran = ''; render();
+  rendreDefil('guide');
+}
 
 /* Deux colonnes : les vingt genres à gauche, les rayons et les films à
    droite. Chaque colonne a son propre défilement — c'est tout l'intérêt de
@@ -724,15 +735,43 @@ const catEtroit = ()=> {
   try{ return !matchMedia('(min-width:860px)').matches; }catch(e){ return true; }
 };
 
+/* Deux gestes, deux oublis à réparer (3008n) :
+
+   — ouvrir un genre en REFERME un autre. Si celui qui se referme est au-dessus,
+     tout remonte sous le doigt et on se retrouve ailleurs dans la liste. On
+     mesure donc où était le genre touché, et on rattrape l'écart après le
+     rendu : la ligne qu'on vient de toucher ne bouge pas d'un pixel.
+   — la rangée de films se pousse du doigt, et le rendu suivant la ramenait au
+     premier film. On note son défilement au fil du geste. */
+const memCat = { ray:0, row:0 };
+function noterCatX(el, quoi){ memCat[quoi] = el.scrollLeft || 0; }
+function restaurerDefilCat(){
+  if(((ui.guide||{}).ecran !== 'cat') || !catEtroit()) return;
+  const ray = document.querySelector('.caccray'), row = document.querySelector('.caccrow');
+  if(ray && memCat.ray) ray.scrollLeft = memCat.ray;
+  if(row && memCat.row) row.scrollLeft = memCat.row;
+}
+
+function basculeCatAcc(gid){
+  const i = TAXO.findIndex(x => x.id === gid);
+  const av = document.querySelectorAll('.caccg')[i];
+  const haut = av ? av.getBoundingClientRect().top : null;
+  memCat.ray = 0; memCat.row = 0;      /* autre genre = autre rangée, on repart du début */
+  setTaxoGenre(gid);
+  if(haut === null) return;
+  const ap = document.querySelectorAll('.caccg')[i];
+  if(ap) window.scrollBy(0, ap.getBoundingClientRect().top - haut);
+}
+
 function corpsCatAccordeon(g){
   const ouvert = taxoGenreOuvert();
   return '<div class="catacc">'+TAXO.map(x=>{
     const on = ouvert === x.id;
-    let h = '<button class="caccg'+(on?' on':'')+'" onclick="setTaxoGenre(\''+x.id+'\')">'+
+    let h = '<button class="caccg'+(on?' on':'')+'" onclick="basculeCatAcc(\''+x.id+'\')">'+
       '<span class="cacce">'+x.emo+'</span><b>'+esc(x.nom)+'</b>'+
       '<i class="caccf">'+(on ? '⌄' : '›')+'</i></button>';
     if(!on) return h;
-    let d = '<div class="caccray">'+
+    let d = '<div class="caccray" onscroll="noterCatX(this,\'ray\')">'+
       (x.sous||[]).map(s=>'<button class="chip'+(g.taxoSel === s.id ? ' on' : '')+
         '" onclick="guiderTaxo(\''+s.id+'\')">'+esc(s.nom)+'</button>').join('')+
       '<button class="chip'+(g.taxoSel === x.id ? ' on' : '')+
@@ -744,7 +783,7 @@ function corpsCatAccordeon(g){
     else {
       const l = g.res.filter(c => !rejete(c.id));
       d += l.length
-        ? '<div class="caccrow">'+l.map(carteGuide).join('')+'</div>'
+        ? '<div class="caccrow" onscroll="noterCatX(this,\'row\')">'+l.map(carteGuide).join('')+'</div>'
         : '<div class="catvide">Rien dans ce rayon. Essaie un rayon voisin.</div>';
     }
     return h + '<div class="caccbloc">'+d+'</div>';
