@@ -49,6 +49,16 @@
   .tab.tel{display:flex}
   .tab.t-profil{display:none}
 
+  /* 3007z — la barre du bas ne compte plus que trois onglets depuis que
+     Sorties vit dans Ma liste : la grille de quatre laissait une colonne
+     vide à droite. Et les icônes passent en émoji colorés, comme sur la
+     maquette validée par Alexandre. */
+  .navin{grid-template-columns:repeat(3,1fr)}
+  .tab .icsvg{display:none}
+  .tab .icemo{display:block;font-size:22px;line-height:23px;
+    transition:transform .18s}
+  .tab.on .icemo{transform:translateY(-1px) scale(1.08)}
+
   /* Typo du guide d'un cran en dessous : sur 420 px de large, les tuiles
      étaient des étiquettes plus que des boutons, et le titre de section
      pesait autant que les affiches qu'il annonce. */
