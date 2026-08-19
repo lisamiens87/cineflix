@@ -192,7 +192,7 @@ function ficheGouts(){
   const plats = g.plats || [];
   openSheet('<h3>Mes goûts</h3>'+
     '<div class="fgrp">Mes plateformes'+
-      (plats.length ? ' ('+plats.length+')' : ' — aucune : le guide pioche dans les quatre')+'</div>'+
+      (plats.length ? ' ('+plats.length+')' : ' — aucune : le guide pioche dans toutes')+'</div>'+
     '<div class="fchips">'+PLATEFORMES.map(pf=>
       '<button class="chip '+pf.cl+' '+(plats.indexOf(pf.id) >= 0 ? 'on' : '')+
       '" onclick="basculerPlatGout('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>'+
@@ -435,7 +435,9 @@ function viewBienvenue(){
       '<p class="accsub">On ne te proposera que ce que tu peux regarder ce soir : '+
       'la bibliothèque du serveur, et ces plateformes-là.</p>'+
       '<div class="gchips">'+PLATEFORMES.map(p=>
-        '<button class="chip plat '+(BROUILLON.plats.indexOf(p.id)>=0?'on':'')+
+        /* Aux couleurs de marque, comme dans les filtres et Mes goûts :
+           onze pastilles grises se ressemblent toutes (3008f). */
+        '<button class="chip plat '+p.cl+' '+(BROUILLON.plats.indexOf(p.id)>=0?'on':'')+
         '" onclick="bascListe(\'plats\','+p.id+')">'+esc(p.nom)+'</button>').join('')+
       '</div>'+
       '<div class="tiny muted center" style="margin-top:12px">'+
