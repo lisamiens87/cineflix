@@ -81,8 +81,14 @@ function viewProfil(){
       '<button class="btn '+(nAcces ? '' : 'ghost ')+'block" style="margin-top:8px" '+
         'onclick="go(\'acces\');chargerAcces()">'+I.user+
         ' Demandes d\'accès'+(nAcces ? ' ('+nAcces+')' : '')+'</button>'+
+      /* Inviter quelqu'un : tout le début de la procédure (envoyer le lien
+         et les trois étapes) tient dans un message WhatsApp prérempli.
+         Il ne reste à l'admin que la validation, dans Demandes d'accès. */
+      '<button class="btn ghost block" style="margin-top:8px" onclick="inviterWhatsApp()">'+
+        '💬 Inviter quelqu\'un (WhatsApp)</button>'+
       '<div class="tiny muted center" style="margin-top:8px">'+
-        'Les titres réclamés, et les personnes qui veulent entrer.</div>'+
+        'Les titres réclamés, les personnes qui veulent entrer, '+
+        'et l\'invitation prête à envoyer.</div>'+
     '</div>';
   }
 
@@ -115,6 +121,21 @@ function viewProfil(){
     /* Le numéro de version, posé par index.html : quand un téléphone semble
        afficher une vieille version, ce numéro tranche en un coup d'œil. */
     (window.BUILD ? ' · v'+esc(window.BUILD) : '')+'</div>';
+}
+
+/* Inviter quelqu'un sur WhatsApp : wa.me sans numéro ouvre WhatsApp sur le
+   choix du destinataire, le message déjà écrit. Les trois étapes collent au
+   vrai parcours (Créer un profil : prénom, e-mail, code à six chiffres,
+   puis « Envoyer ma demande » que l'admin valide). */
+function inviterWhatsApp(){
+  const msg =
+    "🍿 Je t'invite sur Cinéflix, notre cinéma à la maison !\n\n"+
+    "1️⃣ Ouvre ce lien sur ton téléphone :\n"+location.origin+location.pathname+"\n"+
+    "2️⃣ Touche « Créer un profil » : ton prénom, ton e-mail et un code à six chiffres.\n"+
+    "3️⃣ Touche « Envoyer ma demande » — je la valide de mon côté et tu entres.\n\n"+
+    "💡 Astuce : dans le menu du navigateur, « Ajouter à l'écran d'accueil » "+
+    "pour l'avoir comme une vraie appli.";
+  window.open('https://wa.me/?text='+encodeURIComponent(msg), '_blank');
 }
 
 async function lierJellyfin(u){
