@@ -152,6 +152,31 @@ header{
 .chip.p-disney.on{background:#113ccf;border-color:#113ccf;color:#fff}
 .chip.p-canal{border-color:#8a8a8a80}
 .chip.p-canal.on{background:#0e0e0e;border-color:#8a8a8a;color:#fff}
+/* Les sept plateformes ajoutées le 19/08 — couleurs de marque (celle de
+   Molotov relevée sur leur propre bouton : ambre, pas rouge — sinon elle se
+   confondait avec le rouge signature de l'app). Le NOM reste
+   ce qui identifie la pastille ; la couleur ne fait que la reconnaître vite. */
+.btn.plat.p-max{background:#002be7;border-color:#002be7;color:#fff}
+.btn.plat.p-paramount{background:#0064ff;border-color:#0064ff;color:#fff}
+.btn.plat.p-apple{background:#3a3a3c;border-color:#3a3a3c;color:#fff}
+.btn.plat.p-tf1{background:#1b2a8f;border-color:#1b2a8f;color:#fff}
+.btn.plat.p-m6{background:#e2007a;border-color:#e2007a;color:#fff}
+.btn.plat.p-arte{background:#ff7900;border-color:#ff7900;color:#241000}
+.btn.plat.p-molotov{background:#ffc107;border-color:#ffc107;color:#2b2000}
+.chip.p-max{border-color:#3a5cff80}
+.chip.p-max.on{background:#002be7;border-color:#002be7;color:#fff}
+.chip.p-paramount{border-color:#0064ff80}
+.chip.p-paramount.on{background:#0064ff;border-color:#0064ff;color:#fff}
+.chip.p-apple{border-color:#8e8e9380}
+.chip.p-apple.on{background:#3a3a3c;border-color:#8e8e93;color:#fff}
+.chip.p-tf1{border-color:#3f52c880}
+.chip.p-tf1.on{background:#1b2a8f;border-color:#1b2a8f;color:#fff}
+.chip.p-m6{border-color:#e2007a80}
+.chip.p-m6.on{background:#e2007a;border-color:#e2007a;color:#fff}
+.chip.p-arte{border-color:#ff790080}
+.chip.p-arte.on{background:#ff7900;border-color:#ff7900;color:#241000}
+.chip.p-molotov{border-color:#ffc10780}
+.chip.p-molotov.on{background:#ffc107;border-color:#ffc107;color:#2b2000}
 /* La coche « déjà sur Cinéflix » en ligne, dans le calendrier des sorties. */
 .cfx{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;
   background:var(--ok);color:#08130d;vertical-align:-3px;margin-left:4px}
