@@ -133,6 +133,70 @@ function setMode(id){
   chargerSorties();
 }
 
+/* ---------- La grille d'affiches (volet Sorties de « Pour moi ») ----------
+   Maquette validée par Alexandre le 19/08 (3008d) : fini les petites lignes
+   datées — la même grille d'affiches que Favoris, groupée par mois. La date
+   vit en badge sur l'affiche (suivie de « 4K » quand l'édition l'est), le
+   prix et l'édition dessous. Le bureau, lui, garde sa liste (corpsSorties). */
+const MOIS_PLEIN = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet',
+                    'Août','Septembre','Octobre','Novembre','Décembre'];
+function carteSortie(x){
+  const r = x.film, d2 = x.disque;
+  const chez = r.id && surCineflix('movie', r.id);
+  const sous = d2
+    ? [d2.prix ? d2.prix+' €' : '', d2.edition || ''].filter(Boolean).join(' · ')
+    : relatif(x.quand);
+  const corps = '<div class="wrapimg">'+posterEl(r.poster_path,'w342','',r.title||'')+
+      '<div class="sgdate">'+esc(fmtDateCourt(x.quand))+
+        (d2 && d2.uhd ? ' · 4K' : '')+'</div>'+
+      (chez ? '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>' : '')+
+    '</div>'+
+    '<div class="gname">'+esc(r.title||'')+'</div>'+
+    '<div class="gyear">'+esc(sous)+'</div>';
+  return r.id
+    ? '<button class="gcard" onclick="ouvrirFiche('+r.id+',\'movie\',\'liste\')">'+corps+'</button>'
+    : '<div class="gcard inerte">'+corps+'</div>';
+}
+function corpsSortiesGrille(){
+  const s = ui.sorties;
+  if(s.loading)
+    return '<div class="empty"><span class="spin"></span>'+
+      '<p style="margin-top:12px">Lecture des dates de sortie…</p></div>';
+  if(s.err)
+    return '<div class="empty">'+I.cal+'<h3>'+esc(s.err)+'</h3>'+
+      '<p>Vérifie ta connexion, puis réessaie.</p>'+
+      '<button class="btn ghost" onclick="chargerSorties()">Réessayer</button></div>';
+  if(!s.res.length)
+    return '<div class="empty">'+I.cal+'<h3>Aucune date annoncée</h3>'+
+      '<p>Rien de notable sur cette période pour ce type de sortie.</p></div>';
+
+  const t = todayISO();
+  const venir  = s.res.filter(x => x.quand >= t);
+  const passes = s.res.filter(x => x.quand < t).slice().reverse();
+  let html = '', mois = '';
+  venir.forEach(x=>{
+    const km = String(x.quand).slice(0,7);
+    if(km !== mois){
+      if(mois) html += '</div>';
+      mois = km;
+      const dte = new Date(x.quand+'T12:00:00');
+      html += '<div class="sectitle">'+MOIS_PLEIN[dte.getMonth()]+
+        (dte.getFullYear() !== new Date().getFullYear() ? ' '+dte.getFullYear() : '')+
+        '</div><div class="pgrid">';
+    }
+    html += carteSortie(x);
+  });
+  if(mois) html += '</div>';
+  if(passes.length)
+    html += '<div class="sectitle">Déjà sorti<span class="cnt">'+passes.length+'</span></div>'+
+      '<div class="pgrid">'+passes.map(carteSortie).join('')+'</div>';
+  const m = modeCourant();
+  const source = (m.id === 'bluray' && s.res.length && s.res[0].disque)
+    ? 'Calendrier des sorties physiques françaises (4k-ultra-hd.fr), affiches et fiches TMDB.'
+    : 'Dates fournies par TMDB, région '+esc(db.region||'FR')+'.';
+  return html + '<div class="credit">'+source+'</div><div style="height:24px"></div>';
+}
+
 /* Les pastilles de mode (salle / numérique / physique), servies telles
    quelles à la vue Sorties du bureau et au volet Sorties de Ma liste. */
 function chipsModes(sous){
