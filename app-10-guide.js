@@ -325,7 +325,7 @@ function vivierCineflix(r, revoir){
    mode « plats » restreint aux abonnements du profil (à défaut, les quatre
    plateformes connues) ; mode « tout » n'impose aucune disponibilité. */
 async function vivierTmdb(r, pages, mode){
-  const plats = platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id);
+  const plats = platsFilms();   /* 3008h : zéro abonnement veut dire zéro */
   const champ = r.type === 'movie' ? 'primary_release_date' : 'first_air_date';
   const dem = r.genres.concat(r.g, r.gUn);
   const veutAnim = dem.indexOf(16) >= 0 || dem.indexOf(10751) >= 0;
@@ -394,7 +394,7 @@ async function vivierTotems(r){
   const g = GOUTS.d || {};
   const totems = (g.totems||[]).slice(0,3);
   if(!totems.length || r.type !== 'movie') return [];
-  const plats = platsProfil().length ? platsProfil() : PLATEFORMES.map(p=>p.id);
+  const plats = platsFilms();   /* 3008h : zéro abonnement veut dire zéro */
   const lots = await Promise.all(totems.map(t =>
     tmdb('/movie/'+t.id+'/recommendations', {page:'1'})
       .then(d => ({ src:t.titre, l:(d.results||[]) }))
@@ -651,7 +651,7 @@ async function guider(source, txt){
     liste.forEach(c => { g.vus[c.type+':'+c.id] = 1; });
     g.res = liste; g.loading = false; g.charge = true;
     if(!liste.length)
-      g.err = platsProfil().length
+      g.err = platsFilms().length
         ? 'Rien trouvé dans ce registre sur Cinéflix ni sur tes plateformes.'
         : 'Rien trouvé sur Cinéflix. Ajoute tes abonnements dans « Mes goûts » '+
           'pour élargir les propositions.';
@@ -806,10 +806,14 @@ function carteGuide(c){
 /* Une phrase qui dit exactement ce qu'on cherche, et surtout ce qu'on ne
    trouvera pas. Rien n'agace plus qu'un guide dont on ignore la portée. */
 function portee(){
-  return platsProfil().length
-    ? 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, et tes abonnements.'
-    : 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, plus Netflix, Prime Video, '+
-      'Disney+ et Canal+ — coche tes abonnements dans « Mes goûts » pour resserrer.';
+  /* 3008h : trois cas, et non plus deux — j'ai des abonnements, je n'en ai
+     aucun (choix assumé), je n'ai pas encore répondu. */
+  if(platsDits())
+    return platsProfil().length
+      ? 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, et tes abonnements.'
+      : 'Uniquement ta bibliothèque Cinéflix — tu n\'as coché aucun abonnement.';
+  return 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, plus toutes les '+
+    'plateformes — coche tes abonnements dans « Mes goûts » pour resserrer.';
 }
 
 function viewGuide(){
