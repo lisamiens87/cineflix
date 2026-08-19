@@ -601,7 +601,27 @@ async function chargerAcces(){
   if(view === 'acces' || view === 'profil') render();
 }
 
-async function deciderAcces(uid, decision, qui){
+/* Les comptes du serveur, tels que le NAS les a vus au dernier passage
+   (journal_nas, clé « comptes_jf »). Avant 3008i, l'app portait une liste
+   écrite en dur dans config.js — elle vieillissait à chaque compte créé. */
+let comptesJF = { l:null, charge:false };
+async function chargerComptesJF(){
+  if(comptesJF.charge) return comptesJF.l;
+  let l = [];
+  try{
+    const r = await sbFetch('/rest/v1/journal_nas?select=valeur&cle=eq.comptes_jf', {});
+    l = String((r && r[0] && r[0].valeur) || '').split('·')
+          .map(x=>x.trim()).filter(Boolean);
+  }catch(e){ /* le journal est un confort : on retombe sur config.js */ }
+  comptesJF.l = l.length ? l : (CFG.jellyfinUsers||[]).slice();
+  comptesJF.charge = true;
+  return comptesJF.l;
+}
+
+/* Ouvrir l'accès, c'est aussi décider du compte serveur — l'administrateur
+   est le seul à savoir que « Dad », c'est son père (3008i). `jf` vaut :
+   '*' crée-lui un compte · '-' aucun · 'Dad' relie-le à ce compte-là. */
+async function deciderAcces(uid, decision, qui, jf){
   closeSheet();
   try{
     /* return=representation, et PAS return=minimal : quand une règle de
@@ -611,24 +631,44 @@ async function deciderAcces(uid, decision, qui){
        lignes, et on le dit. */
     const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
       {method:'PATCH', headers:{ Prefer:'return=representation' },
-       body: JSON.stringify({ statut: decision, maj: new Date().toISOString() })});
+       body: JSON.stringify(Object.assign(
+         { statut: decision, maj: new Date().toISOString() },
+         jf ? { jellyfin: jf } : {}))});
     if(!Array.isArray(r) || !r.length)
       return toast('Refusé par le serveur — rien n\'a changé.');
     acces.lignes = acces.lignes.filter(l => l.user_id !== uid);
     render();
-    toast(decision === 'valide' ? 'Accès ouvert à '+(qui||'ce profil')
-                                : 'Demande refusée');
+    toast(decision !== 'valide' ? 'Demande refusée'
+      : jf === '*'  ? 'Accès ouvert — compte serveur en création'
+      : jf === '-'  ? 'Accès ouvert, sans compte serveur'
+      : jf          ? 'Accès ouvert, relié à « '+jf+' »'
+                    : 'Accès ouvert à '+(qui||'ce profil'));
   }catch(e){ toast('Échec : '+(e.message||'réessaie')); }
 }
 
-function menuAcces(uid, qui){
+async function menuAcces(uid, qui){
+  const q = esc(qui||'').replace(/'/g,"\\'");
+  const app = (jf)=> 'deciderAcces(\''+uid+'\',\'valide\',\''+q+'\',\''+jf+'\')';
+  const comptes = await chargerComptesJF();
+  /* Ceux qui sont DÉJÀ pris par un autre profil ne sont pas proposés : deux
+     personnes sur le même compte Jellyfin, ce sont deux reprises mélangées. */
+  let pris = [];
+  try{
+    const l = await sbFetch('/rest/v1/profils?select=jellyfin', {});
+    pris = (l||[]).map(p=>String(p.jellyfin||'').trim()).filter(x=>x && x!=='*' && x!=='-');
+  }catch(e){}
+  const libres = comptes.filter(n => pris.indexOf(n) < 0);
   openSheet('<h3>'+esc(qui||'Demande d\'accès')+'</h3>'+
     '<p class="small muted" style="margin:0 0 8px">Une fois l\'accès ouvert, cette '+
-    'personne voit tout le catalogue et peut demander des titres.</p>'+
-    '<button class="opt" onclick="deciderAcces(\''+uid+'\',\'valide\',\''+
-      esc(qui||'').replace(/'/g,"\\'")+'\')">Ouvrir l\'accès</button>'+
-    '<button class="opt danger" onclick="deciderAcces(\''+uid+'\',\'refuse\',\''+
-      esc(qui||'').replace(/'/g,"\\'")+'\')">Refuser</button>'+
+    'personne voit tout le catalogue et peut demander des titres. Le compte '+
+    'serveur, lui, sert à reprendre un film là où elle l\'avait laissé.</p>'+
+    '<button class="opt" onclick="'+app('*')+'">Ouvrir l\'accès et lui créer un compte serveur</button>'+
+    libres.map(n => '<button class="opt" onclick="'+app(esc(n).replace(/'/g,"\\'"))+
+      '">Ouvrir l\'accès et le relier à « '+esc(n)+' »</button>').join('')+
+    '<button class="opt" onclick="'+app('-')+'">Ouvrir l\'accès, sans compte serveur</button>'+
+    '<div class="tiny muted" style="padding:2px 4px 8px">Sans compte serveur, tout '+
+      'fonctionne sauf « Continuer la lecture ».</div>'+
+    '<button class="opt danger" onclick="deciderAcces(\''+uid+'\',\'refuse\',\''+q+'\')">Refuser</button>'+
     '<button class="opt" onclick="closeSheet()">Annuler</button>');
 }
 
