@@ -163,7 +163,10 @@ const aGouts = ()=> !!(GOUTS.d && ((GOUTS.d.aimes||[]).length || (GOUTS.d.totems
 let BROUILLON = null;
 
 function etapesBienvenue(){
-  const l = ['hello','avatar','aimes','fuis','totems','plats','reglages','fin'];
+  /* 3008a — l'écran « Deux ou trois détails » est supprimé (verdict
+     d'Alexandre : aucune de ses questions ne valait d'être posée, et la VO
+     n'était branchée sur rien). Le parcours tient en sept écrans. */
+  const l = ['hello','avatar','aimes','fuis','totems','plats','fin'];
   if(!cleFournie() && !db.apiKey) l.splice(1, 0, 'cle');
   return l;
 }
@@ -440,30 +443,6 @@ function viewBienvenue(){
       piedBienv({});
   }
 
-  else if(e === 'reglages'){
-    const opt = (champ, val, lib)=>
-      '<button class="chip '+(BROUILLON[champ] === val ? 'on':'')+
-      '" onclick="bienvRegler(\''+champ+'\','+(typeof val === 'string' ? '\''+val+'\'' : val)+')">'+
-      esc(lib)+'</button>';
-    /* On ne demande PAS le compte Jellyfin ici : il ne sert encore à rien, et
-       choisir entre trois identifiants techniques n'a aucun sens pour un
-       arrivant. La question attendra d'avoir une utilité visible — elle vit
-       en attendant dans les Réglages. */
-    h += '<h1>Deux ou trois détails</h1>'+
-      '<p class="accsub">De quoi affiner ce qu\'on te proposera. '+
-      'Rien n\'est définitif.</p>'+
-      '<div class="rgbloc"><div class="rglbl">Les films en version originale</div>'+
-        '<div class="gchips">'+opt('vo','oui','Oui')+opt('vo','peu','Peu importe')+
-          opt('vo','non','Plutôt en français')+'</div></div>'+
-      '<div class="rgbloc"><div class="rglbl">La longueur</div>'+
-        '<div class="gchips">'+opt('duree',0,'Peu importe')+opt('duree',110,'Moins d\'1h50')+
-          opt('duree',130,'Moins de 2h10')+'</div></div>'+
-      '<div class="rgbloc"><div class="rglbl">Les films d\'avant 1990</div>'+
-        '<div class="gchips">'+opt('vieux',true,'Volontiers')+opt('vieux',false,'Non merci')+
-        '</div></div>'+
-      piedBienv({});
-  }
-
   else{
     const n = BROUILLON.totems.length, g = BROUILLON.aimes.length;
     h += '<div class="acclogo ok">'+I.check+'</div>'+
@@ -473,12 +452,14 @@ function viewBienvenue(){
             (n ? ' — à commencer par ce qui ressemble à '+esc(BROUILLON.totems[0].titre) : '')+'.'
               : 'Tu as tout passé, et c\'est très bien : le guide marchera à l\'humeur.')+
       '</p>'+
+      /* 3008a — demande d'Alexandre : plus de choix abstrait entre « guider »
+         et « explorer » à la toute fin. Un seul bouton qui ouvre l'app, et un
+         retour discret. Le guide reste à un doigt, dans la barre du bas. */
       '<button class="btn block" style="margin-top:20px" '+(ui.bienv.occupe?'disabled':'')+
-        ' onclick="finirBienvenue(true)">'+
-        (ui.bienv.occupe ? '<span class="spin"></span> Un instant…' : '✨ Laisse-moi te guider')+
+        ' onclick="finirBienvenue(false)">'+
+        (ui.bienv.occupe ? '<span class="spin"></span> Un instant…' : '🍿 C\'est parti, bonne séance !')+
       '</button>'+
-      '<div class="accliens"><button onclick="bienvPrecedent()">Retour</button>'+
-        '<button onclick="finirBienvenue(false)">Explorer par moi-même</button></div>';
+      '<div class="accliens"><button onclick="bienvPrecedent()">Retour</button></div>';
   }
 
   return h + pucesBienv() + '</div>';
