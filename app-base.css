@@ -887,3 +887,7 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
   align-items:center;justify-content:center;gap:4px}
 .sgb svg{width:14px;height:14px}
 .sgb.sgbon{color:var(--accent);border-color:var(--accent)}
+
+/* Icônes émoji de la barre du bas (3007z) : cachées par défaut — le bureau
+   garde ses traits monochromes ; app-mobile fait l'échange. */
+.tab .icemo{display:none}
