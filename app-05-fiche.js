@@ -109,14 +109,18 @@ function ouvrirSeances(){
 }
 
 /* ---------- Boutons d'action ---------- */
-/* Les plateformes (parmi les quatre retenues) qui proposent ce titre par
-   abonnement en France, d'après TMDB/JustWatch. */
+/* Les plateformes retenues qui proposent ce titre par abonnement en France,
+   d'après TMDB/JustWatch. Le repli par NOM rattrape les déclinaisons du même
+   service (« Canal+ Amazon Channel »…) — mais seulement pour les noms assez
+   longs pour être sans équivoque : « Max », « M6+ » ou « Arte » en préfixe
+   attraperaient n'importe quoi. Pour ceux-là, l'identifiant exact suffit. */
 function platsDuTitre(o){
   const p = ((o['watch/providers']||{}).results||{})[db.region||'FR'];
   const abo = (p && p.flatrate) || [];
   return PLATEFORMES.map(pf => {
     const f = abo.find(f => f.provider_id === pf.id ||
-      (f.provider_name||'').toLowerCase().indexOf(pf.nom.toLowerCase()) === 0);
+      (pf.nom.length >= 6 &&
+       (f.provider_name||'').toLowerCase().indexOf(pf.nom.toLowerCase()) === 0));
     return f ? Object.assign({}, pf, { logo: f.logo_path || '' }) : null;
   }).filter(Boolean);
 }
