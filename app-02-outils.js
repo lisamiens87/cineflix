@@ -150,18 +150,32 @@ let navDir = 'none';
 /* Les vues dont on mémorise le défilement : ouvrir un titre puis revenir
    doit ramener exactement où on en était. La filmographie d'une personne
    en fait partie — elle peut faire des centaines de vignettes. */
-const LISTES = { decouvrir:1, sorties:1, liste:1, personne:1, saison:1 };
+const LISTES = { decouvrir:1, sorties:1, liste:1, personne:1, saison:1, guide:1 };
 const memDefil = {};
+
+/* « Guide-moi » est DEUX pages sous un seul nom (l'écran des envies, et
+   « Par catégorie ») : elles ne se lisent pas à la même hauteur, donc elles
+   ne partagent pas leur mémoire de défilement. D'où une clé, et non le seul
+   nom de la vue. */
+function cleDefil(v){
+  return (v === 'guide' && ((ui.guide||{}).ecran === 'cat')) ? 'guide:cat' : v;
+}
+function noterDefil(cle){ memDefil[cle] = window.scrollY || 0; }
+function rendreDefil(cle){
+  const y = memDefil[cle] || 0;
+  window.scrollTo(0, y);
+  if(y) requestAnimationFrame(()=> window.scrollTo(0, y));
+}
 
 function go(v, p, dir){
   if(view === v && JSON.stringify(params) === JSON.stringify(p||{})){ window.scrollTo(0,0); render(); return; }
-  if(LISTES[view]) memDefil[view] = window.scrollY || 0;
+  if(LISTES[view]) memDefil[cleDefil(view)] = window.scrollY || 0;
   if(v === 'decouvrir' && !(ui.searchQ||'').trim()) ui.champOuvert = false;
   const a = DEPTH[view]||0, b = DEPTH[v]||0;
   navDir = dir || (b > a ? 'enter' : b < a ? 'back' : 'none');
   view = v; params = p||{};
   render();
-  const y = LISTES[v] ? (memDefil[v] || 0) : 0;
+  const y = LISTES[v] ? (memDefil[cleDefil(v)] || 0) : 0;
   window.scrollTo(0, y);
   if(y) requestAnimationFrame(()=> window.scrollTo(0, y));
 }
@@ -280,6 +294,9 @@ function render(){
     if(!ui.disc.charge && !ui.disc.loading && db.apiKey) chargerDecouverte();
   }
   if(view === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
+  /* L'accordéon « Par catégorie » a une rangée de films qui défile du doigt :
+     revenir doit la retrouver où elle était, pas la ramener au premier film. */
+  if(view === 'guide' && typeof restaurerDefilCat === 'function') restaurerDefilCat();
   /* Ma liste porte désormais les volets Sorties et Suggestions (3007y) :
      revenir sur l'écran doit relancer le chargement qui manque. */
   if(view === 'liste'){
