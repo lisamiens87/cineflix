@@ -268,6 +268,12 @@ function corpsSuggestions(){
   let html = '<div class="wrap sgintro">'+vis.length+' idées pour la vidéothèque, '+
     'd\'après l\'analyse du N4 du 18/08. Un film acquis disparaît au scan suivant.</div>';
 
+  /* L'émoji de chaque rayon — ceux de la maquette validée (3007z). */
+  const EMO_CAT = { 'Crime & Mafia':'🕴️', 'Action':'💥', 'Comédie':'🎭',
+    'Guerre':'🪖', 'Science-fiction':'🚀', 'Thriller':'🔪', 'Western':'🤠',
+    'Drame & Biopic':'🏆', 'Animation':'🎨', 'Américains années 90':'📼',
+    'Comédies françaises':'🇫🇷' };
+
   cats.forEach((c,i)=>{
     if(!(c.nom in s.plie)) s.plie[c.nom] = i > 0;
     const plie = s.plie[c.nom];
@@ -275,7 +281,7 @@ function corpsSuggestions(){
        rayon avec apostrophe ne doivent pas casser l'onclick. */
     html += '<button class="sgcat" onclick="basculerCatSugg(decodeURIComponent(\''+
       encodeURIComponent(c.nom)+'\'))">'+
-      '<span>'+esc(c.nom)+'</span>'+
+      '<span>'+(EMO_CAT[c.nom] ? EMO_CAT[c.nom]+'  ' : '')+esc(c.nom)+'</span>'+
       '<span class="sgn">'+c.films.length+' film'+(c.films.length>1?'s':'')+
       ' <i class="sgfl'+(plie?'':' ouv')+'">'+I.back+'</i></span></button>';
     if(plie) return;
