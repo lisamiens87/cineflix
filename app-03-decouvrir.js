@@ -18,9 +18,12 @@ const TYPES = [ {id:'movie', label:'Films', cl:'c-films'}, {id:'tv', label:'Sér
    la bibliothèque ET les abonnements, ensemble. La coche verte et les
    pastilles disent d'où vient chaque titre. Même logique que le guide, qui
    ne travaille plus que sur cette banque unique depuis 3007o. */
+/* Les trois portes de Films. « Ce soir » ne disait pas ce qu'on y trouve
+   (verdict d'Alexandre le 19/08) : c'est SA bibliothèque plus SES
+   abonnements — donc « Mes films ». */
 const PRESENCES = [
-  { id:'soir', label:'Ce soir',   cl:'c-flix' },
-  { id:'cine', label:'Au cinéma', cl:'c-cinema' },
+  { id:'soir', label:'Mes films', cl:'c-flix' },
+  { id:'cine', label:'Cinéma',    cl:'c-cinema' },
   { id:'tout', label:'Tout',      cl:'c-tout' }
 ];
 /* Les plateformes de CETTE personne — celles de son profil (Mes goûts).
@@ -28,6 +31,36 @@ const PRESENCES = [
 const platsFilms = ()=> (typeof platsProfil === 'function' && platsProfil().length)
   ? platsProfil() : PLATEFORMES.map(p=>p.id);
 const labelTout = ()=> 'Tout';
+
+/* ---------- Les goûts, appliqués à l'accueil (3008g) ----------
+   Alexandre, 19/08 : « je fuis les films de guerre et tu proposes La Liste de
+   Schindler ». Le « je fuis » du parcours d'inscription ne servait qu'au
+   Guide — la couverture, elle, ne regardait que la note des critiques.
+
+   Les fiches du NAS portent leurs genres EN TOUTES LETTRES (les libellés
+   TMDB en français, vérifiés sur les 2 316 fiches d'Alexandre) ; les goûts,
+   eux, sont des identifiants TMDB. Cette table fait le pont. Les trois
+   dernières entrées sont des genres de séries, qui n'ont pas d'équivalent
+   exact côté films. */
+const GENRE_ID = {
+  'action':28, 'aventure':12, 'animation':16, 'comédie':35, 'crime':80,
+  'documentaire':99, 'drame':18, 'familial':10751, 'fantastique':14,
+  'histoire':36, 'horreur':27, 'musique':10402, 'mystère':9648,
+  'romance':10749, 'science-fiction':878, 'téléfilm':10770, 'thriller':53,
+  'guerre':10752, 'western':37,
+  'action & adventure':28, 'war & politics':10752,
+  'science-fiction & fantastique':878
+};
+const genresIds = i => (i.genres||[])
+  .map(n => GENRE_ID[String(n).toLowerCase().trim()])
+  .filter(Boolean);
+/* Vrai si ce titre tombe dans un genre que la personne a dit fuir. On ne
+   juge que ce qu'on sait : une fiche sans genre lisible passe. */
+function genreFui(i){
+  const f = ((GOUTS.d||{}).fuis)||[];
+  if(!f.length) return false;
+  return genresIds(i).some(id => f.indexOf(id) >= 0);
+}
 
 /* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
    et l'adresse de leur recherche — pour ouvrir un titre directement chez elles. */
@@ -678,7 +711,7 @@ function corpsDecouverte(){
         '<button class="btn ghost" onclick="setPresence(\'tout\')">'+labelTout()+'</button></div>';
     return '<div class="empty">'+I.boussole+'<h3>Rien avec ces filtres</h3>'+
       '<p>Élargis la note minimale ou retire un genre.</p>'+
-      '<button class="btn ghost" onclick="ouvrirFiltres()">Ouvrir les filtres</button></div>';
+      '<button class="btn ghost" onclick="ui.platsTous=false;ouvrirFiltres()">Ouvrir les filtres</button></div>';
   }
   return '<div class="grid">'+d.res.map(r=>carteTitre(r, d.type)).join('')+'</div>'+
     (d.page < d.pages
@@ -814,9 +847,17 @@ function ouvrirFiltres(){
      guide compris. Rien de coché = toutes. */
   if(ui.presence === 'soir'){
     const actives = platsFilms();
+    /* On ne montre QUE ses plateformes (3008g, demande d'Alexandre : « si je
+       n'ai sélectionné que Netflix, il ne peut y avoir que Cinéflix et
+       Netflix »). Les onze au grand complet ne servent qu'au moment de
+       s'abonner ailleurs — c'est ce que fait le bouton « + Ajouter ». */
+    const liste = ui.platsTous ? PLATEFORMES : PLATEFORMES.filter(pf => actives.indexOf(pf.id) >= 0);
     h += '<div class="fgrp">Mes plateformes</div><div class="fchips">'+
-      PLATEFORMES.map(pf=>'<button class="chip '+pf.cl+' '+(actives.indexOf(pf.id)>=0?'on':'')+
-        '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>'+
+      liste.map(pf=>'<button class="chip '+pf.cl+' '+(actives.indexOf(pf.id)>=0?'on':'')+
+        '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+
+      (ui.platsTous ? '' :
+        '<button class="chip" onclick="ui.platsTous=true;ouvrirFiltres()">+ Ajouter</button>')+
+      '</div>'+
       '<div class="small muted" style="margin:4px 2px 0">Décoche une plateforme si tu '+
       'n\'y es plus abonné — le guide en tiendra compte aussi.</div>';
   }
@@ -903,7 +944,7 @@ let heroTente = false;
 function assurerHeroSoir(){
   if(ui.heroSoirs || heroTente) return;
   const l = (CAT.items||[]).filter(i => i && i.t === 'movie' && !i.vu &&
-                                        (i.noteCrit||0) >= 75);
+                                        (i.noteCrit||0) >= 75 && !genreFui(i));
   if(!l.length) return;
   heroTente = true;
   l.sort((a,b)=>(b.noteCrit||0)-(a.noteCrit||0));
@@ -1082,7 +1123,8 @@ function assurerTopBib(){
      le 100e portait encore une note presse de 100 ; couper a 30 ecartait
      des chefs-d'oeuvre pour rien. La regle est desormais lisible :
      « le top = la creme, notee 90 et plus ». */
-  const vivier = (CAT.items||[]).filter(i => i && i.t === 'movie' && (i.noteCrit||0) >= 90);
+  const vivier = (CAT.items||[]).filter(i => i && i.t === 'movie' &&
+                                            (i.noteCrit||0) >= 90 && !genreFui(i));
   if(vivier.length < 5) return;
   let graine = Number(todayISO().replace(/-/g, ''));
   const alea = ()=>{ graine = (graine * 1103515245 + 12345) % 2147483648;
@@ -1135,7 +1177,7 @@ function assurerRangee(nom, choisir){
 }
 function assurerRecents(){
   assurerRangee('recents', ()=> (CAT.items||[])
-    .filter(i => i && i.ajout)
+    .filter(i => i && i.ajout && !genreFui(i))
     .sort((a,b)=> String(b.ajout).localeCompare(String(a.ajout)))
     .slice(0, parRangee(10, 184)));
 }
@@ -1172,7 +1214,7 @@ function viewDecouvrir(){
   if(catalogue){
     ui.exploration = true;
     const bouton = '<button class="iconbtn '+(filtresActifs()?'actif ':'')+(cherche?'masque':'')+
-      '" id="fbtn" onclick="ouvrirFiltres()">'+I.filtre+'</button>';
+      '" id="fbtn" onclick="ui.platsTous=false;ouvrirFiltres()">'+I.filtre+'</button>';
     const rangees =
       (ui.champOuvert ? champRecherche() : '') +
       '<div class="chips types">'+
