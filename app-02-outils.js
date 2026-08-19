@@ -322,11 +322,14 @@ function renderNav(){
      Découvrir : les deux répondent à la même question — qu'est-ce que je
      regarde ce soir. La classe `tel` est l'inverse de `dsk` : allumée par
      app-mobile seulement, elle laisse la barre du bureau intacte. */
+  /* `emo` : la version émoji, colorée, des icônes — celle de la maquette
+     validée. Le bureau garde ses traits monochromes (`ic`) : app-base cache
+     .icemo, app-mobile inverse les deux (3007z). */
   const items = [
     { cl:'t-decouvrir', on: cur === 'decouvrir' && !exp, act:'go2Decouvrir()',
-      ic:I.boussole, lab:'Découvrir' },
+      ic:I.boussole, emo:'🧭', lab:'Découvrir' },
     { cl:'t-guide tel', on: cur === 'guide', act:'allerGuide()',
-      ic:I.etincelle, lab:'Guide-moi' },
+      ic:I.etincelle, emo:'✨', lab:'Guide-moi' },
     { cl:'t-films dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'movie',
       act:"ouvrirCatalogue('movie')", ic:'', lab:'Films' },
     { cl:'t-series dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'tv',
@@ -334,12 +337,13 @@ function renderNav(){
     /* Sorties a rejoint Ma liste sur téléphone (volet, 3007y) : l'onglet ne
        subsiste que sur le bureau — la classe dsk le retire de la barre. */
     { cl:'t-sorties dsk', on: cur === 'sorties', act:"go('sorties')", ic:I.cal, lab:'Sorties' },
-    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, lab:'Ma liste', badge:n },
+    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, emo:'❤️', lab:'Ma liste', badge:n },
     { cl:'t-profil', on: cur === 'profil', act:"go('profil')", ic:I.user, lab:'Profil' }
   ];
   document.getElementById('nav').innerHTML =
     '<button class="navlogo" onclick="go2Decouvrir()">CINÉ<i>FLIX</i></button>' +
-    items.map(t=>'<button class="tab '+t.cl+(t.on ? ' on' : '')+'" onclick="'+t.act+'">'+t.ic+
+    items.map(t=>'<button class="tab '+t.cl+(t.on ? ' on' : '')+'" onclick="'+t.act+'">'+
+      (t.emo ? '<span class="icsvg">'+t.ic+'</span><span class="icemo">'+t.emo+'</span>' : t.ic)+
       (t.badge ? '<span class="pastille-nav">'+t.badge+'</span>' : '')+
       '<span>'+t.lab+'</span></button>').join('');
 
