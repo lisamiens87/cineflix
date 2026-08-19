@@ -864,6 +864,34 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .catvide{padding:22px 14px;font-family:Archivo,Inter,sans-serif;font-size:12px;
   line-height:1.5;color:var(--muted);text-align:center}
 
+/* ---- « Par catégorie » sur téléphone : l'accordéon (3008m) ----
+   La liste des genres prend toute la largeur ; celui qu'on ouvre montre ses
+   rayons et une rangée de films qui défile du doigt. On garde les genres
+   voisins sous les yeux — c'est ce qui manquait aux deux colonnes, où la
+   liste était reléguée dans un tiers d'écran. */
+.catacc{border-top:1px solid var(--line)}
+.caccg{display:flex;align-items:center;gap:12px;width:100%;background:none;
+  border:0;border-bottom:1px solid #16161c;cursor:pointer;padding:13px 16px;
+  text-align:left;font-family:Archivo,Inter,sans-serif;color:var(--text)}
+.caccg b{font-size:15px;font-weight:650;flex:1;min-width:0}
+.cacce{font-size:19px;line-height:1}
+.caccf{font-style:normal;color:var(--muted);font-size:17px}
+.caccg.on{background:var(--surface);border-bottom:0;box-shadow:inset 3px 0 0 var(--accent)}
+.caccg.on b{font-weight:800}
+.caccbloc{background:var(--surface);border-bottom:1px solid var(--line);padding-bottom:10px;
+  box-shadow:inset 3px 0 0 var(--accent)}
+.caccray{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:0 16px 12px}
+.caccray::-webkit-scrollbar{display:none}
+.caccray .chip{height:auto;padding:7px 12px;border-radius:999px;background:var(--surface2);
+  border:0;text-transform:none;letter-spacing:0;font-size:12px;color:#c9c9d4;
+  box-shadow:none;white-space:nowrap;flex:0 0 auto}
+.caccray .chip.on{background:#fff;color:#0b0b0f}
+.caccrow{display:flex;gap:9px;overflow-x:auto;scrollbar-width:none;padding:0 16px 4px;
+  -webkit-overflow-scrolling:touch}
+.caccrow::-webkit-scrollbar{display:none}
+.caccrow .gcard{flex:0 0 108px;width:108px}
+.caccrow .graison{display:none}   /* la raison tient mal en 108 px : on la lit sur la fiche */
+
 
 /* =========== Ajouts récents · Continuer la lecture (v2907x) ===========
    Les mêmes rangées que le Top, sans les chiffres détourés : le décalage
