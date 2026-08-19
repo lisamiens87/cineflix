@@ -956,7 +956,11 @@ function vitrineHtml(){
       l.map((h,i)=>{
         const meta = [h.annee, h.crit ? 'critiques '+h.crit+' %' : '',
                       h.jt >= 2 ? 'T'.repeat(h.jt)+' Télérama' : ''].filter(Boolean).join(' · ');
-        return '<div class="vsl">'+
+        /* Toute la carte ouvre la fiche du film (demande d'Alexandre,
+           3008c) ; les deux boutons arrêtent la propagation pour garder
+           leur geste propre. Un balayage du carrousel ne déclenche pas de
+           clic : le doigt qui glisse n'est pas un appui. */
+        return '<div class="vsl" onclick="ouvrirFiche('+h.id+',\'movie\',\'decouvrir\')">'+
           '<img src="'+IMG(h.aff || h.fond,'w780')+'" alt="">'+
           '<div class="vgr"></div>'+
           '<div class="vtx">'+
@@ -964,8 +968,8 @@ function vitrineHtml(){
             '<h2>'+esc(h.nom)+'</h2>'+
             (meta ? '<div class="hsmeta">'+esc(meta)+'</div>' : '')+
             '<div class="vbt">'+
-              '<button class="vb1" onclick="regarderSoir('+i+')">▶ Regarder</button>'+
-              '<button class="vb2" onclick="listerSoir('+i+')">+ Ma liste</button>'+
+              '<button class="vb1" onclick="event.stopPropagation();regarderSoir('+i+')">▶ Regarder</button>'+
+              '<button class="vb2" onclick="event.stopPropagation();listerSoir('+i+')">+ Ma liste</button>'+
             '</div>'+
           '</div>'+
         '</div>';
