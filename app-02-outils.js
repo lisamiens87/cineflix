@@ -119,7 +119,7 @@ function avatarBouton(){
 let view = 'decouvrir';
 let params = {};
 let ui = {
-  presence:'tout',                       // tout | dispo — le filtre maison
+  presence:'tout',                       // soir | cine | tout — le filtre maison (3008b)
   disc:{ type:'movie', genres:[], tri:'sortie', sens:'desc', noteMin:0, perimetre:'tout',
          plats:[],                            // plateformes cochées (vide = toutes)
          decennie:0,                          // 0 = toutes, sinon 1920, 1930…
