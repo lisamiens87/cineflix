@@ -712,11 +712,51 @@ function fermerCategories(){ ui.guide.ecran = ''; render(); }
    la formule : changer de genre ne doit jamais obliger à remonter la page.
    Les affiches y sont plus GRANDES qu'ailleurs (deux par ligne dans 298 px
    contre trois dans 388), ce qui compense la colonne perdue. */
+/* ---------- Deux mises en page pour le même écran (3008m) ----------
+   Sur téléphone, la colonne de gauche mangeait 122 px des 390 — un tiers de
+   l'écran pour un geste qu'on fait une fois — et les affiches s'y trouvaient
+   à l'étroit : titres sur deux lignes, sous-titre coupé, quatre films
+   visibles. Alexandre a retenu la maquette « accordéon » : la liste des
+   genres tient toute la largeur, celui qu'on ouvre déplie ses rayons et une
+   rangée de films qui défile. Sur grand écran, les deux colonnes restent la
+   meilleure formule — elles ne bougent pas. */
+const catEtroit = ()=> {
+  try{ return !matchMedia('(min-width:860px)').matches; }catch(e){ return true; }
+};
+
+function corpsCatAccordeon(g){
+  const ouvert = taxoGenreOuvert();
+  return '<div class="catacc">'+TAXO.map(x=>{
+    const on = ouvert === x.id;
+    let h = '<button class="caccg'+(on?' on':'')+'" onclick="setTaxoGenre(\''+x.id+'\')">'+
+      '<span class="cacce">'+x.emo+'</span><b>'+esc(x.nom)+'</b>'+
+      '<i class="caccf">'+(on ? '⌄' : '›')+'</i></button>';
+    if(!on) return h;
+    let d = '<div class="caccray">'+
+      (x.sous||[]).map(s=>'<button class="chip'+(g.taxoSel === s.id ? ' on' : '')+
+        '" onclick="guiderTaxo(\''+s.id+'\')">'+esc(s.nom)+'</button>').join('')+
+      '<button class="chip'+(g.taxoSel === x.id ? ' on' : '')+
+        '" onclick="guiderTaxo(\''+x.id+'\')">Tout le genre</button>'+
+    '</div>';
+    if(g.loading)      d += '<div class="catvide"><span class="spin"></span></div>';
+    else if(g.err)     d += '<div class="catvide">'+esc(g.err)+'</div>';
+    else if(!g.charge) d += '<div class="catvide">Choisis un rayon.</div>';
+    else {
+      const l = g.res.filter(c => !rejete(c.id));
+      d += l.length
+        ? '<div class="caccrow">'+l.map(carteGuide).join('')+'</div>'
+        : '<div class="catvide">Rien dans ce rayon. Essaie un rayon voisin.</div>';
+    }
+    return h + '<div class="caccbloc">'+d+'</div>';
+  }).join('')+'</div>';
+}
+
 function viewCategories(){
   const g = ui.guide;
   const ouvert = taxoGenreOuvert();
   const e = TAXO.find(x => x.id === ouvert);
   let h = header('Par catégorie', {back:'fermerCategories()'});
+  if(catEtroit()) return h + corpsCatAccordeon(g);
 
   let droite = '';
   if(!e){
