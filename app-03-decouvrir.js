@@ -12,12 +12,21 @@ const TYPES = [ {id:'movie', label:'Films', cl:'c-films'}, {id:'tv', label:'Sér
    « Plateformes » — en illimité sur les abonnements, en France ;
    « Au cinéma »   — à l'affiche en salle EN CE MOMENT ;
    « Tout »        — le catalogue TMDB entier, sans condition. */
+/* 3008b — « Cinéflix » et « Plateformes » ont fusionné en « Ce soir »
+   (décision d'Alexandre, 19/08) : la question qu'on se pose devant l'écran
+   est « qu'est-ce que je peux regarder LÀ, maintenant ? », et sa réponse est
+   la bibliothèque ET les abonnements, ensemble. La coche verte et les
+   pastilles disent d'où vient chaque titre. Même logique que le guide, qui
+   ne travaille plus que sur cette banque unique depuis 3007o. */
 const PRESENCES = [
-  { id:'dispo', label:'Cinéflix',    cl:'c-flix' },
-  { id:'plats', label:'Plateformes', cl:'c-plats' },
-  { id:'cine',  label:'Au cinéma',   cl:'c-cinema' },
-  { id:'tout',  label:'Tout',        cl:'c-tout' }
+  { id:'soir', label:'Ce soir',   cl:'c-flix' },
+  { id:'cine', label:'Au cinéma', cl:'c-cinema' },
+  { id:'tout', label:'Tout',      cl:'c-tout' }
 ];
+/* Les plateformes de CETTE personne — celles de son profil (Mes goûts).
+   Rien de coché = les quatre : mieux vaut montrer trop que cacher. */
+const platsFilms = ()=> (typeof platsProfil === 'function' && platsProfil().length)
+  ? platsProfil() : PLATEFORMES.map(p=>p.id);
 const labelTout = ()=> 'Tout';
 
 /* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
@@ -71,8 +80,10 @@ const TRIS_LOCAUX = [
 const TRI_LOCAL = t => TRIS_LOCAUX.some(x => x.id === t);
 /* La vue Cinéflix trie localement dès que le NAS a fourni les fiches —
    sauf « Popularité », donnée que seul TMDB possède. */
-const modeLocal = ()=> ui.presence === 'dispo' && (CAT.items||[]).length > 0 &&
-                       ui.disc.tri !== 'populaire';
+/* Sur « Ce soir », seuls les tris de bibliothèque passent en local pur :
+   les autres doivent mélanger bibliothèque ET plateformes (chargerSoir). */
+const modeLocal = ()=> ui.presence === 'soir' && (CAT.items||[]).length > 0 &&
+                       TRI_LOCAL(ui.disc.tri);
 const PERIMETRES = [
   { id:'tout',   label:'Tout le catalogue', court:'tout le catalogue' },
   { id:'recent', label:'Sortis récemment',  court:'sorties récentes' }
@@ -139,12 +150,14 @@ function discParams(){
      dates affichées sont donc les originales — comme dans la filmographie.
      La région reste utilisée là où elle a un sens : watch_region (plateformes)
      et l'onglet Sorties (dates salle/numérique/Blu-ray françaises). */
-  const p = { include_adult:'false', page:String(d.page) };
-  /* Vue « Plateformes » : TMDB filtre lui-même sur l'abonnement en France.
-     Si l'utilisateur a coché des plateformes précises, on ne demande qu'elles. */
-  if(ui.presence === 'plats'){
+  const p = { include_adult:'false',
+              page:String(ui.presence === 'soir' ? (d.pageT || 1) : d.page) };
+  /* Vue « Ce soir », côté plateformes : TMDB filtre lui-même sur les
+     abonnements du profil, en France. La bibliothèque arrive par l'autre
+     versant de chargerSoir. */
+  if(ui.presence === 'soir'){
     p.watch_region = db.region || 'FR';
-    p.with_watch_providers = (d.plats && d.plats.length) ? d.plats.join('|') : FOURNISSEURS;
+    p.with_watch_providers = platsFilms().join('|');
     p.with_watch_monetization_types = 'flatrate';
   }
   /* Vue « Au cinéma » : réellement à l'affiche en salle. `region` fait
@@ -217,10 +230,9 @@ function discParams(){
    pages jusqu'à remplir la grille — sinon l'utilisateur voit trois vignettes
    et croit que sa bibliothèque est vide. */
 function garderPresence(liste, type){
-  /* Seule la vue « Cinéflix » filtre côté client ; « Cinéma » montre tout,
-     « Plateformes » est déjà filtrée par TMDB. */
-  if(ui.presence !== 'dispo') return liste;
-  return liste.filter(r => surCineflix(type, r.id));
+  /* Plus rien à filtrer ici depuis la fusion « Ce soir » (3008b) : ce mode a
+     son propre chargeur, « Cinéma » et « Tout » montrent tout. */
+  return liste;
 }
 
 /* ---------- La vue Cinéflix triée localement ---------- */
@@ -346,10 +358,95 @@ async function chargerLocale(suite){
   peindre();
 }
 
+/* ---------- La vue « Ce soir » : bibliothèque + plateformes (3008b) -------
+   Deux versants par fournée : la tranche suivante de la bibliothèque (triée
+   localement, affiches récupérées comme sur l'ancienne vue Cinéflix), et les
+   pages TMDB filtrées sur les abonnements du profil. Les deux moitiés sont
+   fusionnées puis triées ensemble sur la clé du tri choisi ; les doublons
+   (un film à la fois chez soi et sur Netflix) gardent leur version TMDB,
+   la coche verte dit qu'il est aussi à la maison. */
+async function chargerSoir(suite){
+  const d = ui.disc, type = d.type;
+  const seq = ++discSeq;
+  const MOITIE = Math.floor(CIBLE_GRILLE / 2);
+  if(!suite){
+    d.page = 0; d.pageT = 0; d.pagesT = 1; d.res = []; d.pages = 1;
+    d.locale = catalogueFiltre();
+    if(d.tri === 'aleatoire') melanger(d.locale);
+    else d.locale.sort(comparerLocal(d.tri, d.sens === 'asc' ? 'asc' : 'desc'));
+    oublierDefil('decouvrir');
+    if(view === 'decouvrir' && !enRecherche()) window.scrollTo(0,0);
+  }
+  d.loading = true; d.err = '';
+  peindre();
+  try{
+    await chargerGenres(type);
+    const perdus = d.genres.filter(n => genreParNom(type, n) == null);
+    if(perdus.length){
+      d.genres = d.genres.filter(n => genreParNom(type, n) != null);
+      toast(perdus.length > 1 ? 'Genres sans équivalent ici : '+perdus.join(', ')
+                              : '« '+perdus[0]+' » n\'existe pas pour ce type');
+    }
+    /* Versant plateformes. Les titres déjà chez soi en sont retirés : ils
+       arrivent par le versant bibliothèque, avec de meilleures données. */
+    const plat = [];
+    if(d.pageT === 0 || d.pageT < d.pagesT){
+      let tours = 0;
+      do{
+        d.pageT += 1;
+        const data = await tmdb('/discover/'+type, discParams());
+        if(seq !== discSeq) return;
+        d.pagesT = data.total_pages || 1;
+        plat.push(...(data.results||[]).filter(r => r.poster_path && !surCineflix(type, r.id)));
+        tours++;
+      }while(plat.length < MOITIE && d.pageT < d.pagesT && tours < MAX_PAGES_PAR_TOUR);
+    }
+    /* Versant bibliothèque : la tranche suivante, affiches comprises. */
+    const tranche = (d.locale||[]).slice(d.page * MOITIE, (d.page + 1) * MOITIE);
+    const fiches = await Promise.all(tranche.map(i => detailsTitre(type, i)));
+    if(seq !== discSeq) return;
+
+    /* Fusion, tri commun, dédoublonnage contre ce qui est déjà affiché. */
+    let lot = plat.concat(fiches.filter(Boolean));
+    if(d.tri === 'aleatoire') melanger(lot);
+    else{
+      const dir = d.sens === 'asc' ? 1 : -1;
+      const cle = r => d.tri === 'note' ? (r.vote_average || 0)
+                 : d.tri === 'nom' ? (type === 'movie' ? (r.title||'') : (r.name||''))
+                 : (type === 'movie' ? (r.release_date||'') : (r.first_air_date||''));
+      lot.sort((a,b)=>{
+        const va = cle(a), vb = cle(b);
+        const vida = va == null || va === '', vidb = vb == null || vb === '';
+        if(vida && vidb) return 0;
+        if(vida) return 1;
+        if(vidb) return -1;
+        return typeof va === 'string' ? dir * String(va).localeCompare(vb, 'fr')
+                                      : dir * (va - vb);
+      });
+    }
+    const deja = {};
+    d.res.forEach(r => { deja[r.id] = 1; });
+    lot = lot.filter(r => { if(deja[r.id]) return false; deja[r.id] = 1; return true; });
+
+    d.page += 1;
+    d.res = d.res.concat(lot);
+    /* « Voir plus » tant que l'un des deux versants a encore de la matière. */
+    d.pages = (d.page * MOITIE < (d.locale||[]).length || d.pageT < d.pagesT)
+      ? d.page + 1 : d.page;
+    d.loading = false; d.err = ''; d.charge = true;
+  }catch(e){
+    if(seq !== discSeq) return;
+    d.loading = false; d.charge = true;
+    d.err = (e.message === 'BADKEY') ? 'Clé TMDB refusée' : 'Pas de connexion';
+  }
+  peindre();
+}
+
 async function chargerDecouverte(suite){
   const d = ui.disc;
   if(!db.apiKey){ toast('Ajoute ta clé TMDB dans les réglages'); return go('reglages', {from:'decouvrir'}); }
   if(modeLocal()) return chargerLocale(suite);
+  if(ui.presence === 'soir') return chargerSoir(suite);
   const seq = ++discSeq;
   if(!suite){
     d.page = 0; d.res = []; d.pages = 1;
@@ -562,10 +659,10 @@ function corpsDecouverte(){
       '<p>Vérifie ta connexion, puis réessaie.</p>'+
       '<button class="btn ghost" onclick="chargerDecouverte()">Réessayer</button></div>';
   if(!d.res.length){
-    if(ui.presence === 'dispo')
-      return '<div class="empty">'+I.serveur+'<h3>Rien de Cinéflix ici</h3>'+
-        '<p>Aucun titre de ces filtres n\'est sur le serveur. Élargis les filtres, '+
-        'ou repasse sur « '+labelTout()+' » pour voir ce qui existe.</p>'+
+    if(ui.presence === 'soir')
+      return '<div class="empty">'+I.serveur+'<h3>Rien à regarder ce soir avec ces filtres</h3>'+
+        '<p>Ni sur Cinéflix, ni sur tes plateformes. Élargis les filtres, '+
+        'ou passe sur « '+labelTout()+' » pour voir ce qui existe ailleurs.</p>'+
         '<button class="btn ghost" onclick="setPresence(\'tout\')">'+labelTout()+'</button></div>';
     return '<div class="empty">'+I.boussole+'<h3>Rien avec ces filtres</h3>'+
       '<p>Élargis la note minimale ou retire un genre.</p>'+
@@ -596,20 +693,35 @@ function setType(t){
 function setPresence(p){
   if(ui.presence === p) return;
   ui.presence = p;
-  /* Les tris de bibliothèque n'ont pas de sens sur « tous les films » :
-     TMDB ignore quand un titre est arrivé sur le NAS ou combien de fois
-     il a été vu. On retombe sur la popularité. */
-  if(p !== 'dispo' && TRI_LOCAL(ui.disc.tri)){
+  /* Les tris de bibliothèque n'ont de sens que sur « Ce soir » : TMDB ignore
+     quand un titre est arrivé sur le NAS ou combien de fois il a été vu. */
+  if(p !== 'soir' && TRI_LOCAL(ui.disc.tri)){
     ui.disc.tri = 'sortie'; ui.disc.sens = 'desc';
-    toast('Ce tri n\'existe que sur la vue Cinéflix');
+    toast('Ce tri n\'existe que sur « Ce soir »');
+  }
+  /* La popularité, à l'inverse, est la seule donnée que la bibliothèque n'a
+     pas : sur « Ce soir » on trie sur ce que les deux mondes partagent. */
+  if(p === 'soir' && ui.disc.tri === 'populaire'){
+    ui.disc.tri = 'sortie'; ui.disc.sens = 'desc';
   }
   render();
   if(!enRecherche()) chargerDecouverte();
 }
+/* Cocher / décocher une plateforme depuis les filtres modifie le PROFIL
+   (Mes goûts) — demande d'Alexandre : « il faut pouvoir retirer les
+   plateformes si un utilisateur arrête une de ses plateformes ». Le guide
+   suit donc aussi, immédiatement. */
 function bascPlateforme(id){
-  const sel = ui.disc.plats || (ui.disc.plats = []);
-  const k = sel.indexOf(id);
-  if(k < 0) sel.push(id); else sel.splice(k,1);
+  const g = GOUTS.d || (GOUTS.d = {});
+  let l = (g.plats||[]).slice();
+  /* Liste vide = « les quatre » : avant d'en retirer une, on rend ce
+     « toutes » explicite, sinon décocher Netflix l'aurait AJOUTÉ seul. */
+  if(!l.length) l = PLATEFORMES.map(p=>p.id);
+  const k = l.indexOf(id);
+  if(k < 0) l.push(id); else l.splice(k,1);
+  g.plats = l;
+  if(!l.length) toast('Aucune cochée : les quatre seront proposées');
+  enregistrerGouts(g);
   ouvrirFiltres(); chargerDecouverte();
 }
 function setVue(v){
@@ -647,23 +759,25 @@ function bascGenre(i){
 function resetFiltres(){
   const d = ui.disc;
   d.genres = []; d.perimetre = 'tout'; d.tri = 'sortie'; d.sens = 'desc'; d.noteMin = 0;
-  d.plats = []; d.decennie = 0; d.origine = 'eurna';
+  d.decennie = 0; d.origine = 'eurna';
   ouvrirFiltres(); chargerDecouverte();
 }
 function filtresActifs(){
   const d = ui.disc;
   return d.genres.length > 0 || d.noteMin > 0 || d.perimetre !== 'tout' ||
          d.tri !== 'sortie' || (d.sens||'desc') !== 'desc' || !!d.decennie ||
-         (d.origine||'eurna') !== 'eurna' ||
-         (ui.presence === 'plats' && (d.plats||[]).length > 0);
+         (d.origine||'eurna') !== 'eurna';
 }
 function resumeFiltres(){
   const d = ui.disc;
   const bouts = [];
   const pres = PRESENCES.find(p=>p.id === ui.presence);
-  if(ui.presence !== 'tout') bouts.push((pres.label||'').toLowerCase());
-  if(ui.presence === 'plats' && (d.plats||[]).length)
-    bouts.push(d.plats.map(id => (PLATEFORMES.find(p=>p.id===id)||{}).nom).filter(Boolean).join(' + '));
+  if(pres && ui.presence !== 'tout') bouts.push((pres.label||'').toLowerCase());
+  if(ui.presence === 'soir'){
+    const l = platsFilms();
+    if(l.length < PLATEFORMES.length)
+      bouts.push(l.map(id => (PLATEFORMES.find(p=>p.id===id)||{}).nom).filter(Boolean).join(' + '));
+  }
   const tri = TRIS.concat(TRIS_LOCAUX).find(t=>t.id===d.tri) || {};
   bouts.push(tri.court + (d.tri !== 'aleatoire' && d.sens === 'asc' ? ' croissant' : ''));
   if(d.perimetre === 'recent') bouts.push('sorties récentes');
@@ -683,11 +797,16 @@ function ouvrirFiltres(){
   const genres = genresTMDB[d.type] || [];
   let h = '<h3>Filtres</h3><div class="small muted" style="margin-top:-4px">Appliqués aux '+
     (d.type === 'movie' ? 'films' : 'séries')+'.</div>';
-  /* Sur la vue Plateformes : choisir lesquelles. Rien de coché = toutes. */
-  if(ui.presence === 'plats'){
-    h += '<div class="fgrp">Plateformes'+((d.plats||[]).length?' ('+d.plats.length+')':'')+'</div><div class="fchips">'+
-      PLATEFORMES.map(pf=>'<button class="chip '+pf.cl+' '+((d.plats||[]).indexOf(pf.id)>=0?'on':'')+
-        '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>';
+  /* Sur « Ce soir » : les plateformes du PROFIL, modifiables ici même.
+     Décocher = « je n'ai plus cet abonnement » — l'app entière suit,
+     guide compris. Rien de coché = les quatre. */
+  if(ui.presence === 'soir'){
+    const actives = platsFilms();
+    h += '<div class="fgrp">Mes plateformes</div><div class="fchips">'+
+      PLATEFORMES.map(pf=>'<button class="chip '+pf.cl+' '+(actives.indexOf(pf.id)>=0?'on':'')+
+        '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>'+
+      '<div class="small muted" style="margin:4px 2px 0">Décoche une plateforme si tu '+
+      'n\'y es plus abonné — le guide en tiendra compte aussi.</div>';
   }
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
@@ -702,16 +821,20 @@ function ouvrirFiltres(){
     '<div class="fchips defil" id="forig">'+
     REGIONS.map(r=>'<button class="chip '+(regionActive().id===r.id?'on':'')+
       '" onclick="setOrigine(\''+r.id+'\')">'+r.label+'</button>').join('')+'</div>';
-  const bibli = ui.presence === 'dispo' && (CAT.items||[]).length > 0;
-  const tris = bibli ? TRIS.concat(TRIS_LOCAUX) : TRIS;
+  const bibli = ui.presence === 'soir' && (CAT.items||[]).length > 0;
+  /* La popularité n'existe pas côté bibliothèque : sur « Ce soir », on trie
+     sur ce que les deux mondes partagent (date, note, nom, hasard). */
+  const tris = bibli ? TRIS.filter(t=>t.id !== 'populaire').concat(TRIS_LOCAUX)
+             : ui.presence === 'soir' ? TRIS.filter(t=>t.id !== 'populaire')
+             : TRIS;
   h += '<div class="fgrp">Trier par</div><div class="fchips">'+
     tris.map(t=>'<button class="chip '+(d.tri===t.id?'on':'')+
       '" onclick="setTri(\''+t.id+'\')">'+t.label+'</button>').join('')+'</div>';
   if(!bibli)
     h += '<div class="small muted" style="margin:6px 2px 0">'+
-      (ui.presence === 'dispo'
+      (ui.presence === 'soir'
         ? 'Date d\'ajout, durée, lectures… arrivent avec la prochaine mise à jour du serveur (toutes les heures).'
-        : 'Date d\'ajout, durée, lectures… : ces tris s\'appliquent à la vue « Cinéflix », '+
+        : 'Date d\'ajout, durée, lectures… : ces tris vivent sur « Ce soir », '+
           'où l\'app connaît ta bibliothèque.')+'</div>';
   if(d.tri !== 'aleatoire')
     h += '<div class="fgrp">Ordre de tri</div><div class="fchips">'+
