@@ -102,7 +102,9 @@ function viewProfil(){
   html += '<div class="sectitle">Raccourcis</div><div class="wrap" style="padding-top:0">'+
     '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.presence=\'dispo\';ui.disc.charge=false;go(\'decouvrir\')">'+
       I.serveur+' Parcourir ce qui est sur Cinéflix</button>'+
-    '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.sorties.mode=\'bluray\';ui.sorties.charge=false;go(\'sorties\')">'+
+    /* Le calendrier vit dans Ma liste depuis 3007y : le raccourci ouvre le
+       volet Sorties, sur téléphone comme sur bureau. */
+    '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.sorties.mode=\'bluray\';ui.sorties.charge=false;ui.listeVolet=\'sorties\';go(\'liste\')">'+
       I.disque+' Prochaines sorties Blu-ray</button>'+
     '<button class="btn ghost block" onclick="go(\'reglages\',{from:\'profil\'})">Réglages</button>'+
   '</div>';
