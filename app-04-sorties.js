@@ -86,7 +86,8 @@ async function chargerSorties(){
     render();
     return;
   }
-  if(!db.apiKey){ toast('Ajoute ta clé TMDB dans les réglages'); return go('reglages', {from:'sorties'}); }
+  if(!db.apiKey){ toast('Ajoute ta clé TMDB dans les réglages');
+    return go('reglages', {from: view === 'liste' ? 'liste' : 'sorties'}); }
   const seq = ++sortiesSeq;
   s.loading = true; s.err = ''; s.res = [];
   render();
@@ -132,13 +133,24 @@ function setMode(id){
   chargerSorties();
 }
 
-function viewSorties(){
-  const s = ui.sorties, m = modeCourant();
-  const sub = '<div class="chips">'+MODES.map(x=>
-    '<button class="chip '+(s.mode===x.id?'on':'')+'" onclick="setMode(\''+x.id+'\')">'+
+/* Les pastilles de mode (salle / numérique / physique), servies telles
+   quelles à la vue Sorties du bureau et au volet Sorties de Ma liste. */
+function chipsModes(sous){
+  return '<div class="chips'+(sous ? ' souschips' : '')+'">'+MODES.map(x=>
+    '<button class="chip '+(ui.sorties.mode===x.id?'on':'')+'" onclick="setMode(\''+x.id+'\')">'+
     x.label+'</button>').join('')+'</div>';
+}
 
-  let html = header('Sorties', {sub:sub}) + banniereCle();
+function viewSorties(){
+  let html = header('Sorties', {sub:chipsModes(false)}) + banniereCle();
+  return html + corpsSorties();
+}
+
+/* Le corps seul — chargement, erreur, calendrier — sans en-tête ni
+   pastilles : Ma liste l'affiche sous ses propres volets (3007y). */
+function corpsSorties(){
+  const s = ui.sorties, m = modeCourant();
+  let html = '';
 
   if(s.loading)
     return html + '<div class="empty"><span class="spin"></span>'+
@@ -217,8 +229,10 @@ function ligneSortie(x, m){
     '</div>';
 
   /* Une sortie que TMDB n'a pas su identifier reste au calendrier — elle ne
-     mène simplement nulle part. */
+     mène simplement nulle part. Le retour de la fiche revient là d'où l'on
+     vient : la vue Sorties du bureau, ou le volet Sorties de Ma liste. */
+  const de = (view === 'liste') ? 'liste' : 'sorties';
   return r.id
-    ? '<button class="crow" onclick="ouvrirFiche('+r.id+',\'movie\',\'sorties\')">'+corps+'</button>'
+    ? '<button class="crow" onclick="ouvrirFiche('+r.id+',\'movie\',\''+de+'\')">'+corps+'</button>'
     : '<div class="crow inerte">'+corps+'</div>';
 }
