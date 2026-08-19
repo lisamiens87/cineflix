@@ -81,6 +81,14 @@ window.CINEFLIX = {
      collecte des points de reprise viendra dans un second temps.          */
   jellyfinUsers: ['Dad', 'lisamiens87', 'Lolo'],
 
+  /* --- Le compte qui exécute l'export du NAS ----------------------------
+     Transitoire (3008i) : les catalogues produits AVANT ce build portent
+     une progression de lecture unique, celle de ce compte-là. On ne la
+     montre qu'à lui — sinon chacun verrait les films en cours d'un autre.
+     Dès qu'un export au nouveau format est passé (5 min de cron), la
+     progression est nominative et cette ligne ne sert plus à rien.       */
+  jellyfinExport: 'lisamiens87',
+
   /* --- Nom affiché ------------------------------------------------------ */
   nom: 'Cinéflix'
 };
