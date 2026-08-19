@@ -672,6 +672,154 @@ async function menuAcces(uid, qui){
     '<button class="opt" onclick="closeSheet()">Annuler</button>');
 }
 
+/* ======================= Les membres du foyer (admin) =======================
+   Deux besoins d'Alexandre, le 20/08 : attribuer les comptes serveur des
+   personnes DÉJÀ validées (le choix à la validation ne vaut que pour les
+   nouvelles demandes), et pouvoir retirer quelqu'un.
+
+   « Retirer l'accès » repose sur le statut et se défait d'un geste.
+   « Supprimer » efface la ligne : la base n'a pas forcément la politique qui
+   l'autorise, alors on COMPTE les lignes rendues et on le dit franchement
+   plutôt que de laisser croire que c'est fait. */
+let membres = { lignes:[], charge:false, occupe:false, err:'' };
+
+async function chargerMembres(){
+  if(!estAdmin) return;
+  membres.occupe = true; membres.err = '';
+  if(view === 'membres') render();
+  try{
+    membres.lignes = await sbFetch('/rest/v1/profils?select=user_id,pseudo,email,statut,jellyfin'+
+                                   '&statut=neq.attente&order=pseudo.asc', {}) || [];
+    membres.charge = true;
+  }catch(e){ membres.err = e.message || 'lecture impossible'; }
+  membres.occupe = false;
+  if(view === 'membres') render();
+}
+
+async function poserCompteServeur(uid, jf, qui){
+  closeSheet();
+  try{
+    const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
+      {method:'PATCH', headers:{ Prefer:'return=representation' },
+       body: JSON.stringify({ jellyfin: jf, maj: new Date().toISOString() })});
+    if(!Array.isArray(r) || !r.length) return toast('Refusé par le serveur.');
+    const m = membres.lignes.find(x=>x.user_id===uid);
+    if(m) m.jellyfin = jf;
+    render();
+    toast(jf === '*' ? 'Compte serveur en création pour '+(qui||'ce profil')
+        : jf === '-' ? 'Sans compte serveur'
+                     : 'Relié à « '+jf+' »');
+  }catch(e){ toast('Échec : '+(e.message||'réessaie')); }
+}
+
+async function changerStatutMembre(uid, statut, qui){
+  closeSheet();
+  try{
+    const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
+      {method:'PATCH', headers:{ Prefer:'return=representation' },
+       body: JSON.stringify({ statut: statut, maj: new Date().toISOString() })});
+    if(!Array.isArray(r) || !r.length) return toast('Refusé par le serveur.');
+    const m = membres.lignes.find(x=>x.user_id===uid);
+    if(m) m.statut = statut;
+    render();
+    toast(statut === 'valide' ? 'Accès rétabli pour '+(qui||'ce profil')
+                              : 'Accès retiré à '+(qui||'ce profil'));
+  }catch(e){ toast('Échec : '+(e.message||'réessaie')); }
+}
+
+function confirmerSuppression(uid, qui){
+  closeSheet();
+  openSheet('<h3>Supprimer '+esc(qui||'ce profil')+' ?</h3>'+
+    '<p class="small muted" style="margin:0 0 8px">Son profil, ses goûts et ses '+
+    'favoris seront effacés. Son compte Jellyfin et son historique de lecture, '+
+    'eux, ne sont pas touchés. C\'est sans retour.</p>'+
+    '<button class="opt danger" onclick="supprimerMembre(\''+uid+'\',\''+
+      esc(qui||'').replace(/'/g,"\\'")+'\')">Oui, supprimer définitivement</button>'+
+    '<button class="opt" onclick="closeSheet()">Annuler</button>');
+}
+
+async function supprimerMembre(uid, qui){
+  closeSheet();
+  try{
+    /* Les goûts d'abord (ils ne partent pas d'eux-mêmes), le profil ensuite. */
+    try{ await sbFetch('/rest/v1/gouts?user_id=eq.'+encodeURIComponent(uid), {method:'DELETE'}); }catch(e){}
+    const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
+      {method:'DELETE', headers:{ Prefer:'return=representation' }});
+    if(!Array.isArray(r) || !r.length)
+      return toast('Le serveur refuse la suppression — retire plutôt l\'accès.');
+    membres.lignes = membres.lignes.filter(x=>x.user_id!==uid);
+    render();
+    toast(esc(qui||'Profil')+' supprimé');
+  }catch(e){ toast('Échec : '+(e.message||'réessaie')); }
+}
+
+async function menuMembre(uid, qui, statut, jf){
+  const q = esc(qui||'').replace(/'/g,"\\'");
+  const comptes = await chargerComptesJF();
+  let pris = [];
+  try{
+    const l = await sbFetch('/rest/v1/profils?select=user_id,jellyfin', {});
+    pris = (l||[]).filter(p=>p.user_id!==uid)
+            .map(p=>String(p.jellyfin||'').trim()).filter(x=>x && x!=='*' && x!=='-');
+  }catch(e){}
+  const libres = comptes.filter(n => pris.indexOf(n) < 0);
+  const pose = (v)=> 'poserCompteServeur(\''+uid+'\',\''+v+'\',\''+q+'\')';
+  openSheet('<h3>'+esc(qui||'Ce profil')+'</h3>'+
+    '<div class="small muted" style="margin:0 0 8px">Compte serveur : <b>'+
+      (jf === '*' ? 'en cours de création' : jf === '-' ? 'aucun' : (jf ? esc(jf) : 'non défini'))+
+      '</b></div>'+
+    (jf && jf !== '-' && jf !== '*' ? '' :
+      '<button class="opt" onclick="'+pose('*')+'">Lui créer un compte serveur</button>')+
+    libres.map(n => '<button class="opt" onclick="'+pose(esc(n).replace(/'/g,"\\'"))+
+      '">Le relier à « '+esc(n)+' »</button>').join('')+
+    (jf === '-' ? '' : '<button class="opt" onclick="'+pose('-')+'">Aucun compte serveur</button>')+
+    '<div style="height:1px;background:var(--line);margin:8px 0"></div>'+
+    (statut === 'valide'
+      ? '<button class="opt" onclick="changerStatutMembre(\''+uid+'\',\'refuse\',\''+q+'\')">'+
+        'Retirer l\'accès</button>'
+      : '<button class="opt" onclick="changerStatutMembre(\''+uid+'\',\'valide\',\''+q+'\')">'+
+        'Rétablir l\'accès</button>')+
+    '<button class="opt danger" onclick="confirmerSuppression(\''+uid+'\',\''+q+'\')">'+
+      'Supprimer définitivement…</button>'+
+    '<button class="opt" onclick="closeSheet()">Annuler</button>');
+}
+
+function viewMembres(){
+  let html = header('Membres', {back:'goBack()',
+    right:'<button class="iconbtn" onclick="chargerMembres()">'+I.horloge+'</button>'});
+  if(membres.occupe && !membres.charge)
+    return html + '<div class="empty"><span class="spin"></span>'+
+      '<p style="margin-top:12px">Chargement…</p></div>';
+  if(membres.err)
+    return html + '<div class="empty"><h3>Lecture impossible</h3><p>'+esc(membres.err)+'</p>'+
+      '<button class="btn ghost" onclick="chargerMembres()">Réessayer</button></div>';
+  if(!membres.lignes.length)
+    return html + '<div class="empty">'+I.user+'<h3>Personne encore</h3>'+
+      '<p>Les profils validés apparaîtront ici.</p></div>';
+
+  html += '<div class="list">'+membres.lignes.map(l => {
+    const jf = String(l.jellyfin||'');
+    const dit = jf === '*' ? 'compte serveur en création'
+              : jf === '-' ? 'sans compte serveur'
+              : jf ? 'serveur : '+jf : 'compte serveur non défini';
+    return '<div class="lrow">'+
+      avatarHtml(null, 'moyen', l.pseudo)+
+      '<div class="cinfo" style="margin-left:12px">'+
+        '<div class="cname2">'+esc(l.pseudo||'Sans nom')+
+          (l.statut !== 'valide' ? ' <span class="tiny muted">(accès retiré)</span>' : '')+'</div>'+
+        '<div class="csub">'+esc(l.email||'—')+' · '+esc(dit)+'</div>'+
+      '</div>'+
+      '<button class="iconbtn" onclick="menuMembre(\''+l.user_id+'\',\''+
+        esc(l.pseudo||'').replace(/'/g,"\\'")+'\',\''+esc(l.statut||'')+'\',\''+
+        esc(jf).replace(/'/g,"\\'")+'\')">'+I.dots+'</button>'+
+    '</div>';
+  }).join('')+'</div>';
+
+  return html + '<div class="wrap tiny muted center" style="padding-bottom:26px">'+
+    'Le compte serveur s\'attribue ici, et nulle part ailleurs : chacun ne peut '+
+    'pas choisir le sien, sinon deux personnes se partageraient les mêmes reprises.</div>';
+}
+
 function viewAcces(){
   let html = header('Demandes d\'accès', {back:'goBack()',
     right:'<button class="iconbtn" onclick="chargerAcces()">'+I.horloge+'</button>'});
