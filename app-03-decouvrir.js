@@ -1196,7 +1196,7 @@ function assurerRangee(nom, choisir){
   Promise.all(l.map(c => tmdb('/'+(c.t === 'tv' ? 'tv' : 'movie')+'/'+c.id).catch(()=>null)))
     .then(fs=>{
       ui[nom] = l.map((c,i)=>({ id:c.id, t:c.t, nom:c.nom,
-        pos:c.pos||0, duree:c.duree||0,
+        pos:maReprise(c), duree:c.duree||0,
         poster:(fs[i] && fs[i].poster_path) || '' })).filter(x=>x.poster);
       if(view === 'decouvrir') render();
     });
@@ -1207,11 +1207,34 @@ function assurerRecents(){
     .sort((a,b)=> String(b.ajout).localeCompare(String(a.ajout)))
     .slice(0, parRangee(10, 184)));
 }
+/* Où EN SUIS-JE, moi — pas le foyer entier (3008i).
+   `pos` valait un entier : la progression du seul compte qui exécute
+   l'export. Chacun voyait donc les films en cours d'Alexandre. Le NAS écrit
+   désormais un dictionnaire { "Dad": 42, … } et on n'y lit que son compte,
+   celui relié au profil. L'ancien format est encore accepté le temps qu'un
+   passage du cron réécrive le catalogue. */
+function monCompteServeur(){
+  return String((ui.monProfil||{}).jellyfin || '').trim();
+}
+function maReprise(i){
+  const p = i && i.pos;
+  if(!p) return 0;
+  const moi = monCompteServeur();
+  /* Catalogue d'avant 3008i : un simple nombre, qui est la progression du
+     compte AVEC LEQUEL L'EXPORT SE CONNECTE — donc celle d'une personne
+     précise, pas celle de qui regarde. L'afficher à tout le monde serait
+     refaire le bug qu'on corrige : on ne la montre qu'à son propriétaire.
+     Ce repli disparaîtra de lui-même au premier passage du cron muni du
+     nouveau script. */
+  if(typeof p === 'number')
+    return (moi && moi === (CFG.jellyfinExport||'')) ? p : 0;
+  return moi ? (Number(p[moi]) || 0) : 0;  /* sans compte relié : rien */
+}
 function assurerReprises(){
   /* « En cours » = commencé, pas fini. On laisse deux minutes de marge au
      bout : un générique qu'on coupe ne doit pas ressortir toute la semaine. */
   assurerRangee('reprises', ()=> (CAT.items||[])
-    .filter(i => i && (i.pos||0) > 0 && (i.duree||0) > 0 && i.pos < i.duree - 2)
+    .filter(i => i && maReprise(i) > 0 && (i.duree||0) > 0 && maReprise(i) < i.duree - 2)
     .sort((a,b)=> String(b.lu||'').localeCompare(String(a.lu||'')))
     .slice(0, parRangee(10, 184)));
 }
