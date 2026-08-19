@@ -855,3 +855,35 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 /* La porte de sortie du parcours des goûts, quand il est relancé depuis le
    profil (11/08) : sans elle, on était enfermé jusqu'à la dernière étape. */
 .accquitte{position:fixed;top:calc(12px + env(safe-area-inset-top));left:12px;z-index:6}
+
+/* =============== Suggestions N4, volet de Ma liste (3007y) ===============
+   Les idées d'achat tirées de l'analyse de la vidéothèque : des cartes en
+   liste — affiche, titre, la justification en toutes lettres, et deux
+   gestes (Acquis, cœur). Les catégories se replient comme des rayons. */
+.sgintro{padding-top:4px;padding-bottom:10px;font-size:12.5px;color:var(--muted)}
+.sgcat{display:flex;justify-content:space-between;align-items:center;width:calc(100% - 28px);
+  margin:4px 14px 8px;padding:11px 13px;background:var(--surface);
+  border:1px solid var(--line);border-radius:12px;color:var(--text);
+  font-size:14px;font-weight:700;cursor:pointer}
+.sgcat .sgn{font-size:12px;color:var(--muted);font-weight:400;display:flex;
+  align-items:center;gap:6px}
+.sgfl{display:inline-flex;transform:rotate(-90deg);transition:transform .15s}
+.sgfl.ouv{transform:rotate(90deg)}
+.sgfl svg{width:14px;height:14px}
+.sgsous{padding:4px 16px 6px;font-size:12px;font-weight:700;color:var(--accent)}
+.sgfilm{display:flex;gap:10px;align-items:stretch;margin:0 14px 8px;padding:9px;
+  background:var(--surface);border:1px solid var(--line);border-radius:12px}
+.sgaff{flex:0 0 auto;padding:0;border:0;background:none;cursor:pointer}
+.sgaff .poster{width:54px;height:80px;border-radius:8px;object-fit:cover;display:block}
+.sgaff .poster.ph{display:flex;align-items:center;justify-content:center;
+  font-size:9px;color:var(--muted);background:var(--surface2)}
+.sginfo{flex:1;min-width:0;cursor:pointer}
+.sgt{font-size:13.5px;font-weight:700;line-height:1.25}
+.sgy{color:var(--muted);font-weight:400;font-size:12px}
+.sgwhy{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:3px}
+.sgbt{display:flex;flex-direction:column;gap:6px;justify-content:center;flex:0 0 auto}
+.sgb{font-size:11px;padding:5px 9px;border-radius:999px;background:none;
+  border:1px solid var(--line);color:var(--muted);cursor:pointer;display:flex;
+  align-items:center;justify-content:center;gap:4px}
+.sgb svg{width:14px;height:14px}
+.sgb.sgbon{color:var(--accent);border-color:var(--accent)}
