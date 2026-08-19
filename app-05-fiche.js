@@ -177,16 +177,21 @@ function actionsFiche(o, type){
        rang : être sur Netflix aujourd'hui n'empêche pas de vouloir le titre
        chez soi pour toujours. Et si la demande est déjà partie, c'est son
        état qu'on rappelle plutôt qu'une invitation à la refaire. */
+    /* 3008l — c'était un lien souligné, qu'Alexandre trouvait illisible :
+       « pas facile à comprendre, suggestion bouton ? ». C'en est un, en
+       second rang (ghost) : regarder tout de suite prime sur demander. */
     const second =
       (st === 'demande' || st === 'encours')
-        ? '<button class="lienplat" onclick="menuDemande('+o.id+',\''+type+'\')">'+
-          (st === 'demande' ? 'Déjà demandé sur Cinéflix' : 'En cours d’ajout sur Cinéflix')+'</button>'
+        ? '<button class="btn attente block" onclick="menuDemande('+o.id+',\''+type+'\')">'+
+          I.horloge+' '+(st === 'demande' ? 'Déjà demandé sur Cinéflix'
+                                          : 'En cours d’ajout sur Cinéflix')+'</button>'
       : st === 'refuse'
-        ? '<button class="lienplat" onclick="menuDemande('+o.id+',\''+type+'\')">Demande refusée</button>'
-        : '<button class="lienplat" onclick="demander('+ref+',\''+type+'\');render()">'+
-          'Le demander aussi sur Cinéflix</button>';
+        ? '<button class="btn ghost block" onclick="menuDemande('+o.id+',\''+type+'\')">'+
+          'Demande refusée</button>'
+        : '<button class="btn ghost block" onclick="demander('+ref+',\''+type+'\');render()">'+
+          I.envoi+' Le demander aussi sur Cinéflix</button>';
     return '<div class="actions plats">'+boutons+coeur+'</div>'+
-           '<div class="credit">'+second+'</div>';
+           '<div class="wrap" style="padding:10px 16px 0">'+second+'</div>';
   }
 
   let principal;
