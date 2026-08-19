@@ -270,10 +270,13 @@ function setTaxoGenre(gid){
   const g = ui.guide;
   if(g.taxoG === gid){ g.taxoG = ''; return render(); }
   g.taxoG = gid;
-  const e = TAXO.find(x => x.id === gid);
-  /* Un genre sans sous-catégorie se lance directement : rien à choisir. */
-  if(e && !(e.sous||[]).length) return guiderTaxo(gid);
-  render();
+  /* 3008k — toucher un genre CHERCHE, toujours. Auparavant, un genre pourvu
+     de sous-catégories ne faisait que les déplier : les résultats de la
+     demande précédente restaient affichés au-dessus, et rien ne disait
+     qu'ils n'avaient plus rien à voir. Alexandre, le 20/08 : « je choisis
+     Guerre et il reste sur la requête précédente ». On lance donc le genre
+     entier, et les sous-catégories s'ouvrent DESSOUS pour affiner ensuite. */
+  guiderTaxo(gid);
 }
 
 function guiderTaxo(id){
