@@ -27,9 +27,25 @@ const PRESENCES = [
   { id:'tout', label:'Tout',      cl:'c-tout' }
 ];
 /* Les plateformes de CETTE personne — celles de son profil (Mes goûts).
-   Rien de coché = les quatre : mieux vaut montrer trop que cacher. */
-const platsFilms = ()=> (typeof platsProfil === 'function' && platsProfil().length)
-  ? platsProfil() : PLATEFORMES.map(p=>p.id);
+   ⚠️ LE PIÈGE, corrigé en 3008h : « liste vide » voulait dire DEUX choses
+   opposées — « je n'ai encore rien répondu » (→ montrer toutes les
+   plateformes) et « je n'ai aucun abonnement » (→ n'en montrer aucune).
+   Faute de les distinguer, décocher la dernière plateforme les rallumait
+   toutes : Alexandre est tombé dessus le 19/08, « je ne peux pas enlever
+   toutes les plateformes, c'est incohérent ».
+
+   Le drapeau `platsDit` tranche : il est posé dès qu'on répond, à
+   l'inscription comme dans les filtres. Un profil d'avant ce build n'a pas
+   le drapeau — mais s'il a des plateformes cochées, il a manifestement
+   répondu : c'est le second terme du OU. */
+const platsDits = ()=> {
+  const g = (typeof GOUTS === 'object' && GOUTS.d) || {};
+  return !!g.platsDit || (Array.isArray(g.plats) && g.plats.length > 0);
+};
+const platsFilms = ()=> {
+  if(typeof platsProfil !== 'function') return PLATEFORMES.map(p=>p.id);
+  return platsDits() ? platsProfil() : PLATEFORMES.map(p=>p.id);
+};
 const labelTout = ()=> 'Tout';
 
 /* ---------- Les goûts, appliqués à l'accueil (3008g) ----------
@@ -759,13 +775,15 @@ function setPresence(p){
 function bascPlateforme(id){
   const g = GOUTS.d || (GOUTS.d = {});
   let l = (g.plats||[]).slice();
-  /* Liste vide = « toutes » : avant d'en retirer une, on rend ce
-     « toutes » explicite, sinon décocher Netflix l'aurait AJOUTÉ seul. */
-  if(!l.length) l = PLATEFORMES.map(p=>p.id);
+  /* Tant que la personne n'a rien dit, l'écran montre TOUTES les plateformes
+     allumées : avant d'en retirer une, il faut donc rendre ce « toutes »
+     explicite, sinon décocher Netflix l'aurait AJOUTÉ seul. */
+  if(!platsDits()) l = PLATEFORMES.map(p=>p.id);
   const k = l.indexOf(id);
   if(k < 0) l.push(id); else l.splice(k,1);
   g.plats = l;
-  if(!l.length) toast('Aucune cochée : toutes seront proposées');
+  g.platsDit = true;          /* désormais, zéro veut dire zéro */
+  if(!l.length) toast('Aucun abonnement : seul le catalogue Cinéflix sera proposé');
   enregistrerGouts(g);
   ouvrirFiltres(); chargerDecouverte();
 }
@@ -852,14 +870,22 @@ function ouvrirFiltres(){
        Netflix »). Les onze au grand complet ne servent qu'au moment de
        s'abonner ailleurs — c'est ce que fait le bouton « + Ajouter ». */
     const liste = ui.platsTous ? PLATEFORMES : PLATEFORMES.filter(pf => actives.indexOf(pf.id) >= 0);
-    h += '<div class="fgrp">Mes plateformes</div><div class="fchips">'+
+    /* Cinéflix en tête, coché et non décochable (3008h, demande d'Alexandre :
+       « j'aimerais qu'il soit précisé que le catalogue Cinéflix est coché »).
+       Sa bibliothèque est le socle : elle ne s'enlève pas, et le voir écrit
+       rend lisible le cas « aucun abonnement ». */
+    h += '<div class="fgrp">Où je peux regarder</div><div class="fchips">'+
+      '<button class="chip c-flix on" onclick="toast(\'Ta bibliothèque Cinéflix est toujours incluse.\')">'+
+        'Cinéflix ✓</button>'+
       liste.map(pf=>'<button class="chip '+pf.cl+' '+(actives.indexOf(pf.id)>=0?'on':'')+
         '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+
       (ui.platsTous ? '' :
         '<button class="chip" onclick="ui.platsTous=true;ouvrirFiltres()">+ Ajouter</button>')+
       '</div>'+
       '<div class="small muted" style="margin:4px 2px 0">Décoche une plateforme si tu '+
-      'n\'y es plus abonné — le guide en tiendra compte aussi.</div>';
+      'n\'y es plus abonné — le guide en tiendra compte aussi. '+
+      (actives.length ? '' : 'Aucun abonnement coché : seul le catalogue Cinéflix est proposé.')+
+      '</div>';
   }
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
     PERIMETRES.map(p=>'<button class="chip '+(d.perimetre===p.id?'on':'')+
