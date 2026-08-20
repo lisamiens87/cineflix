@@ -24,60 +24,23 @@ function lots(){
 
 function setListeTab(id){ ui.listeTab = id; render(); }
 
-/* ---------- Les trois volets (3007y) ----------
-   Ma liste a absorbé le calendrier des Sorties (l'onglet a quitté la barre
-   du bas du téléphone) et gagné les Suggestions — les idées d'achat tirées
-   de l'analyse de la vidéothèque N4, visibles par le seul administrateur.
-   Choix d'Alexandre sur maquette : trois volets « Ma liste · Sorties ·
-   Suggestions », et les anciens onglets Favoris / Demandes / Arrivés
-   deviennent la seconde rangée du premier volet. */
-function voletsListe(){
-  const volets = [ {id:'liste', label:'Ma liste'}, {id:'sorties', label:'Sorties'} ];
-  if(typeof estAdmin !== 'undefined' && estAdmin)
-    volets.push({id:'sugg', label:'Suggestions'});
-  if(!volets.some(v => v.id === ui.listeVolet)) ui.listeVolet = 'liste';
-  /* `volets` : trois parts égales, pleine largeur — les puces flottaient à
-     gauche et Alexandre les voulait alignées (3008d). */
-  return '<div class="chips volets">'+volets.map(v=>
-    '<button class="chip '+(ui.listeVolet===v.id?'on':'')+'" onclick="setListeVolet(\''+v.id+'\')">'+
-    v.label+'</button>').join('')+'</div>';
-}
-function setListeVolet(id){
-  if(ui.listeVolet === id) return;
-  ui.listeVolet = id;
-  window.scrollTo(0,0);
-  render();
-  if(id === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
-  if(id === 'sugg' && !ui.sugg.charge && !ui.sugg.loading) chargerSuggestions();
-}
-
+/* ---------- Ma liste, redevenue Ma liste (3008p) ----------
+   L'écran avait fini par tout héberger : le calendrier des Sorties (3007y),
+   puis les Suggestions. Les deux sont partis dans l'onglet Cinéma, qui a
+   maintenant sa place en bas à droite. Il ne reste que ce que le nom promet,
+   avec les mêmes sous-catégories qu'avant : Favoris, Demandes, Arrivés. */
 function viewListe(){
-  const volets = voletsListe();
-
-  /* ---- Volet Sorties : le calendrier d'app-04, en grille d'affiches ---- */
-  if(ui.listeVolet === 'sorties'){
-    return header('Pour moi', {sub: volets + chipsModes(true)}) +
-      banniereCle() + corpsSortiesGrille();
-  }
-
-  /* ---- Volet Suggestions ---- */
-  if(ui.listeVolet === 'sugg'){
-    return header('Pour moi', {sub: volets}) + corpsSuggestions();
-  }
-
-  /* ---- Volet Ma liste : l'écran historique ---- */
   const L = lots();
   const compte = { favoris:L.favoris.length, demandes:L.demandes.length, arrives:L.arrives.length };
   if(!ONGLETS.some(o => o.id === ui.listeTab)) ui.listeTab = 'favoris';
 
-  const sub = volets + '<div class="chips souschips">'+ONGLETS.map(o=>
+  const sub = '<div class="chips souschips">'+ONGLETS.map(o=>
     '<button class="chip '+(ui.listeTab===o.id?'on':'')+'" onclick="setListeTab(\''+o.id+'\')">'+
     o.label+' <span style="opacity:.65">'+compte[o.id]+'</span></button>').join('')+'</div>';
 
-  /* « Pour moi » en titre d'écran (3008d) : « Ma liste » vivait en double —
-     dans la barre du bas ET sur le premier volet. L'onglet et l'écran disent
-     désormais l'espace personnel, le volet garde son nom. */
-  let html = header('Pour moi', {sub:sub,
+  /* Le doublon de 3008d (« Ma liste » dans la barre du bas ET en volet) n'a
+     plus lieu d'être : le volet a disparu, le nom revient. */
+  let html = header('Ma liste', {sub:sub,
     right:'<button class="iconbtn" onclick="menuListe()">'+I.dots+'</button>'});
 
   if(ui.listeTab === 'favoris'){
