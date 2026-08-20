@@ -167,8 +167,65 @@ function rendreDefil(cle){
   if(y) requestAnimationFrame(()=> window.scrollTo(0, y));
 }
 
+/* ---------- La pile de navigation (3008r) ----------
+   « Revenir en arrière » ne se DEVINE plus. Jusqu'ici chaque écran déclarait
+   un parent supposé — la fiche disait « je viens de Ma liste » parce qu'à
+   l'époque le calendrier des sorties y vivait. Le calendrier a déménagé dans
+   Cinéma, la déclaration est restée, et le retour renvoyait sur Ma liste.
+   Alexandre, le 20/08 : « quand je suis dans Cinéma et que je reviens en
+   arrière ça m'amène à Ma liste. C'est incohérent et de manière générale
+   c'est souvent le cas. » Il a raison, et le vice est dans la méthode : une
+   origine écrite à la main dans une carte devient fausse au premier
+   déménagement, sans que rien ne le signale.
+
+   On garde donc la trace de ce qu'on quitte VRAIMENT : l'écran, ses
+   paramètres, la hauteur de lecture, et l'état interne qui ne tient pas dans
+   le nom de la vue (la page du guide, le volet de Cinéma). Le retour rejoue
+   cette trace. Les parents déclarés ne servent plus que de filet, quand la
+   pile est vide — arrivée directe sur un écran profond. */
+const pileNav = [];
+const PILE_MAX = 25;
+
+function etatNav(){
+  return { v:view, p:params, y:window.scrollY || 0,
+           ecran:((ui.guide||{}).ecran || ''), volet:(ui.cineVolet || '') };
+}
+function empiler(){
+  /* Avant d'être entré, il n'y a rien où revenir. */
+  if(view === 'auth' || view === 'accueil' || view === 'attente') return;
+  const e = etatNav();
+  const d = pileNav[pileNav.length - 1];
+  /* Deux fois le même écran d'affilée : on met à jour, on n'empile pas —
+     sinon trois retours seraient nécessaires pour quitter une page. */
+  if(d && d.v === e.v && d.ecran === e.ecran &&
+     JSON.stringify(d.p) === JSON.stringify(e.p)){ pileNav[pileNav.length-1] = e; return; }
+  pileNav.push(e);
+  if(pileNav.length > PILE_MAX) pileNav.shift();
+  /* Une entrée d'historique par étage : le bouton « retour » d'Android tombe
+     alors sur notre `popstate` au lieu de sortir de l'app. */
+  try{ history.pushState({cf:pileNav.length}, ''); }catch(e2){}
+}
+/* Le vrai retour, celui que tout le monde appelle : la flèche, le balayage,
+   et le geste système via popstate. */
+function reculer(){
+  const e = pileNav.pop();
+  if(!e){
+    const t = currentBack();
+    if(t) go(t, {}, 'back');
+    return;
+  }
+  if(ui.guide) ui.guide.ecran = e.ecran;
+  if(e.volet)  ui.cineVolet   = e.volet;
+  view = e.v; params = e.p || {};
+  navDir = 'back';
+  render();
+  window.scrollTo(0, e.y);
+  if(e.y) requestAnimationFrame(()=> window.scrollTo(0, e.y));
+}
+
 function go(v, p, dir){
   if(view === v && JSON.stringify(params) === JSON.stringify(p||{})){ window.scrollTo(0,0); render(); return; }
+  if(dir !== 'back') empiler();
   if(LISTES[view]) memDefil[cleDefil(view)] = window.scrollY || 0;
   if(v === 'decouvrir' && !(ui.searchQ||'').trim()) ui.champOuvert = false;
   const a = DEPTH[view]||0, b = DEPTH[v]||0;
@@ -201,9 +258,26 @@ function goBack(){
   const navP = view === 'personne' ? ((ui.personne||{}).nav || {})
              : view === 'saison'   ? ((ui.saison||{}).nav   || {}) : null;
   if(navP && navP.fid) return ouvrirFiche(navP.fid, navP.ftype, navP.ffrom);
-  const t = currentBack();
-  if(t) go(t, {}, 'back');
+  /* Une entrée d'historique nous attend : on la consomme, et c'est `popstate`
+     qui fera le retour. Sans quoi le geste système et la flèche se
+     décaleraient l'un de l'autre, et un retour sur deux serait avalé. */
+  if(pileNav.length && histoireLiee){ history.back(); return; }
+  reculer();
 }
+
+/* ---------- Le bouton « retour » du téléphone (3008r) ----------
+   L'app ne changeait jamais d'adresse : le geste système d'Android n'avait
+   aucune entrée à dépiler et sortait de l'app — ou pire, atterrissait
+   n'importe où. On pose maintenant une entrée par étage (voir `empiler`), et
+   on rattrape le geste ici pour le traiter comme la flèche de l'app. Quand
+   la pile est vide, on ne retient plus rien : quitter l'app est alors le
+   comportement attendu. */
+let histoireLiee = false;
+try{
+  history.replaceState({cf:0}, '');
+  window.addEventListener('popstate', ()=>{ if(pileNav.length) reculer(); });
+  histoireLiee = true;
+}catch(e){}
 
 /* Balayage depuis le bord gauche : le doigt entraîne l'écran, et au
    relâchement soit on part en arrière, soit la page reprend sa place. */
