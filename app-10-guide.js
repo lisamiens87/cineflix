@@ -867,7 +867,7 @@ function rendreLesEcartes(){
 /* ---------- L'écran ---------- */
 function carteGuide(c){
   return '<div class="gcard">'+
-    '<button class="gouvre" onclick="ouvrirFiche('+c.id+',\''+c.type+'\',\'guide\')">'+
+    '<button class="gouvre" onclick="ouvrirFiche('+c.id+',\''+c.type+'\')">'+
       /* Pas de coche « sur Premier Rang » ici (retirée en 3007j, demande
          d'Alexandre) : en « chez toi » TOUT l'est — la coche était partout,
          donc muette — et en « tes abonnements » plus rien ne l'est depuis
