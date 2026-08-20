@@ -83,6 +83,22 @@ function sessionMorte(){
   }
 }
 
+/* Le profil a été supprimé côté serveur pendant qu'on s'en servait.
+   Alexandre, le 20/08 : « ça a supprimé sur Supabase mais pas dans le code,
+   quand je renvoie un lien d'invitation ça lui ouvre sa page comme si elle
+   n'avait jamais été supprimée. » Deux choses traînaient : la session, qui
+   vit encore le temps que son jeton expire, et surtout la TÊTE mémorisée sur
+   l'appareil — l'écran « qui regarde ce soir ? » se sert de `db.foyer`, une
+   liste locale que le serveur n'a jamais vue. On efface les deux. */
+function compteDisparu(){
+  const mail = String((db.auth && db.auth.email) || '').toLowerCase();
+  db.profilVu = '';
+  if(mail) db.foyer = (db.foyer||[]).filter(x => String(x.email||'').toLowerCase() !== mail);
+  sessionMorte();
+  ui.auth.err = 'Ce profil a été supprimé par l\'administrateur du foyer.';
+  try{ render(); }catch(e){}
+}
+
 function seDeconnecter(){
   openSheet('<h3>Se déconnecter ?</h3>'+
     '<p class="small muted" style="margin:0 0 8px">Tes favoris et tes demandes restent '+
@@ -189,7 +205,16 @@ async function chargerMonProfil(){
     const l = await sbFetch('/rest/v1/profils?select=pseudo,avatar,jellyfin,onboarde,statut'+
                             '&user_id=eq.'+encodeURIComponent(db.auth.uid), {});
     const p = (Array.isArray(l) && l[0]) || null;
-    if(!p) return;
+    if(!p){
+      /* Aucune ligne pour MOI. Deux situations que rien ne distingue dans la
+         réponse, et qui appellent l'inverse l'une de l'autre : une inscription
+         dont la ligne n'est pas encore écrite (on attend), ou un profil
+         supprimé par l'administrateur (on ne peut plus rester). On ne tranche
+         que si CET appareil a déjà vu le profil de CE compte (3008s). */
+      if(db.profilVu && db.profilVu === db.auth.uid) compteDisparu();
+      return;
+    }
+    db.profilVu = db.auth.uid;
     /* Statut inconnu = on laisse passer : le vrai verrou est en base (politique
        RLS + déclencheur), cet écran n'est qu'une politesse. Bloquer ici sur une
        lecture ratée ferait un faux positif désagréable. */
@@ -730,9 +755,10 @@ async function changerStatutMembre(uid, statut, qui){
 function confirmerSuppression(uid, qui){
   closeSheet();
   openSheet('<h3>Supprimer '+esc(qui||'ce profil')+' ?</h3>'+
-    '<p class="small muted" style="margin:0 0 8px">Son profil, ses goûts et ses '+
-    'favoris seront effacés. Son compte Jellyfin et son historique de lecture, '+
-    'eux, ne sont pas touchés. C\'est sans retour.</p>'+
+    '<p class="small muted" style="margin:0 0 8px">Son profil, ses goûts, ses '+
+    'favoris et ses demandes seront effacés. Son compte de connexion, son '+
+    'compte Jellyfin et son historique de lecture, eux, ne sont pas touchés. '+
+    'C\'est sans retour.</p>'+
     '<button class="opt danger" onclick="supprimerMembre(\''+uid+'\',\''+
       esc(qui||'').replace(/'/g,"\\'")+'\')">Oui, supprimer définitivement</button>'+
     '<button class="opt" onclick="closeSheet()">Annuler</button>');
@@ -741,12 +767,29 @@ function confirmerSuppression(uid, qui){
 async function supprimerMembre(uid, qui){
   closeSheet();
   try{
-    /* Les goûts d'abord (ils ne partent pas d'eux-mêmes), le profil ensuite. */
+    /* Rien ne part tout seul : le profil ne commande pas les autres tables,
+       chacune référence le COMPTE de connexion. On efface donc les trois,
+       les dépendances d'abord — sinon les favoris et les demandes resteraient
+       dans la base sans personne à qui les rattacher, alors que la fenêtre de
+       confirmation promet de les effacer (3008s).
+
+       ⚠️ Ceci n'efface PAS le compte de connexion (Authentication → Users) :
+       une app qui peut supprimer des comptes est une app dont une faille en
+       supprime. Ça reste un geste du tableau de bord Supabase — et là, tout
+       le reste s'en va en cascade. */
     try{ await sbFetch('/rest/v1/gouts?user_id=eq.'+encodeURIComponent(uid), {method:'DELETE'}); }catch(e){}
+    try{ await sbFetch('/rest/v1/elements?user_id=eq.'+encodeURIComponent(uid), {method:'DELETE'}); }catch(e){}
     const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
       {method:'DELETE', headers:{ Prefer:'return=representation' }});
+    /* Une politique RLS manquante ne lève pas d'erreur : PostgREST répond 200
+       avec une liste VIDE. Compter les lignes est le seul contrôle qui vaille. */
     if(!Array.isArray(r) || !r.length)
       return toast('Le serveur refuse la suppression — retire plutôt l\'accès.');
+    /* La tête mémorisée sur CET appareil part avec : sinon l'écran d'accueil
+       continuerait de proposer quelqu'un que le serveur ne connaît plus. */
+    const ligne = membres.lignes.find(x=>x.user_id===uid) || {};
+    const mail = String(ligne.email||'').toLowerCase();
+    if(mail) { db.foyer = (db.foyer||[]).filter(x => String(x.email||'').toLowerCase() !== mail); saveDB(); }
     membres.lignes = membres.lignes.filter(x=>x.user_id!==uid);
     render();
     toast(esc(qui||'Profil')+' supprimé');
