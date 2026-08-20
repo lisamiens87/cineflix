@@ -114,9 +114,9 @@ function viewProfil(){
     /* « Ce soir » a remplacé la vue Cinéflix seule (fusion 3008b). */
     '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.presence=\'soir\';ui.disc.charge=false;go(\'decouvrir\')">'+
       I.serveur+' Parcourir ce que je peux regarder ce soir</button>'+
-    /* Le calendrier vit dans Ma liste depuis 3007y : le raccourci ouvre le
-       volet Sorties, sur téléphone comme sur bureau. */
-    '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.sorties.mode=\'bluray\';ui.sorties.charge=false;ui.listeVolet=\'sorties\';go(\'liste\')">'+
+    /* Le calendrier a son écran depuis 3008p : le raccourci ouvre l'onglet
+       Cinéma, sur téléphone comme sur bureau. */
+    '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.sorties.mode=\'bluray\';ui.sorties.charge=false;ui.cineVolet=\'sorties\';allerCinema()">'+
       I.disque+' Prochaines sorties Blu-ray</button>'+
     '<button class="btn ghost block" onclick="go(\'reglages\',{from:\'profil\'})">Réglages</button>'+
   '</div>';
