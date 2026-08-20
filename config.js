@@ -1,6 +1,6 @@
 "use strict";
 /* ============================================================
-   Cinéflix — configuration du serveur
+   Premier Rang — configuration du serveur
    Le seul fichier à modifier pour brancher l'app. Il est chargé avant
    tout le reste et fournit les valeurs par défaut de chaque appareil.
    ============================================================ */
@@ -76,7 +76,7 @@ window.CINEFLIX = {
      Un compte en attente ne voit rien, même en trafiquant l'app.          */
 
   /* --- Comptes Jellyfin du serveur --------------------------------------
-     Proposés à l'inscription pour relier un profil Cinéflix à son compte
+     Proposés à l'inscription pour relier un profil Premier Rang à son compte
      sur le NAS. Sert à retrouver où chacun en était dans un film — la
      collecte des points de reprise viendra dans un second temps.          */
   jellyfinUsers: ['Dad', 'lisamiens87', 'Lolo'],
@@ -90,5 +90,5 @@ window.CINEFLIX = {
   jellyfinExport: 'lisamiens87',
 
   /* --- Nom affiché ------------------------------------------------------ */
-  nom: 'Cinéflix'
+  nom: 'Premier Rang'
 };
