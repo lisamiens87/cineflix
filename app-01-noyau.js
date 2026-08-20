@@ -42,7 +42,7 @@ let memoryOnly = false, storageKO = false;
    remplacer dans les réglages. Un config.js absent ne casse rien : l'app
    retombe sur la saisie manuelle de la clé, comme au premier jour. */
 const CFG = Object.assign(
-  { tmdbKey:'', jellyfinHosts:[], catalogue:'./cineflix.json', region:'FR', nom:'Cinéflix' },
+  { tmdbKey:'', jellyfinHosts:[], catalogue:'./cineflix.json', region:'FR', nom:'Premier Rang' },
   window.CINEFLIX || {}
 );
 
@@ -227,15 +227,15 @@ async function tmdb(path, params, extra){
 }
 const sleep = ms => new Promise(r=>setTimeout(r,ms));
 
-/* ============================ Catalogue Cinéflix ============================ */
+/* ============================ Catalogue Premier Rang ============================ */
 /* La bibliothèque du NAS, réduite à des identifiants TMDB. Un export tourne
    sur le serveur (voir outils-nas/) et dépose ce fichier à côté de l'app.
    Tout tient en mémoire : quelques milliers d'entiers, quelques dizaines de
-   Ko. C'est ce qui rend le filtre « Sur Cinéflix » instantané, là où un
+   Ko. C'est ce qui rend le filtre « Sur Premier Rang » instantané, là où un
    service qui interroge le serveur titre par titre ne peut pas suivre. */
 /* items : les fiches compactes envoyées par le NAS (nom, dates, durée,
    classification, notes, lectures). C'est ce qui permet de trier la vue
-   « Cinéflix » comme Jellyfin le fait — l'app a toute la bibliothèque
+   « Premier Rang » comme Jellyfin le fait — l'app a toute la bibliothèque
    en mémoire, aucun serveur ne sait faire ce tri à sa place. */
 const CAT = { movie:new Set(), tv:new Set(), items:[], maj:null, charge:false, erreur:'' };
 
@@ -385,12 +385,12 @@ async function choisirJellyfin(){
 
 /* ============================ Favoris & demandes ============================ */
 /* Deux axes indépendants, jamais confondus :
-     - la PRÉSENCE dans Cinéflix : un fait, identique pour tout le monde,
+     - la PRÉSENCE dans Premier Rang : un fait, identique pour tout le monde,
        qui vient du catalogue ci-dessus ;
      - mon STATUT personnel : favori, demandé, en cours, obtenu.
    Un titre demandé bascule tout seul en « obtenu » le jour où il apparaît
    dans le catalogue — personne n'a à cocher quoi que ce soit. */
-const STATUTS = { fav:'Favori', demande:'Demandé', encours:'En cours', obtenu:'Sur Cinéflix', refuse:'Refusé' };
+const STATUTS = { fav:'Favori', demande:'Demandé', encours:'En cours', obtenu:'Sur Premier Rang', refuse:'Refusé' };
 
 function item(type,id){ return db.items[cle(type,id)] || null; }
 
@@ -437,7 +437,7 @@ function basculerFavori(o, type){
 }
 
 function demander(o, type){
-  if(surCineflix(type,o.id)) return toast('Déjà sur Cinéflix');
+  if(surCineflix(type,o.id)) return toast('Déjà sur Premier Rang');
   const it = assurerItem(o, type);
   if(it.req) return toast('Demande déjà envoyée');
   it.req = { statut:'demande', le:Date.now() };
