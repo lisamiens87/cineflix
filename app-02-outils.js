@@ -131,7 +131,7 @@ let ui = {
   searchQ:'', searchRes:null, searchPers:null, searching:false, searchErr:'',
   sorties:{ mode:'bluray', res:[], loading:false, err:'', charge:false },
   listeTab:'favoris',
-  listeVolet:'liste',                    // Ma liste | Sorties | Suggestions (3007y)
+  cineVolet:'sorties',                   // écran Cinéma : Sorties | Suggestions (3008p)
   sugg:{ l:[], plie:{}, loading:false, err:'', charge:false },
   fiche:null,
   saison:null,
@@ -297,12 +297,10 @@ function render(){
   /* L'accordéon « Par catégorie » a une rangée de films qui défile du doigt :
      revenir doit la retrouver où elle était, pas la ramener au premier film. */
   if(view === 'guide' && typeof restaurerDefilCat === 'function') restaurerDefilCat();
-  /* Ma liste porte désormais les volets Sorties et Suggestions (3007y) :
-     revenir sur l'écran doit relancer le chargement qui manque. */
-  if(view === 'liste'){
-    if(ui.listeVolet === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
-    if(ui.listeVolet === 'sugg' && !ui.sugg.charge && !ui.sugg.loading) chargerSuggestions();
-  }
+  /* L'écran Cinéma porte les Sorties ET les Suggestions (3008p) : y revenir
+     doit relancer le chargement qui manque, selon le volet ouvert. */
+  if(view === 'sorties' && ui.cineVolet === 'sugg' && !ui.sugg.charge && !ui.sugg.loading)
+    chargerSuggestions();
 }
 
 /* La page principale est une COUVERTURE (le grand visuel, rien d'autre) ;
@@ -354,12 +352,21 @@ function renderNav(){
       act:"ouvrirCatalogue('movie')", ic:'', lab:'Films' },
     { cl:'t-series dsk', on: cur === 'decouvrir' && exp && ui.disc.type === 'tv',
       act:"ouvrirCatalogue('tv')", ic:'', lab:'Séries' },
-    /* Sorties a rejoint Ma liste sur téléphone (volet, 3007y) : l'onglet ne
-       subsiste que sur le bureau — la classe dsk le retire de la barre. */
-    { cl:'t-sorties dsk', on: cur === 'sorties', act:"go('sorties')", ic:I.cal, lab:'Sorties' },
-    /* « Pour moi » (3008d) : « Ma liste » vivait en double — l'onglet du bas
-       ET le premier volet de l'écran portaient le même nom. */
-    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, emo:'❤️', lab:'Pour moi', badge:n },
+    /* Le quatrième onglet, demandé le 20/08 : les sorties et les suggestions
+       réunies sous le nom qui les rassemble. Il remplace l'onglet Sorties du
+       bureau — même écran, même vue `sorties`, un titre plus large.
+
+       ⚠️ Sa place dans CE tableau est celle qu'avait Sorties, et elle ne doit
+       pas bouger : la feuille du bureau accroche `t-sorties` (marge
+       automatique qui pousse la fin de barre à droite, icône seule) et
+       app-site.css ne s'édite pas depuis cette conversation. Sur téléphone,
+       Alexandre veut le cœur en 3 et Cinéma en 4 : c'est app-mobile.css qui
+       intervertit les deux, avec `order`. */
+    { cl:'t-sorties t-cinema', on: cur === 'sorties', act:"allerCinema()",
+      ic:I.cal, emo:'🎬', lab:'Cinéma' },
+    /* « Ma liste » reprend son nom (3008p) : le volet qui le portait en
+       double est parti dans Cinéma. */
+    { cl:'t-liste', on: cur === 'liste', act:"go('liste')", ic:I.coeur, emo:'❤️', lab:'Ma liste', badge:n },
     { cl:'t-profil', on: cur === 'profil', act:"go('profil')", ic:I.user, lab:'Profil' }
   ];
   document.getElementById('nav').innerHTML =
