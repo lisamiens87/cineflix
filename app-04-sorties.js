@@ -153,8 +153,12 @@ function carteSortie(x){
     '</div>'+
     '<div class="gname">'+esc(r.title||'')+'</div>'+
     '<div class="gyear">'+esc(sous)+'</div>';
+  /* Pas d'origine écrite à la main (3008r) : `ouvrirFiche` prend l'écran où
+     l'on se trouve. C'est ce \'liste\' oublié ici, du temps où les sorties
+     vivaient dans Ma liste, qui renvoyait Alexandre sur Ma liste depuis
+     Cinéma. */
   return r.id
-    ? '<button class="gcard" onclick="ouvrirFiche('+r.id+',\'movie\',\'liste\')">'+corps+'</button>'
+    ? '<button class="gcard" onclick="ouvrirFiche('+r.id+',\'movie\')">'+corps+'</button>'
     : '<div class="gcard inerte">'+corps+'</div>';
 }
 function corpsSortiesGrille(){
@@ -340,8 +344,7 @@ function ligneSortie(x, m){
   /* Une sortie que TMDB n'a pas su identifier reste au calendrier — elle ne
      mène simplement nulle part. Le retour de la fiche revient là d'où l'on
      vient : la vue Sorties du bureau, ou le volet Sorties de Ma liste. */
-  const de = (view === 'liste') ? 'liste' : 'sorties';
   return r.id
-    ? '<button class="crow" onclick="ouvrirFiche('+r.id+',\'movie\',\''+de+'\')">'+corps+'</button>'
+    ? '<button class="crow" onclick="ouvrirFiche('+r.id+',\'movie\')">'+corps+'</button>'
     : '<div class="crow inerte">'+corps+'</div>';
 }
