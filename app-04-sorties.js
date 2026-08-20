@@ -205,9 +205,54 @@ function chipsModes(sous){
     x.label+'</button>').join('')+'</div>';
 }
 
+/* ---------- L'écran CINÉMA (3008p) ----------
+   Alexandre, le 20/08 : « on crée un quatrième icône en bas, le quatrième
+   étant une bobine intitulée Cinéma où on retrouve les sorties et les trois
+   sous-catégories ». Les Sorties quittent donc Ma liste, qui s'était mise à
+   tout héberger, et retrouvent un écran à elles ; les Suggestions les
+   suivent (« Suggestion va dans cinéma »). Ma liste redevient ce que son nom
+   dit : les titres qu'on a mis de côté.
+
+   Deux étages, comme sur la maquette retenue : les volets d'abord, les trois
+   sous-catégories de sortie ensuite. La vue reste `sorties` côté routeur —
+   ce n'est que le titre et le contenu qui changent. */
+function voletsCine(){
+  const v = [{ id:'sorties', label:'Sorties' }];
+  if(typeof estAdmin !== 'undefined' && estAdmin) v.push({ id:'sugg', label:'Suggestions' });
+  if(!v.some(x => x.id === ui.cineVolet)) ui.cineVolet = 'sorties';
+  if(v.length < 2) return '';          /* un seul volet ne se choisit pas */
+  return '<div class="chips volets">'+v.map(x=>
+    '<button class="chip '+(ui.cineVolet===x.id?'on':'')+'" onclick="setCineVolet(\''+x.id+'\')">'+
+    x.label+'</button>').join('')+'</div>';
+}
+function setCineVolet(id){
+  if(ui.cineVolet === id) return;
+  ui.cineVolet = id;
+  window.scrollTo(0,0);
+  render();
+  if(id === 'sorties' && !ui.sorties.charge && !ui.sorties.loading && db.apiKey) chargerSorties();
+  if(id === 'sugg' && !ui.sugg.charge && !ui.sugg.loading) chargerSuggestions();
+}
+/* Le téléphone montre les affiches en grille (c'est ce que Ma liste servait
+   depuis 3007y), le bureau garde son calendrier en lignes. */
+const cineEtroit = ()=> {
+  try{ return !matchMedia('(min-width:860px)').matches; }catch(e){ return true; }
+};
+
+/* L'entrée de la barre du bas : on ouvre toujours sur les sorties, et on
+   lance le chargement qui manque plutôt que d'afficher un écran vide. */
+function allerCinema(){
+  if(ui.cineVolet === 'sugg' && !(typeof estAdmin !== 'undefined' && estAdmin))
+    ui.cineVolet = 'sorties';
+  go('sorties');
+}
+
 function viewSorties(){
-  let html = header('Sorties', {sub:chipsModes(false)}) + banniereCle();
-  return html + corpsSorties();
+  const volets = voletsCine();
+  if(ui.cineVolet === 'sugg')
+    return header('Cinéma', {sub:volets}) + corpsSuggestions();
+  return header('Cinéma', {sub: volets + chipsModes(true)}) + banniereCle() +
+    (cineEtroit() ? corpsSortiesGrille() : corpsSorties());
 }
 
 /* Le corps seul — chargement, erreur, calendrier — sans en-tête ni
