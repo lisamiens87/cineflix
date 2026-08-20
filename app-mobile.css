@@ -49,11 +49,16 @@
   .tab.tel{display:flex}
   .tab.t-profil{display:none}
 
-  /* 3007z — la barre du bas ne compte plus que trois onglets depuis que
-     Sorties vit dans Ma liste : la grille de quatre laissait une colonne
-     vide à droite. Et les icônes passent en émoji colorés, comme sur la
-     maquette validée par Alexandre. */
-  .navin{grid-template-columns:repeat(3,1fr)}
+  /* 3008p — retour à quatre onglets : Cinéma reprend la place que Sorties
+     avait quittée en 3007z, cette fois avec les suggestions sous le bras.
+     Et les icônes restent en émoji colorés, comme sur la maquette validée
+     par Alexandre. */
+  .navin{grid-template-columns:repeat(4,1fr)}
+  /* L'ordre du tableau JS sert le bureau (Cinéma avant Ma liste, à cause de
+     la marge automatique d'app-site.css). Sur téléphone, Alexandre veut le
+     cœur en 3 et Cinéma en 4 : on les intervertit ici, sans toucher au JS. */
+  .tab.t-liste{order:3}
+  .tab.t-cinema{order:4}
   .tab .icsvg{display:none}
   .tab .icemo{display:block;font-size:22px;line-height:23px;
     transition:transform .18s}
