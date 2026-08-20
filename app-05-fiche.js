@@ -142,7 +142,7 @@ function ouvrirPlateforme(id){
    c'est-à-dire par l'ONGLET de Découvrir ouvert en dernier. Le même film,
    avec les mêmes données, changeait donc de bouton selon la porte par
    laquelle on arrivait : « Netflix » depuis l'onglet Plateformes, mais
-   « Demander sur Cinéflix » depuis le guide, la recherche ou l'accueil.
+   « Demander sur Premier Rang » depuis le guide, la recherche ou l'accueil.
    Vérifié le 06/08 sur « The Debt Collector » — sur Netflix, absent du
    serveur, et l'app proposait de le demander. Le bouton suit désormais le
    FILM, plus la provenance. */
@@ -163,7 +163,7 @@ function actionsFiche(o, type){
      qu'on ne peut pas lancer, faute d'abonnement, est une fausse promesse :
      Alexandre l'a dit le 19/08. Les plateformes qu'il A passent en tête ;
      les autres redescendent en une ligne d'information, sous le bouton
-     « Demander sur Cinéflix » qui redevient l'action principale. */
+     « Demander sur Premier Rang » qui redevient l'action principale. */
   const miennes = platsFilms();
   const dispo  = toutes.filter(pf => miennes.indexOf(pf.id) >= 0);
   const ailleurs = toutes.filter(pf => miennes.indexOf(pf.id) < 0);
@@ -173,7 +173,7 @@ function actionsFiche(o, type){
       '<button class="btn plat '+pf.cl+'" onclick="ouvrirPlateforme('+pf.id+')">'+
       (pf.logo ? '<img class="plogo" src="'+IMG(pf.logo,'w92')+'" alt="">' : '')+
       esc(pf.nom)+'</button>').join('');
-    /* « Demander sur Cinéflix » ne disparaît pas pour autant, il descend d'un
+    /* « Demander sur Premier Rang » ne disparaît pas pour autant, il descend d'un
        rang : être sur Netflix aujourd'hui n'empêche pas de vouloir le titre
        chez soi pour toujours. Et si la demande est déjà partie, c'est son
        état qu'on rappelle plutôt qu'une invitation à la refaire. */
@@ -183,13 +183,13 @@ function actionsFiche(o, type){
     const second =
       (st === 'demande' || st === 'encours')
         ? '<button class="btn attente block" onclick="menuDemande('+o.id+',\''+type+'\')">'+
-          I.horloge+' '+(st === 'demande' ? 'Déjà demandé sur Cinéflix'
-                                          : 'En cours d’ajout sur Cinéflix')+'</button>'
+          I.horloge+' '+(st === 'demande' ? 'Déjà demandé sur Premier Rang'
+                                          : 'En cours d’ajout sur Premier Rang')+'</button>'
       : st === 'refuse'
         ? '<button class="btn ghost block" onclick="menuDemande('+o.id+',\''+type+'\')">'+
           'Demande refusée</button>'
         : '<button class="btn ghost block" onclick="demander('+ref+',\''+type+'\');render()">'+
-          I.envoi+' Le demander aussi sur Cinéflix</button>';
+          I.envoi+' Le demander aussi sur Premier Rang</button>';
     return '<div class="actions plats">'+boutons+coeur+'</div>'+
            '<div class="wrap" style="padding:10px 16px 0">'+second+'</div>';
   }
@@ -209,7 +209,7 @@ function actionsFiche(o, type){
       'Demande refusée</button>';
   } else {
     principal = '<button class="btn" onclick="demander('+ref+',\''+type+'\');render()">'+
-      I.envoi+' Demander sur Cinéflix</button>';
+      I.envoi+' Demander sur Premier Rang</button>';
   }
 
   /* « Sinon, il existe ailleurs » — une phrase, pas des boutons : c'est une
@@ -232,7 +232,7 @@ function ouvrirJellyfin(titre, jf){
   const base = jellyBase || (db.jellyfin||'').replace(/\/+$/,'');
   if(!base){
     return openSheet('<h3>Serveur non renseigné</h3>'+
-      '<p class="small muted" style="margin:0 0 8px">Indique l\'adresse de Cinéflix dans '+
+      '<p class="small muted" style="margin:0 0 8px">Indique l\'adresse de Premier Rang dans '+
       'les réglages pour ouvrir les titres directement dans Jellyfin.</p>'+
       '<button class="opt" onclick="closeSheet();go(\'reglages\',{from:\'profil\'})">Ouvrir les réglages</button>'+
       '<button class="opt" onclick="closeSheet()">Annuler</button>');
@@ -262,7 +262,7 @@ function menuDemande(id, type){
   openSheet('<h3>'+(st === 'encours' ? 'Demande en cours de traitement' : 'Demande envoyée')+'</h3>'+
     '<p class="small muted" style="margin:0 0 8px">'+
       (st === 'encours'
-        ? 'Le titre est en cours d\'ajout sur Cinéflix. Il basculera tout seul en « Regarder » dès qu\'il sera là.'
+        ? 'Le titre est en cours d\'ajout sur Premier Rang. Il basculera tout seul en « Regarder » dès qu\'il sera là.'
         : 'Elle apparaît dans la file de demandes. Tu seras prévenu quand le titre arrivera.')+'</p>'+
     /* Attention à l'ordre : annulerDemande(type, id) — il a déjà été inversé
        ici, et la fonction ne trouvait alors jamais la demande à annuler. */
@@ -451,13 +451,13 @@ function viewSaison(){
       '<div class="small muted">'+esc(nom)+
         (d.air_date ? ' · '+esc(year(d.air_date)) : '')+
         ' · '+eps.length+' épisode'+(eps.length > 1 ? 's' : '')+
-        (surCineflix('tv', st.tv) ? ' · <span class="badge live">Sur Cinéflix</span>' : '')+'</div>'+
+        (surCineflix('tv', st.tv) ? ' · <span class="badge live">Sur Premier Rang</span>' : '')+'</div>'+
     '</div></div>';
   if(surCineflix('tv', st.tv))
     h += '<div class="actions"><button class="btn vert" onclick="ouvrirJellyfin('+
       JSON.stringify(nom).replace(/"/g,'&quot;')+','+
       JSON.stringify((ficheDe('tv', st.tv)||{}).jf || '').replace(/"/g,'&quot;')+
-      ')">'+I.play+' Regarder sur Cinéflix</button></div>';
+      ')">'+I.play+' Regarder sur Premier Rang</button></div>';
   if(d.overview)
     h += '<div class="overview clamp" onclick="this.classList.toggle(\'clamp\')">'+esc(d.overview)+'</div>';
 
@@ -610,7 +610,7 @@ function viewPersonne(){
       '<div class="overview clamp" style="margin-top:0" onclick="this.classList.toggle(\'clamp\')">'+
       esc(d.biography)+'</div>';
   /* La grille réutilise les cartes de Découvrir : la coche verte « déjà sur
-     Cinéflix » et les statuts de demande viennent avec, gratuitement. */
+     Premier Rang » et les statuts de demande viennent avec, gratuitement. */
   h += '<div class="sectitle">Filmographie <span class="cnt">'+l.length+'</span></div>'+
     '<div class="grid">'+ l.map(w=>carteTitre(w, w.media_type)).join('') +'</div>';
   return h + '<div style="height:32px"></div>';
@@ -642,7 +642,7 @@ function viewFiche(){
       '<div class="small muted">'+esc(year(date))+
         (isTv && d.networks && d.networks[0] ? ' · '+esc(d.networks[0].name) : '')+
         (!isTv && d.runtime ? ' · '+fmtDuree(d.runtime) : '')+
-        (dispo ? ' · <span class="badge live">Sur Cinéflix</span>' : '')+'</div>'+
+        (dispo ? ' · <span class="badge live">Sur Premier Rang</span>' : '')+'</div>'+
       (note ? '<div style="margin-top:6px"><span class="note">'+I.star+note+'</span>'+
         '<span class="tiny muted" style="margin-left:6px">'+(d.vote_count||0)+' votes</span></div>' : '')+
       (function(){ const n = noteDe(type, d.id, titre, date);
