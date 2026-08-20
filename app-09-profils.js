@@ -65,7 +65,7 @@ function viewAccueil(){
 
   let h = '<div class="acc large">'+
     '<div class="acclogo">'+I.film+'</div>'+
-    '<h1>'+esc(CFG.nom||'Cinéflix')+'</h1>'+
+    '<h1>'+esc(CFG.nom||'Premier Rang')+'</h1>'+
     '<p class="accsub">Qui regarde ce soir ?</p>'+
     '<div class="avgrid">';
 
@@ -195,11 +195,11 @@ function ficheGouts(){
   const plats = g.plats || [];
   openSheet('<h3>Mes goûts</h3>'+
     '<div class="fgrp">Où je peux regarder'+
-      (plats.length ? ' — Cinéflix + '+plats.length
-        : (g.platsDit ? ' — Cinéflix seul' : ' — Cinéflix + toutes les plateformes'))+'</div>'+
+      (plats.length ? ' — Premier Rang + '+plats.length
+        : (g.platsDit ? ' — Premier Rang seul' : ' — Premier Rang + toutes les plateformes'))+'</div>'+
     '<div class="fchips">'+
-      '<button class="chip c-flix on" onclick="toast(\'Ta bibliothèque Cinéflix est toujours incluse.\')">'+
-        'Cinéflix ✓</button>'+
+      '<button class="chip c-flix on" onclick="toast(\'Ta bibliothèque Premier Rang est toujours incluse.\')">'+
+        'Premier Rang ✓</button>'+
       PLATEFORMES.map(pf=>
       '<button class="chip '+pf.cl+' '+(plats.indexOf(pf.id) >= 0 ? 'on' : '')+
       '" onclick="basculerPlatGout('+pf.id+')">'+pf.nom+'</button>').join('')+'</div>'+
@@ -369,7 +369,7 @@ function viewBienvenue(){
 
   if(e === 'hello'){
     h += '<div class="acclogo">'+I.film+'</div>'+
-      '<h1>Bienvenue sur '+esc(CFG.nom||'Cinéflix')+'</h1>'+
+      '<h1>Bienvenue sur '+esc(CFG.nom||'Premier Rang')+'</h1>'+
       '<p class="accsub">Quelques questions rapides, et l\'app saura quoi te proposer '+
       'au lieu de te laisser devant une grille de milliers de titres.</p>'+
       '<label class="fld" style="margin-top:22px"><span>Comment tu t\'appelles ?</span>'+
@@ -445,8 +445,8 @@ function viewBienvenue(){
       '<p class="accsub">On ne te proposera que ce que tu peux regarder ce soir : '+
       'la bibliothèque du serveur, et ces plateformes-là.</p>'+
       '<div class="gchips">'+
-        '<button class="chip plat c-flix on" onclick="toast(\'Ta bibliothèque Cinéflix est toujours incluse.\')">'+
-          'Cinéflix ✓</button>'+
+        '<button class="chip plat c-flix on" onclick="toast(\'Ta bibliothèque Premier Rang est toujours incluse.\')">'+
+          'Premier Rang ✓</button>'+
         PLATEFORMES.map(p=>
         /* Aux couleurs de marque, comme dans les filtres et Mes goûts :
            onze pastilles grises se ressemblent toutes (3008f). */
@@ -454,7 +454,7 @@ function viewBienvenue(){
         '" onclick="bascListe(\'plats\','+p.id+')">'+esc(p.nom)+'</button>').join('')+
       '</div>'+
       '<div class="tiny muted center" style="margin-top:12px">'+
-        'Aucun abonnement coché ? Les suggestions se limiteront à Cinéflix.</div>'+
+        'Aucun abonnement coché ? Les suggestions se limiteront à Premier Rang.</div>'+
       piedBienv({});
   }
 
