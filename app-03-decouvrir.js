@@ -8,11 +8,11 @@ const TYPES = [ {id:'movie', label:'Films', cl:'c-films'}, {id:'tv', label:'Sér
 /* Les quatre sources, du plus proche au plus large (revu le 10/08 avec
    Alexandre — avant, « Cinéma » voulait dire « tout TMDB », et rien ne
    montrait ce qui passe RÉELLEMENT en salle) :
-   « Cinéflix »    — la bibliothèque du serveur, et elle seule ;
+   « Premier Rang »    — la bibliothèque du serveur, et elle seule ;
    « Plateformes » — en illimité sur les abonnements, en France ;
    « Au cinéma »   — à l'affiche en salle EN CE MOMENT ;
    « Tout »        — le catalogue TMDB entier, sans condition. */
-/* 3008b — « Cinéflix » et « Plateformes » ont fusionné en « Ce soir »
+/* 3008b — « Premier Rang » et « Plateformes » ont fusionné en « Ce soir »
    (décision d'Alexandre, 19/08) : la question qu'on se pose devant l'écran
    est « qu'est-ce que je peux regarder LÀ, maintenant ? », et sa réponse est
    la bibliothèque ET les abonnements, ensemble. La coche verte et les
@@ -131,7 +131,7 @@ const ORDRES = [
   { id:'asc',  label:'Croissant'   }
 ];
 
-/* Les tris qui n'existent que sur la vue « Cinéflix » : ils lisent les fiches
+/* Les tris qui n'existent que sur la vue « Premier Rang » : ils lisent les fiches
    envoyées par le NAS (CAT.items), pas TMDB. C'est toute la bibliothèque,
    triée d'un coup en mémoire — exactement ce que fait Jellyfin chez lui. */
 const TRIS_LOCAUX = [
@@ -144,7 +144,7 @@ const TRIS_LOCAUX = [
   { id:'duree', label:'Durée',                 court:'durée' }
 ];
 const TRI_LOCAL = t => TRIS_LOCAUX.some(x => x.id === t);
-/* La vue Cinéflix trie localement dès que le NAS a fourni les fiches —
+/* La vue Premier Rang trie localement dès que le NAS a fourni les fiches —
    sauf « Popularité », donnée que seul TMDB possède. */
 /* Sur « Ce soir », seuls les tris de bibliothèque passent en local pur :
    les autres doivent mélanger bibliothèque ET plateformes (chargerSoir). */
@@ -165,7 +165,7 @@ const FENETRE = 120;                 // « récemment » = les 120 derniers jour
 
 /* Le filtre « Origine » : des groupes de pays de production. TMDB filtre
    par pays d'origine (with_origin_country, codes ISO séparés par |) ; la
-   vue Cinéflix filtre localement sur les pays que le NAS met dans les
+   vue Premier Rang filtre localement sur les pays que le NAS met dans les
    fiches (champ pays). Par défaut Europe + Amérique du Nord : le tri par
    date de sortie mondial noyait les listes sous des sorties lointaines. */
 const PAYS_EUROPE = ['FR','GB','DE','IT','ES','PT','BE','NL','LU','IE','AT','CH',
@@ -230,7 +230,7 @@ function discParams(){
   if(ids.length) p.with_genres = ids.join(',');
 
   /* Le filtre Origine, sur toutes les vues qui interrogent TMDB (la vue
-     Cinéflix triée localement a son équivalent dans catalogueFiltre). */
+     Premier Rang triée localement a son équivalent dans catalogueFiltre). */
   const reg = regionActive();
   if(reg.pays) p.with_origin_country = reg.pays.join('|');
 
@@ -289,7 +289,7 @@ function garderPresence(liste, type){
   return liste;
 }
 
-/* ---------- La vue Cinéflix triée localement ---------- */
+/* ---------- La vue Premier Rang triée localement ---------- */
 function melanger(l){
   for(let i = l.length - 1; i > 0; i--){
     const j = Math.floor(Math.random() * (i + 1));
@@ -414,7 +414,7 @@ async function chargerLocale(suite){
 
 /* ---------- La vue « Ce soir » : bibliothèque + plateformes (3008b) -------
    Deux versants par fournée : la tranche suivante de la bibliothèque (triée
-   localement, affiches récupérées comme sur l'ancienne vue Cinéflix), et les
+   localement, affiches récupérées comme sur l'ancienne vue Premier Rang), et les
    pages TMDB filtrées sur les abonnements du profil. Les deux moitiés sont
    fusionnées puis triées ensemble sur la clé du tri choisi ; les doublons
    (un film à la fois chez soi et sur Netflix) gardent leur version TMDB,
@@ -639,9 +639,9 @@ function carteTitre(r, type){
 
   let tag = '';
   /* La pastille verte est volontairement minuscule : sur une grille entière
-     de titres possédés, une étiquette « Cinéflix » par affiche criait. Une
+     de titres possédés, une étiquette « Premier Rang » par affiche criait. Une
      coche suffit — le texte sous le titre dit déjà le reste. */
-  if(st === 'obtenu')       tag = '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>';
+  if(st === 'obtenu')       tag = '<div class="tag dispo mini" aria-label="Sur Premier Rang">'+I.check+'</div>';
   else if(st === 'demande') tag = '<div class="tag demande">'+I.horloge+'Demandé</div>';
   else if(st === 'encours') tag = '<div class="tag encours">'+I.horloge+'En cours</div>';
   else if(st === 'fav')     tag = '<div class="tag fav">'+I.coeurPlein+'</div>';
@@ -715,7 +715,7 @@ function corpsDecouverte(){
   if(!d.res.length){
     if(ui.presence === 'soir')
       return '<div class="empty">'+I.serveur+'<h3>Rien à regarder ce soir avec ces filtres</h3>'+
-        '<p>Ni sur Cinéflix, ni sur tes plateformes. Élargis les filtres, '+
+        '<p>Ni sur Premier Rang, ni sur tes plateformes. Élargis les filtres, '+
         'ou passe sur « '+labelTout()+' » pour voir ce qui existe ailleurs.</p>'+
         '<button class="btn ghost" onclick="setPresence(\'tout\')">'+labelTout()+'</button></div>';
     return '<div class="empty">'+I.boussole+'<h3>Rien avec ces filtres</h3>'+
@@ -774,7 +774,7 @@ function bascPlateforme(id){
   if(k < 0) l.push(id); else l.splice(k,1);
   g.plats = l;
   g.platsDit = true;          /* désormais, zéro veut dire zéro */
-  if(!l.length) toast('Aucun abonnement : seul le catalogue Cinéflix sera proposé');
+  if(!l.length) toast('Aucun abonnement : seul le catalogue Premier Rang sera proposé');
   enregistrerGouts(g);
   ouvrirFiltres(); chargerDecouverte();
 }
@@ -857,17 +857,17 @@ function ouvrirFiltres(){
   if(ui.presence === 'soir'){
     const actives = platsFilms();
     /* On ne montre QUE ses plateformes (3008g, demande d'Alexandre : « si je
-       n'ai sélectionné que Netflix, il ne peut y avoir que Cinéflix et
+       n'ai sélectionné que Netflix, il ne peut y avoir que Premier Rang et
        Netflix »). Les onze au grand complet ne servent qu'au moment de
        s'abonner ailleurs — c'est ce que fait le bouton « + Ajouter ». */
     const liste = ui.platsTous ? PLATEFORMES : PLATEFORMES.filter(pf => actives.indexOf(pf.id) >= 0);
-    /* Cinéflix en tête, coché et non décochable (3008h, demande d'Alexandre :
-       « j'aimerais qu'il soit précisé que le catalogue Cinéflix est coché »).
+    /* Premier Rang en tête, coché et non décochable (3008h, demande d'Alexandre :
+       « j'aimerais qu'il soit précisé que le catalogue Premier Rang est coché »).
        Sa bibliothèque est le socle : elle ne s'enlève pas, et le voir écrit
        rend lisible le cas « aucun abonnement ». */
     h += '<div class="fgrp">Où je peux regarder</div><div class="fchips">'+
-      '<button class="chip c-flix on" onclick="toast(\'Ta bibliothèque Cinéflix est toujours incluse.\')">'+
-        'Cinéflix ✓</button>'+
+      '<button class="chip c-flix on" onclick="toast(\'Ta bibliothèque Premier Rang est toujours incluse.\')">'+
+        'Premier Rang ✓</button>'+
       liste.map(pf=>'<button class="chip '+pf.cl+' '+(actives.indexOf(pf.id)>=0?'on':'')+
         '" onclick="bascPlateforme('+pf.id+')">'+pf.nom+'</button>').join('')+
       (ui.platsTous ? '' :
@@ -875,7 +875,7 @@ function ouvrirFiltres(){
       '</div>'+
       '<div class="small muted" style="margin:4px 2px 0">Décoche une plateforme si tu '+
       'n\'y es plus abonné — le guide en tiendra compte aussi. '+
-      (actives.length ? '' : 'Aucun abonnement coché : seul le catalogue Cinéflix est proposé.')+
+      (actives.length ? '' : 'Aucun abonnement coché : seul le catalogue Premier Rang est proposé.')+
       '</div>';
   }
   h += '<div class="fgrp">Quoi</div><div class="fchips">'+
@@ -1079,7 +1079,7 @@ function pilulesHtml(){
 }
 
 /* « Regarder » sur la couverture tient sa promesse : il ouvre le film DANS
-   Jellyfin, par son identifiant — plus la fiche Cinéflix. Si l'identifiant
+   Jellyfin, par son identifiant — plus la fiche Premier Rang. Si l'identifiant
    manque (catalogue pas encore réexporté), on retombe sur la fiche. */
 function regarderSoir(i){
   const h = (ui.heroSoirs||[])[i||0] || ui.heroSoir;
@@ -1095,7 +1095,7 @@ function regarderSoir(i){
    téléphone elle est reposée à plat (.minihaut) au-dessus des pilules :
    depuis la vitrine, ce sont elles qui portent Films et Séries. */
 function hsBarre(){
-  return '<div class="hsbar"><div class="hslogo">CINÉ<i>FLIX</i></div>'+
+  return '<div class="hsbar"><div class="hslogo">Premier Rang</div>'+
     avatarBouton()+'</div>';
 }
 
