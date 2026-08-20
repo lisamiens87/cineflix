@@ -21,10 +21,15 @@ const TYPES = [ {id:'movie', label:'Films', cl:'c-films'}, {id:'tv', label:'Sér
 /* Les trois portes de Films. « Ce soir » ne disait pas ce qu'on y trouve
    (verdict d'Alexandre le 19/08) : c'est SA bibliothèque plus SES
    abonnements — donc « Mes films ». */
+/* 3008p — deux choix, pas trois. « Cinéma » (ce qui est à l'affiche en
+   salle) a quitté cette rangée : il a désormais son propre onglet en bas de
+   l'écran, avec les sorties et les suggestions. Reste la seule question que
+   pose vraiment cet écran : ce que j'ai chez moi, ou tout ce qui existe.
+   « Mes films » devient « Cinémathèque » — le mot dit la collection, et il
+   ne répète plus le titre de l'écran juste au-dessus. */
 const PRESENCES = [
-  { id:'soir', label:'Mes films', cl:'c-flix' },
-  { id:'cine', label:'Cinéma',    cl:'c-cinema' },
-  { id:'tout', label:'Tout',      cl:'c-tout' }
+  { id:'soir', label:'Cinémathèque', cl:'c-flix' },
+  { id:'tout', label:'Tout',         cl:'c-tout' }
 ];
 /* Les plateformes de CETTE personne — celles de son profil (Mes goûts).
    ⚠️ LE PIÈGE, corrigé en 3008h : « liste vide » voulait dire DEUX choses
@@ -220,18 +225,6 @@ function discParams(){
     p.watch_region = db.region || 'FR';
     p.with_watch_providers = platsFilms().join('|');
     p.with_watch_monetization_types = 'flatrate';
-  }
-  /* Vue « Au cinéma » : réellement à l'affiche en salle. `region` fait
-     porter le filtre sur les dates de sortie FRANÇAISES (l'entorse à la
-     règle « pas de region ici » est assumée : sur cette vue, c'est la date
-     française qui compte), et release_type 2|3 = avant-première + salle.
-     Six semaines : la durée de vie d'un film à l'affiche. Les séries ne
-     passent pas en salle — en mode Séries, le bouton n'existe pas. */
-  if(ui.presence === 'cine' && type === 'movie'){
-    p.region = db.region || 'FR';
-    p.with_release_type = '2|3';
-    p['release_date.lte'] = todayISO();
-    p['release_date.gte'] = new Date(Date.now() - 42*864e5).toISOString().slice(0,10);
   }
   const ids = d.genres.map(n => genreParNom(type, n)).filter(x => x != null);
   if(ids.length) p.with_genres = ids.join(',');
@@ -740,8 +733,6 @@ function corpsDecouverte(){
 /* ---------- Actions ---------- */
 function setType(t){
   if(ui.disc.type === t) return;
-  /* « Au cinéma » n'existe que pour les films. */
-  if(t === 'tv' && ui.presence === 'cine') ui.presence = 'tout';
   ui.disc.type = t;
   if(enRecherche()){
     clearTimeout(searchTimer); abortSearch();
@@ -1272,10 +1263,12 @@ function viewDecouvrir(){
         TYPES.map(t=>'<button class="chip '+t.cl+' '+(d.type===t.id?'on':'')+
           '" onclick="setType(\''+t.id+'\')">'+t.label+'</button>').join('')+
       '</div>'+
-      '<div class="souschips">'+
-        PRESENCES.filter(p => p.id !== 'cine' || ui.disc.type === 'movie')
-          .map(p=>'<button class="chip '+p.cl+' '+(ui.presence===p.id?'on':'')+
-          '" onclick="setPresence(\''+p.id+'\')">'+(p.label || labelTout())+'</button>').join('')+
+      /* Un interrupteur, et non deux pastilles perdues dans une rangée : à
+         deux choix exclusifs, la forme doit dire « l'un OU l'autre » d'un
+         coup d'œil. Maquette retenue par Alexandre le 20/08. */
+      '<div class="presdeux">'+
+        PRESENCES.map(p=>'<button class="'+(ui.presence===p.id?'on':'')+
+          '" onclick="setPresence(\''+p.id+'\')">'+esc(p.label || labelTout())+'</button>').join('')+
       '</div>'+
       '<div class="resume">'+(cherche ? esc(resumeRecherche()) : '<b>'+esc(resumeFiltres())+'</b>')+'</div>';
     return header(d.type === 'movie' ? 'Films' : 'Séries', {right:bouton, sub:rangees}) +
