@@ -113,7 +113,7 @@ header{
 .chip.chipico.ouvert{border-color:var(--accent);color:var(--accent);background:var(--surface)}
 /* Chaque bouton de tête a sa couleur : contour teinté au repos, couleur
    pleine quand il est actif. Films bleu, Séries violet, Cinéma orange,
-   Plateformes rouge, Cinéflix vert. */
+   Plateformes rouge, Premier Rang vert. */
 .chip.c-films{border-color:#3b82f680}
 .chip.c-films.on{background:#3b82f6;border-color:#3b82f6;color:#fff}
 .chip.c-series{border-color:#a855f780}
@@ -177,7 +177,7 @@ header{
 .chip.p-arte.on{background:#ff7900;border-color:#ff7900;color:#241000}
 .chip.p-molotov{border-color:#ffc10780}
 .chip.p-molotov.on{background:#ffc107;border-color:#ffc107;color:#2b2000}
-/* La coche « déjà sur Cinéflix » en ligne, dans le calendrier des sorties. */
+/* La coche « déjà sur Premier Rang » en ligne, dans le calendrier des sorties. */
 .cfx{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;
   background:var(--ok);color:#08130d;vertical-align:-3px;margin-left:4px}
 .cfx svg{width:10px;height:10px}
@@ -250,14 +250,14 @@ body.vue-liste .tag{transform:scale(.85);transform-origin:top right}
 .gname{font-size:12.5px;font-weight:640;margin-top:6px;min-height:2.5em;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .gyear{font-size:11px;color:var(--muted)}
-/* Pastille de présence, coin haut droit : vert plein = sur Cinéflix. */
+/* Pastille de présence, coin haut droit : vert plein = sur Premier Rang. */
 .tag{position:absolute;top:6px;right:6px;height:22px;padding:0 7px;border-radius:11px;
   display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:750;
   box-shadow:0 2px 8px rgba(0,0,0,.5)}
 .tag svg{width:12px;height:12px}
 .tag.dispo{background:var(--ok);color:#08130d}
 /* Version discrète : une simple coche ronde, sans texte. Sur la grille
-   « Cinéflix » où chaque affiche est possédée, une étiquette par vignette
+   « Premier Rang » où chaque affiche est possédée, une étiquette par vignette
    devenait du bruit. */
 .tag.mini{width:20px;height:20px;padding:0;border-radius:50%;justify-content:center}
 .tag.mini svg{width:11px;height:11px}
@@ -663,14 +663,25 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
 body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse */
 
 /* Le logo : caché dans la barre du bas (pas la place), visible partout où la
-   maquette le pose. */
-.navlogo{display:none;font-family:'Archivo Expanded',Archivo,sans-serif;
-  font-weight:800;font-size:17px;letter-spacing:.02em;color:#fff}
+   maquette le pose.
+
+   ---- « PREMIER RANG » (3008q) ----
+   Le nom et le logo ont changé le 20/08. Le ticket dessiné par Alexandre
+   (bleu nuit, crème, filet doré) devient l'icône du raccourci ; dans l'app,
+   c'est sa TYPO qu'on reprend, pas son image : à 34 px de haut le ticket
+   n'est plus qu'une tache, son texte ne se lit pas. Donc un serif crème et
+   un filet doré, sur le noir de l'app — le rouge signature reste celui de
+   tout le reste, seul le mot-écrit passe aux couleurs du ticket. */
+.navlogo,.hslogo{font-family:'Playfair Display',Georgia,'Times New Roman',serif;
+  font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:#f1e6d2;
+  position:relative;white-space:nowrap}
+.navlogo:after,.hslogo:after{content:'';position:absolute;left:0;bottom:0;
+  height:2px;width:54px;background:#c9a227;border-radius:2px}
+.navlogo{display:none;font-size:16px;padding-bottom:7px;background:none;border:0}
 .navlogo i,.hslogo i{color:var(--accent);font-style:normal}
 .hsbar{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;
   align-items:center;padding:calc(12px + var(--safe-t)) 16px 0}
-.hslogo{font-family:'Archivo Expanded',Archivo,sans-serif;font-weight:800;
-  font-size:16px;letter-spacing:.02em}
+.hslogo{font-size:16px;padding-bottom:7px}
 .minihaut{position:relative;padding:calc(10px + var(--safe-t)) 0 2px}
 .minihaut .hsbar{position:static;padding:0 16px}
 
