@@ -275,13 +275,46 @@ function goBack(){
 let histoireLiee = false;
 try{
   history.replaceState({cf:0}, '');
-  window.addEventListener('popstate', ()=>{ if(pileNav.length) reculer(); });
+  window.addEventListener('popstate', ()=>{
+    /* Un panneau ouvert se ferme AVANT de naviguer — sinon le menu d'un écran
+       reste posé sur l'écran suivant (constaté à l'audit du 20/08). La flèche
+       le faisait déjà ; le geste du système, non, puisqu'il arrive ici sans
+       passer par `goBack`. On remet aussitôt une entrée : une entrée
+       d'historique par étage de la pile, c'est ce qui garde les deux comptes
+       alignés. */
+    const sh = document.getElementById('sheet');
+    if(sh && sh.classList.contains('show')){
+      closeSheet();
+      try{ history.pushState({cf:pileNav.length}, ''); }catch(e2){}
+      return;
+    }
+    if(pileNav.length) reculer();
+  });
   histoireLiee = true;
 }catch(e){}
+
+/* iOS ou iPadOS ? Le test du `platform` suffit pour l'iPhone ; l'iPad moderne
+   se présente comme un Mac, d'où le second test sur le nombre de doigts. */
+const surIOS = ()=> {
+  try{
+    const ua = navigator.userAgent || '', pf = navigator.platform || '';
+    return /iPad|iPhone|iPod/.test(pf) || /iPhone|iPad|iPod/.test(ua) ||
+           (/Macintosh/.test(ua) && (navigator.maxTouchPoints || 0) > 1);
+  }catch(e){ return false; }
+};
 
 /* Balayage depuis le bord gauche : le doigt entraîne l'écran, et au
    relâchement soit on part en arrière, soit la page reprend sa place. */
 (function swipeBack(){
+  /* ⚠️ PAS SUR iOS (3008u). Le balayage depuis le bord gauche y est un geste
+     du SYSTÈME : Safari et les apps posées sur l'écran d'accueil reculent
+     d'elles-mêmes dans l'historique, et nos écouteurs sont passifs — on ne
+     peut pas les en empêcher. Résultat mesuré à l'audit : un seul geste
+     partait deux fois, le sien et le nôtre, et on sautait un écran. Alexandre,
+     le 20/08 : « les retours en arrière sont aléatoires, surtout sur iOS. »
+     C'était exactement ça. On laisse donc iOS conduire : son geste dépile une
+     entrée d'historique, notre `popstate` la reçoit et rejoue la pile. */
+  if(surIOS()) return;
   const SEUIL = 60, COURSE = 90;
   let x0=null, y0=null, t0=0, actif=false;
   const app = ()=> document.getElementById('app');
@@ -303,7 +336,10 @@ try{
   document.addEventListener('touchstart', e=>{
     const t = e.touches[0];
     actif = false;
-    if(t.clientX <= 28 && currentBack()){ x0=t.clientX; y0=t.clientY; t0=Date.now(); } else x0=null;
+    /* Sur la pile, pas sur `currentBack()` : ce dernier ne connaît que les
+       parents déclarés, et laissait le geste inerte sur Découvrir, Cinéma,
+       Ma liste et Profil — alors qu'il y avait bien où revenir. */
+    if(t.clientX <= 28 && (pileNav.length || currentBack())){ x0=t.clientX; y0=t.clientY; t0=Date.now(); } else x0=null;
   }, {passive:true});
   document.addEventListener('touchmove', e=>{
     if(x0===null) return;
