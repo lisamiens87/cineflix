@@ -116,6 +116,7 @@ function changerDeProfil(){
   db.auth = null; db.items = {}; db.itemsUid = '';
   estAdmin = false; file.charge = false;
   GOUTS.d = null; GOUTS.charge = false;
+  if(typeof oublierAccueil === 'function') oublierAccueil();
   saveDB();
   ui.accueil = { gere:false };
   go(foyerListe().length ? 'accueil' : 'auth');
@@ -148,6 +149,12 @@ async function chargerGouts(){
 }
 async function enregistrerGouts(d){
   GOUTS.d = d; GOUTS.charge = true;
+  /* Changer ses goûts doit se voir tout de suite sur l'accueil, pas au
+     prochain rechargement de la page. */
+  if(typeof oublierAccueil === 'function'){
+    oublierAccueil();
+    if(typeof view !== 'undefined' && view === 'decouvrir'){ try{ render(); }catch(e){} }
+  }
   if(!connecte()) return;
   try{
     await sbFetch('/rest/v1/gouts', {method:'POST',
