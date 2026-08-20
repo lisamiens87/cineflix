@@ -708,7 +708,12 @@ function guiderHumeur(id){
    page sans changer de vue : on note la hauteur de lecture qu'on quitte et
    on rend celle qu'on retrouve (3008n). */
 function ouvrirCategories(){
+  /* Un étage à part entière (3008u) : on empile l'écran des envies AVANT de
+     le quitter. Sans ça, la flèche fermait les catégories pendant que le
+     balayage sortait du guide — deux gestes qui disent « reviens », deux
+     destinations. Maintenant les deux dépilent la même chose. */
   noterDefil('guide');
+  if(typeof empiler === 'function') empiler();
   ui.guide.ecran = 'cat'; render();
   rendreDefil('guide:cat');
 }
@@ -794,7 +799,7 @@ function viewCategories(){
   const g = ui.guide;
   const ouvert = taxoGenreOuvert();
   const e = TAXO.find(x => x.id === ouvert);
-  let h = header('Par catégorie', {back:'fermerCategories()'});
+  let h = header('Par catégorie', {back:'goBack()'});
   if(catEtroit()) return h + corpsCatAccordeon(g);
 
   let droite = '';
