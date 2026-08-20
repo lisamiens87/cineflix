@@ -52,7 +52,7 @@ function viewListe(){
   else if(ui.listeTab === 'demandes'){
     if(!L.demandes.length)
       html += vide(I.envoi, 'Aucune demande en attente',
-                   'Sur la fiche d\'un titre absent de Cinéflix, « Demander » l\'ajoute à cette liste.');
+                   'Sur la fiche d\'un titre absent de Premier Rang, « Demander » l\'ajoute à cette liste.');
     else{
       /* On sépare ce qui est encore en attente de ce qui a été refusé :
          sinon les refus s'accumulent en tête et donnent l'impression que
@@ -71,7 +71,7 @@ function viewListe(){
       ? '<div class="sectitle">Tes demandes qui sont arrivées</div>'+
         '<div class="pgrid">'+L.arrives.map(carteItem).join('')+'</div>'
       : vide(I.check, 'Rien n\'est encore arrivé',
-             'Les titres que tu as demandés apparaîtront ici dès qu\'ils seront sur Cinéflix.');
+             'Les titres que tu as demandés apparaîtront ici dès qu\'ils seront sur Premier Rang.');
   }
   return html + '<div style="height:26px"></div>';
 }
@@ -84,7 +84,7 @@ function vide(icone, titre, sous){
 function carteItem(it){
   const st = statut(it.type, it.id);
   let tag = '';
-  if(st === 'obtenu')       tag = '<div class="tag dispo">'+I.check+'Cinéflix</div>';
+  if(st === 'obtenu')       tag = '<div class="tag dispo">'+I.check+'Premier Rang</div>';
   else if(st === 'demande') tag = '<div class="tag demande">'+I.horloge+'</div>';
   else if(st === 'encours') tag = '<div class="tag encours">'+I.horloge+'</div>';
   return '<button class="gcard" onclick="ouvrirFiche('+it.id+',\''+it.type+'\',\'liste\')">'+
@@ -97,7 +97,7 @@ function carteItem(it){
 
 function ligneItem(it){
   const st = statut(it.type, it.id);
-  const lib = { demande:'En attente', encours:'En cours d\'ajout', refuse:'Refusée', obtenu:'Sur Cinéflix' };
+  const lib = { demande:'En attente', encours:'En cours d\'ajout', refuse:'Refusée', obtenu:'Sur Premier Rang' };
   const cls = st === 'refuse' ? 'refuse' : st === 'encours' ? 'encours' : 'demande';
   return '<div class="lrow" onclick="ouvrirFiche('+it.id+',\''+it.type+'\',\'liste\')">'+
     (it.poster ? '<img class="lposter" loading="lazy" src="'+IMG(it.poster,'w154')+'" alt="">'
@@ -132,7 +132,7 @@ function exporterDemandes(){
   const lignes = L.demandes.map(it =>
     (it.type === 'movie' ? 'Film' : 'Série')+' · '+it.titre+' ('+year(it.date)+') · '+
     'https://www.themoviedb.org/'+it.type+'/'+it.id);
-  const txt = 'Demandes Cinéflix'+(db.pseudo?' — '+db.pseudo:'')+'\n'+
+  const txt = 'Demandes Premier Rang'+(db.pseudo?' — '+db.pseudo:'')+'\n'+
               fmtDate(todayISO())+'\n\n'+lignes.join('\n')+'\n';
   const blob = new Blob([txt], {type:'text/plain'});
   const a = document.createElement('a');
@@ -220,7 +220,7 @@ function corpsSuggestions(){
 
   if(!vis.length)
     return '<div class="empty">'+I.check+'<h3>Plus rien à suggérer</h3>'+
-      '<p>Tout est acquis ou déjà sur Cinéflix. Beau travail.</p>'+
+      '<p>Tout est acquis ou déjà sur Premier Rang. Beau travail.</p>'+
       (masquesAcquis ? '<button class="btn ghost" onclick="retablirAcquis()">Rétablir les films marqués acquis</button>' : '')+
       '</div>';
 
@@ -245,7 +245,7 @@ function corpsSuggestions(){
   const nMasques = masquesAcquis + Math.max(0, masquesCat);
   if(nMasques)
     html += '<div class="credit">'+nMasques+' film'+(nMasques>1?'s':'')+' masqué'+(nMasques>1?'s':'')+
-      ' (acquis ou déjà sur Cinéflix)'+
+      ' (acquis ou déjà sur Premier Rang)'+
       (masquesAcquis ? ' · <a href="#" onclick="event.preventDefault();retablirAcquis()">rétablir les acquis</a>' : '')+
       '</div>';
   return html + '<div style="height:26px"></div>';
