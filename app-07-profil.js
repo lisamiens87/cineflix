@@ -13,7 +13,7 @@ function viewProfil(){
   html += '<div class="phead">'+avatarHtml(mp.avatar, 'moyen', nom)+
     '<div><div style="font-size:18px;font-weight:700">'+esc(nom || 'Sans nom')+'</div>'+
     '<div class="small muted">'+
-      (mp.jellyfin ? 'Compte serveur : '+esc(mp.jellyfin) : 'Cinéflix')+'</div></div></div>';
+      (mp.jellyfin ? 'Compte serveur : '+esc(mp.jellyfin) : 'Premier Rang')+'</div></div></div>';
 
   /* Deux gestes qu'on cherche là, et nulle part ailleurs : refaire le tour de
      ses goûts, et rendre l'app à quelqu'un d'autre. */
@@ -34,12 +34,12 @@ function viewProfil(){
 
   /* L'état du catalogue est la première chose à vérifier quand quelque chose
      paraît faux : on l'affiche en clair plutôt que de le cacher. */
-  html += '<div class="sectitle">Le serveur Cinéflix</div><div class="wrap" style="padding-top:0">'+
+  html += '<div class="sectitle">Le serveur Premier Rang</div><div class="wrap" style="padding-top:0">'+
     '<div class="card" style="padding:14px">'+
       (CAT.erreur
         ? '<div style="font-weight:660;color:var(--warn)">Catalogue introuvable</div>'+
           '<div class="small muted" style="margin-top:4px">'+esc(CAT.erreur)+
-          '. Le filtre « Sur Cinéflix » ne peut pas fonctionner.</div>'
+          '. Le filtre « Sur Premier Rang » ne peut pas fonctionner.</div>'
         : '<div style="font-weight:660">'+CAT.movie.size+' film'+(CAT.movie.size>1?'s':'')+
           ' · '+CAT.tv.size+' série'+(CAT.tv.size>1?'s':'')+'</div>'+
           '<div class="small muted" style="margin-top:4px">'+
@@ -111,7 +111,7 @@ function viewProfil(){
   }
 
   html += '<div class="sectitle">Raccourcis</div><div class="wrap" style="padding-top:0">'+
-    /* « Ce soir » a remplacé la vue Cinéflix seule (fusion 3008b). */
+    /* « Ce soir » a remplacé la vue Premier Rang seule (fusion 3008b). */
     '<button class="btn ghost block" style="margin-bottom:10px" onclick="ui.presence=\'soir\';ui.disc.charge=false;go(\'decouvrir\')">'+
       I.serveur+' Parcourir ce que je peux regarder ce soir</button>'+
     /* Le calendrier a son écran depuis 3008p : le raccourci ouvre l'onglet
@@ -122,7 +122,7 @@ function viewProfil(){
   '</div>';
 
   return html + '<div class="wrap tiny muted center" style="padding-bottom:30px">'+
-    'Cinéflix · données films et séries fournies par TMDB'+
+    'Premier Rang · données films et séries fournies par TMDB'+
     /* Le numéro de version, posé par index.html : quand un téléphone semble
        afficher une vieille version, ce numéro tranche en un coup d'œil. */
     (window.BUILD ? ' · v'+esc(window.BUILD) : '')+'</div>';
@@ -134,7 +134,7 @@ function viewProfil(){
    puis « Envoyer ma demande » que l'admin valide). */
 function inviterWhatsApp(){
   const msg =
-    "🍿 Je t'invite sur Cinéflix, notre cinéma à la maison !\n\n"+
+    "🍿 Je t'invite sur Premier Rang, notre cinéma à la maison !\n\n"+
     "1️⃣ Ouvre ce lien sur ton téléphone :\n"+location.origin+location.pathname+"\n"+
     "2️⃣ Touche « Créer un profil » : ton prénom, ton e-mail et un code à six chiffres.\n"+
     "3️⃣ Touche « Envoyer ma demande » — je la valide de mon côté et tu entres.\n\n"+
@@ -180,7 +180,7 @@ function viewReglages(){
               'reprend un film là où tu l\'avais laissé, et c\'est lui que tu '+
               'choisis dans Swiftfin ou Jellyfin sur ta télé.</div>'
           : '<div style="font-weight:660">Aucun</div>'+
-            '<div class="tiny muted" style="margin-top:4px">Tout Cinéflix '+
+            '<div class="tiny muted" style="margin-top:4px">Tout Premier Rang '+
               'fonctionne, sauf « Continuer la lecture ». Demande à '+
               'l\'administrateur du foyer s\'il t\'en faut un.</div>')+
       '</div>'+
@@ -205,7 +205,7 @@ function viewReglages(){
       '<em>Les dates cinéma, numérique et Blu-ray dépendent du pays.</em></label>'+
   '</div>';
 
-  html += '<div class="sectitle">Le serveur Cinéflix</div><div class="wrap" style="padding-top:0">'+
+  html += '<div class="sectitle">Le serveur Premier Rang</div><div class="wrap" style="padding-top:0">'+
     '<label class="fld"><span>Adresse du catalogue</span>'+
       '<input type="text" id="rgcat" value="'+esc(db.catalogueUrl||'')+'" '+
       'placeholder="./cineflix.json" autocapitalize="off" autocorrect="off" spellcheck="false">'+
@@ -282,7 +282,7 @@ function importData(input){
   r.onload = ()=>{
     let d;
     try{ d = JSON.parse(r.result); }catch(e){ return toast('Fichier illisible'); }
-    if(!objetSimple(d) || !objetSimple(d.items)) return toast('Ce fichier n\'est pas une sauvegarde Cinéflix');
+    if(!objetSimple(d) || !objetSimple(d.items)) return toast('Ce fichier n\'est pas une sauvegarde Premier Rang');
     db.items = d.items;
     if(d.pseudo) db.pseudo = d.pseudo;
     if(d.apiKey) db.apiKey = d.apiKey;
@@ -385,7 +385,7 @@ function secours(e){
   /* On GARDE la trace : un démarrage muet a coûté une soirée de recherche.
      Elle est lisible dans la console et dans window.__bootErr. */
   window.__bootErr = (e && (e.stack || e.message)) || String(e);
-  try{ console.error('Cinéflix — démarrage interrompu :', e); }catch(x){}
+  try{ console.error('Premier Rang — démarrage interrompu :', e); }catch(x){}
   document.body.classList.remove('booting');
   /* Chaque étape à part : si l'une échoue, les suivantes doivent quand même
      s'exécuter — sinon l'écran reste noir, exactement ce qu'on veut éviter. */
