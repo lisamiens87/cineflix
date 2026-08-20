@@ -60,6 +60,21 @@ body.accueil .app{padding-bottom:24px}
   border-radius:11px;padding:10px 12px;font-size:13.5px}
 .accliens{display:flex;justify-content:center;gap:22px;margin-top:16px}
 .accliens button{color:var(--muted);font-size:13.5px;font-weight:650;padding:8px}
+/* ---- La toute première visite (3008t) : le mot-écrit centré, puis les
+   trois étapes du parcours, puis le bouton qui compte. ---- */
+.motacc{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-weight:700;
+  text-transform:uppercase;letter-spacing:.09em;color:#f1e6d2;font-size:19px;
+  align-self:center;position:relative;padding-bottom:7px;margin-bottom:24px;white-space:nowrap}
+.motacc:after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:0;
+  height:2px;width:54px;background:#c9a227;border-radius:2px}
+.pasl{margin-top:20px;display:flex;flex-direction:column;gap:13px}
+.pas{display:flex;gap:12px;align-items:flex-start}
+.pas em{flex:0 0 24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;
+  font-style:normal;font-size:12px;font-weight:800;display:grid;place-items:center;margin-top:1px}
+.pas b{display:block;font-size:14.5px;font-weight:700;line-height:1.3}
+.pas s{display:block;text-decoration:none;color:var(--muted);font-size:12.5px;
+  line-height:1.4;margin-top:2px}
+
 .puces{display:flex;gap:7px;justify-content:center;margin-top:auto;padding-top:28px}
 .puces i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .puces i.on{background:var(--accent);width:20px;border-radius:4px}
