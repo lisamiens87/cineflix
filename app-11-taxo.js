@@ -6,7 +6,7 @@
 
    POURQUOI DES RÈGLES ET NON DES ÉTIQUETTES.
    Étiqueter film par film ne couvrirait que les 2 270 fiches du NAS. Or ce
-   guide travaille sur trois périmètres : Cinéflix, les plateformes, et tout
+   guide travaille sur trois périmètres : Premier Rang, les plateformes, et tout
    le cinéma. Sur les deux derniers, on interroge TMDB en direct — aucune
    étiquette maison n'existe sur ces titres-là. Une sous-catégorie est donc
    écrite comme une RECETTE (genres, mots-clés, pays, durée, note), qui
@@ -31,7 +31,7 @@ const G_ACTION=28, G_AVENT=12, G_ANIM=16, G_COM=35, G_CRIME=80, G_DOC=99,
 /* ---------- La table ----------
    g     : genres TOUS obligatoires        gUn : au moins un de ceux-ci
    sans  : aucun de ceux-ci                mc  : au moins un mot-clé
-   sansMc: aucun de ces mots-clés          loc : n'existe que sur Cinéflix   */
+   sansMc: aucun de ces mots-clés          loc : n'existe que sur Premier Rang   */
 const TAXO = [
 
 { id:'action', nom:'Action', emo:'🎬', g:[G_ACTION], sans:[G_ANIM], sous:[
@@ -85,7 +85,7 @@ const TAXO = [
 /* Concert et Théâtre sont des rayons Jellyfin : sur le serveur, le NOM du
    genre est la vérité et rien ne le bat. Hors serveur, ils existent quand même
    chez TMDB, mais par leurs mots-clés — « concert film », « live performance »,
-   « music documentary ». Les deux voies cohabitent : locNoms sur Cinéflix,
+   « music documentary ». Les deux voies cohabitent : locNoms sur Premier Rang,
    mots-clés partout ailleurs. */
 { id:'concert', nom:'Concert', emo:'🎤', locNoms:['concert'],
   gUn:[G_MUS,G_DOC], mc:[6029,156205,11634,246377,162066,204236,318206], sous:[] },
@@ -313,7 +313,7 @@ function viewTaxoChips(){
      plateformes : l'avertissement vaut donc en permanence pour ces genres.) */
   if(e && (e.locNoms||[]).length)
     h += '<div class="tiny muted" style="margin-top:6px">'+
-         esc(e.nom)+' est un genre de ton serveur : hors Cinéflix, '+
+         esc(e.nom)+' est un genre de ton serveur : hors Premier Rang, '+
          'les résultats seront approximatifs.</div>';
   return h + '</div>';
 }
