@@ -1030,7 +1030,7 @@ function vitrineHtml(){
            3008c) ; les deux boutons arrêtent la propagation pour garder
            leur geste propre. Un balayage du carrousel ne déclenche pas de
            clic : le doigt qui glisse n'est pas un appui. */
-        return '<div class="vsl" onclick="ouvrirFiche('+h.id+',\'movie\',\'decouvrir\')">'+
+        return '<div class="vsl" onclick="ouvrirFiche('+h.id+',\'movie\')">'+
           '<img src="'+IMG(h.aff || h.fond,'w780')+'" alt="">'+
           '<div class="vgr"></div>'+
           '<div class="vtx">'+
