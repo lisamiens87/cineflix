@@ -87,7 +87,7 @@ function carteItem(it){
   if(st === 'obtenu')       tag = '<div class="tag dispo">'+I.check+'Premier Rang</div>';
   else if(st === 'demande') tag = '<div class="tag demande">'+I.horloge+'</div>';
   else if(st === 'encours') tag = '<div class="tag encours">'+I.horloge+'</div>';
-  return '<button class="gcard" onclick="ouvrirFiche('+it.id+',\''+it.type+'\',\'liste\')">'+
+  return '<button class="gcard" onclick="ouvrirFiche('+it.id+',\''+it.type+'\')">'+
     '<div class="wrapimg">'+posterEl(it.poster,'w342','',it.titre)+tag+'</div>'+
     '<div class="gname">'+esc(it.titre)+'</div>'+
     '<div class="gyear">'+esc(year(it.date))+
@@ -99,7 +99,7 @@ function ligneItem(it){
   const st = statut(it.type, it.id);
   const lib = { demande:'En attente', encours:'En cours d\'ajout', refuse:'Refusée', obtenu:'Sur Premier Rang' };
   const cls = st === 'refuse' ? 'refuse' : st === 'encours' ? 'encours' : 'demande';
-  return '<div class="lrow" onclick="ouvrirFiche('+it.id+',\''+it.type+'\',\'liste\')">'+
+  return '<div class="lrow" onclick="ouvrirFiche('+it.id+',\''+it.type+'\')">'+
     (it.poster ? '<img class="lposter" loading="lazy" src="'+IMG(it.poster,'w154')+'" alt="">'
                : '<div class="lposter"></div>')+
     '<div class="cinfo">'+
@@ -254,7 +254,7 @@ function corpsSuggestions(){
 function carteSugg(f){
   const it = item('movie', f.id);
   const fav = !!(it && it.fav);
-  return '<div class="sgc" onclick="ouvrirFiche('+f.id+',\'movie\',\'liste\')">'+
+  return '<div class="sgc" onclick="ouvrirFiche('+f.id+',\'movie\')">'+
     '<div class="wrapimg">'+posterEl(f.poster,'w342','',f.titre)+
       '<div class="sgact">'+
         '<button onclick="event.stopPropagation();marquerAcquis('+f.id+')" aria-label="Marquer acquis">✓</button>'+
