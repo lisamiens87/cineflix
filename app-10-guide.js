@@ -172,7 +172,7 @@ function couvertureMC(){
 /* ---------- Le périmètre ---------- */
 /* Le guide n'était braqué que sur la bibliothèque. Les trois sources de
    Découvrir s'appliquent tout aussi bien ici — avec une conséquence assumée :
-   hors Cinéflix, une suggestion n'est pas regardable ce soir, elle devient
+   hors Premier Rang, une suggestion n'est pas regardable ce soir, elle devient
    une demande. L'écran le dit plutôt que de le cacher. */
 /* Plus de choix de portée ici (10/08) : la banque du guide est UNE, et
    c'est la réunion de la bibliothèque et des plateformes cochées dans
@@ -286,7 +286,7 @@ function vivierCineflix(r, revoir){
       /* Les mots-clés ne s'appliquent PAS quand le rayon a déjà été reconnu
          par son nom : Concert et Théâtre sont des genres du serveur, aucun de
          ces films ne porte de mot-clé TMDB, et le filtre les effaçait. Les
-         mots-clés restent la porte d'entrée hors Cinéflix, où le nom du rayon
+         mots-clés restent la porte d'entrée hors Premier Rang, où le nom du rayon
          n'existe pas. */
       if(r.mc.length && !r.locNoms.length){
         if(c.mc){ if(!r.mc.some(id => c.mc.indexOf(id) >= 0)) return false; }
@@ -652,8 +652,8 @@ async function guider(source, txt){
     g.res = liste; g.loading = false; g.charge = true;
     if(!liste.length)
       g.err = platsFilms().length
-        ? 'Rien trouvé dans ce registre sur Cinéflix ni sur tes plateformes.'
-        : 'Rien trouvé sur Cinéflix. Ajoute tes abonnements dans « Mes goûts » '+
+        ? 'Rien trouvé dans ce registre sur Premier Rang ni sur tes plateformes.'
+        : 'Rien trouvé sur Premier Rang. Ajoute tes abonnements dans « Mes goûts » '+
           'pour élargir les propositions.';
     render();
   }catch(e){
@@ -868,7 +868,7 @@ function rendreLesEcartes(){
 function carteGuide(c){
   return '<div class="gcard">'+
     '<button class="gouvre" onclick="ouvrirFiche('+c.id+',\''+c.type+'\',\'guide\')">'+
-      /* Pas de coche « sur Cinéflix » ici (retirée en 3007j, demande
+      /* Pas de coche « sur Premier Rang » ici (retirée en 3007j, demande
          d'Alexandre) : en « chez toi » TOUT l'est — la coche était partout,
          donc muette — et en « tes abonnements » plus rien ne l'est depuis
          3007d. Savoir si on possède UN film précis, c'est le travail de la
@@ -890,7 +890,7 @@ function portee(){
   if(platsDits())
     return platsProfil().length
       ? 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, et tes abonnements.'
-      : 'Uniquement ta bibliothèque Cinéflix — tu n\'as coché aucun abonnement.';
+      : 'Uniquement ta bibliothèque Premier Rang — tu n\'as coché aucun abonnement.';
   return 'Uniquement ce que tu peux lancer ce soir : ta bibliothèque, plus toutes les '+
     'plateformes — coche tes abonnements dans « Mes goûts » pour resserrer.';
 }
