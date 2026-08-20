@@ -149,7 +149,7 @@ function carteSortie(x){
   const corps = '<div class="wrapimg">'+posterEl(r.poster_path,'w342','',r.title||'')+
       '<div class="sgdate">'+esc(fmtDateCourt(x.quand))+
         (d2 && d2.uhd ? ' · 4K' : '')+'</div>'+
-      (chez ? '<div class="tag dispo mini" aria-label="Sur Cinéflix">'+I.check+'</div>' : '')+
+      (chez ? '<div class="tag dispo mini" aria-label="Sur Premier Rang">'+I.check+'</div>' : '')+
     '</div>'+
     '<div class="gname">'+esc(r.title||'')+'</div>'+
     '<div class="gyear">'+esc(sous)+'</div>';
@@ -308,7 +308,7 @@ function ligneSortie(x, m){
   const r = x.film, d = x.disque;
   const st = r.id ? statut('movie', r.id) : null;
   let marque = '';
-  if(st === 'obtenu')       marque = '<span class="pastille dispo">'+I.check+' Sur Cinéflix</span>';
+  if(st === 'obtenu')       marque = '<span class="pastille dispo">'+I.check+' Sur Premier Rang</span>';
   else if(st === 'demande') marque = '<span class="pastille demande">'+I.horloge+' Demandé</span>';
   else if(st === 'encours') marque = '<span class="pastille encours">'+I.horloge+' En cours</span>';
   else if(st === 'fav')     marque = '<span class="pastille encours">'+I.coeurPlein+' Favori</span>';
@@ -331,7 +331,7 @@ function ligneSortie(x, m){
         /* La coche verte suit le titre partout : ici aussi, on voit d'un
            coup d'œil ce qui est déjà sur le serveur. */
         (r.id && surCineflix('movie', r.id)
-          ? ' <span class="cfx" aria-label="Sur Cinéflix">'+I.check+'</span>' : '')+
+          ? ' <span class="cfx" aria-label="Sur Premier Rang">'+I.check+'</span>' : '')+
       '</div>'+
       '<div class="csub">'+sous+'</div>'+
       marque+
