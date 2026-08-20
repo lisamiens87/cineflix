@@ -125,7 +125,7 @@ let ui = {
          decennie:0,                          // 0 = toutes, sinon 1920, 1930…
          origine:'eurna',                     // groupe de pays (REGIONS) — défaut Europe + Amér. du Nord
          /* NB : disc est commun aux trois vues (Cinéma / Plateformes /
-            Cinéflix) — un filtre posé reste posé quand on en change. */
+            Premier Rang) — un filtre posé reste posé quand on en change. */
          page:1, pages:1, res:[], loading:false, err:'', charge:false },
   champOuvert:false, focusSearch:false,
   searchQ:'', searchRes:null, searchPers:null, searching:false, searchErr:'',
@@ -370,7 +370,7 @@ function renderNav(){
     { cl:'t-profil', on: cur === 'profil', act:"go('profil')", ic:I.user, lab:'Profil' }
   ];
   document.getElementById('nav').innerHTML =
-    '<button class="navlogo" onclick="go2Decouvrir()">CINÉ<i>FLIX</i></button>' +
+    '<button class="navlogo" onclick="go2Decouvrir()">Premier Rang</button>' +
     items.map(t=>'<button class="tab '+t.cl+(t.on ? ' on' : '')+'" onclick="'+t.act+'">'+
       (t.emo ? '<span class="icsvg">'+t.ic+'</span><span class="icemo">'+t.emo+'</span>' : t.ic)+
       (t.badge ? '<span class="pastille-nav">'+t.badge+'</span>' : '')+
@@ -389,10 +389,10 @@ function banniereCle(){
   return '<div class="banner">Ajoute ta clé TMDB dans <b>Profil → Réglages</b> pour voir le catalogue.</div>';
 }
 /* Le catalogue absent n'est pas une erreur bloquante : l'app reste utilisable,
-   on prévient simplement que la distinction « sur Cinéflix » ne marche pas. */
+   on prévient simplement que la distinction « sur Premier Rang » ne marche pas. */
 function banniereCatalogue(){
   if(!CAT.erreur) return '';
-  return '<div class="banner"><b>Catalogue Cinéflix introuvable.</b><br>'+
+  return '<div class="banner"><b>Catalogue Premier Rang introuvable.</b><br>'+
     'Impossible de savoir ce qui est déjà sur le serveur. Vérifie l\'adresse du '+
     'catalogue dans les réglages.</div>';
 }
