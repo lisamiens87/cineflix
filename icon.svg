@@ -1,29 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- La tuile blanche : le système arrondit lui-même les coins sur le
-       téléphone ; on garde le plein cadre pour la version maskable. -->
-  <rect width="512" height="512" fill="#faf8f5"/>
-  <!-- La pellicule, légèrement inclinée comme sur la maquette. -->
-  <g transform="rotate(14 256 256)">
-    <rect x="181" y="76" width="150" height="360" rx="18" fill="#b3261e"/>
-    <!-- Perforations, colonne gauche -->
-    <g fill="#faf8f5">
-      <rect x="196" y="98"  width="22" height="16" rx="5"/>
-      <rect x="196" y="146" width="22" height="16" rx="5"/>
-      <rect x="196" y="194" width="22" height="16" rx="5"/>
-      <rect x="196" y="302" width="22" height="16" rx="5"/>
-      <rect x="196" y="350" width="22" height="16" rx="5"/>
-      <rect x="196" y="398" width="22" height="16" rx="5"/>
-      <!-- colonne droite -->
-      <rect x="294" y="98"  width="22" height="16" rx="5"/>
-      <rect x="294" y="146" width="22" height="16" rx="5"/>
-      <rect x="294" y="194" width="22" height="16" rx="5"/>
-      <rect x="294" y="302" width="22" height="16" rx="5"/>
-      <rect x="294" y="350" width="22" height="16" rx="5"/>
-      <rect x="294" y="398" width="22" height="16" rx="5"/>
-      <!-- La fenêtre centrale -->
-      <rect x="203" y="226" width="106" height="60" rx="8"/>
-    </g>
-    <!-- Le triangle de lecture, dans la fenêtre -->
-    <path d="M238 234 L286 256 L238 278 Z" fill="#b3261e"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" rx="0" fill="#f1e6d2"/><g transform="translate(256,256) scale(.74) translate(-256,-256)"><g transform="rotate(-12 256 256)">
+  <rect x="56" y="150" width="400" height="212" rx="30" fill="#22354a"/>
+  <rect x="74" y="168" width="364" height="176" rx="18"
+        fill="none" stroke="#c9a227" stroke-width="6"/>
+  <circle cx="56" cy="256" r="26" fill="#f1e6d2"/>
+  <circle cx="456" cy="256" r="26" fill="#f1e6d2"/>
+  <text x="256" y="243" text-anchor="middle" fill="#f1e6d2"
+        font-family="Playfair Display,Georgia,Times New Roman,serif" font-weight="700"
+        font-size="44" letter-spacing="5">PREMIER</text>
+  <rect x="176" y="258" width="160" height="5" rx="2.5" fill="#c9a227"/>
+  <text x="256" y="322" text-anchor="middle" fill="#f1e6d2"
+        font-family="Playfair Display,Georgia,Times New Roman,serif" font-weight="700"
+        font-size="44" letter-spacing="5">RANG</text>
+</g></g></svg>
