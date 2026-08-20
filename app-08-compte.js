@@ -524,10 +524,54 @@ async function apresConnexion(){
 }
 
 /* ---------- Le rendu ---------- */
+/* ---------- La toute première visite (3008t) ----------
+   Alexandre, le 20/08 : « quand on envoie un lien sur WhatsApp ça propose de
+   se connecter, et en dessous créer un compte ; pour la première fois ce
+   serait mieux de faire l'inverse, non ? » Oui : on tendait un formulaire de
+   connexion à quelqu'un qui n'a par définition pas de compte, et on rangeait
+   la seule action qui le concerne tout en bas, en petit.
+
+   L'écran ne s'affiche que si l'appareil ne connaît PERSONNE et n'a jamais
+   servi : un téléphone du foyer garde son « qui regarde ce soir ? ». Et
+   jamais quand un message d'erreur attend d'être lu — il passerait à la
+   trappe. */
+function premiereVisite(){
+  const a = ui.auth || {};
+  return a.mode === 'connexion' && !a.err && !a.deja && !a.motdepasse && !a.email &&
+         !db.auth && !(db.foyer||[]).length && !(db.pseudo||'').trim();
+}
+function jaiDejaUnProfil(){
+  ui.auth = { mode:'connexion', err:'', occupe:false, code:'', deja:true };
+  render();
+}
+function viewPremiereVisite(){
+  const pas = (n, titre, sous)=>
+    '<div class="pas"><em>'+n+'</em><div><b>'+esc(titre)+'</b><s>'+esc(sous)+'</s></div></div>';
+  return '<div class="acc">'+
+    '<div class="motacc">'+esc(CFG.nom||'Premier Rang')+'</div>'+
+    '<h1>Bienvenue chez nous</h1>'+
+    '<p class="accsub">Trois minutes, et tu as accès au cinéma de la maison.</p>'+
+    '<div class="pasl">'+
+      pas(1, 'Ton prénom et ton e-mail',
+             'plus un code à six chiffres, à la place d\'un mot de passe')+
+      pas(2, 'L\'administrateur ouvre ton accès',
+             'tu es prévenu dès que c\'est fait')+
+      pas(3, 'Tu dis ce que tu aimes',
+             'et l\'app te propose des films pour toi')+
+    '</div>'+
+    '<button class="btn block" style="margin-top:20px" onclick="nouveauProfil()">'+
+      'Créer mon profil</button>'+
+    '<div class="accliens" style="margin-top:auto;padding-top:26px">'+
+      '<button onclick="jaiDejaUnProfil()">J\'ai déjà un profil</button>'+
+    '</div>'+
+  '</div>';
+}
+
 function viewAuth(){
   const a = ui.auth || (ui.auth = {mode:'connexion', err:'', occupe:false, code:''});
 
   if(a.mode === 'inscription') return viewInscription(a);
+  if(premiereVisite()) return viewPremiereVisite();
 
   const parTete = a.mode === 'code' && a.email;
   let h = '<div class="acc">';
