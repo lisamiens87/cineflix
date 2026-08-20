@@ -83,6 +83,41 @@ function genreFui(i){
   return genresIds(i).some(id => f.indexOf(id) >= 0);
 }
 
+/* ---------- Ce qu'on AIME, enfin utilisé ici aussi (3008v) ----------
+   Alexandre, le 20/08 : « on a rentré 4 goûts pour Caro et dans les
+   suggestions en home page on lui propose autre chose ». Vérifié : les
+   genres aimés ne servaient QUE dans Guide-moi ; la couverture ne regardait
+   les goûts que pour écarter ce qu'on fuit, et se triait sur la seule note
+   de la presse. Quatre goûts déclarés, aucun effet là où on les cherche.
+
+   On reprend donc la règle du guide plutôt que d'en inventer une seconde :
+   là-bas un genre aimé vaut +2 dans un barème où « critiques ≥ 85 » vaut
+   +2, plafonné à +4. Ici le tri se fait sur la note de presse, de 0 à 100 :
+   même rapport, donc 8 points par genre aimé, plafonnés à 16. Une comédie à
+   85 passe devant un film de guerre à 99 pour qui aime la comédie ; un
+   chef-d'œuvre à 99 reste devant une comédie à 75. Une seule règle dans
+   toute l'app, donc un seul endroit à régler le jour où elle déplaît. */
+function bonusGouts(i){
+  const a = ((GOUTS.d||{}).aimes)||[];
+  if(!a.length) return 0;
+  const ids = genresIds(i);
+  return Math.min(16, 8 * a.filter(id => ids.indexOf(id) >= 0).length);
+}
+const noteAvecGouts = i => (i.noteCrit||0) + bonusGouts(i);
+const dansSesGouts  = i => bonusGouts(i) > 0;
+
+/* La couverture est calculée UNE fois et gardée. Il faut donc l'oublier
+   quand la personne change — sinon le suivant hérite de la sélection du
+   précédent, ses goûts à lui déjà chargés (constaté le 20/08 : on passait
+   d'un profil à l'autre sur le même téléphone et l'accueil ne bougeait pas
+   tant qu'on ne rechargeait pas la page). */
+function oublierAccueil(){
+  ui.heroSoirs = null; heroTente = false;
+  ui.topBib = null;    topReq = false;
+  ui.recents = null;   ui.reprises = null;
+  RANGS.recents = false; RANGS.reprises = false;
+}
+
 /* Les plateformes retenues, avec leur identifiant TMDB (données JustWatch)
    et l'adresse de leur recherche — pour ouvrir un titre directement chez elles. */
 /* Les plateformes proposées au foyer. Les identifiants sont ceux de TMDB
@@ -964,7 +999,7 @@ function assurerHeroSoir(){
                                         (i.noteCrit||0) >= 75 && !genreFui(i));
   if(!l.length) return;
   heroTente = true;
-  l.sort((a,b)=>(b.noteCrit||0)-(a.noteCrit||0));
+  l.sort((a,b)=> noteAvecGouts(b) - noteAvecGouts(a));
   /* CINQ propositions, pas une : sur téléphone elles se balayent du doigt.
      Tirées sans doublon dans le haut du panier, elles changent à chaque
      session. On garde l'AFFICHE en plus du décor — c'est elle qui remplit un
@@ -1150,7 +1185,13 @@ function assurerTopBib(){
     const j = Math.floor(alea() * (i + 1));
     const t = vivier[i]; vivier[i] = vivier[j]; vivier[j] = t;
   }
-  const l = vivier.slice(0, parRangee(7, 184));
+  /* Ses genres d'abord, le reste ensuite — l'ordre du tirage du jour est
+     conservé À L'INTÉRIEUR de chaque groupe, donc le top tourne toujours
+     tous les matins, mais il commence par ce qu'elle aime. Et quand elle
+     n'a pas sept titres dans ses genres, on complète : mieux vaut un top
+     entier qu'un top fidèle et à moitié vide. */
+  const range = vivier.filter(dansSesGouts).concat(vivier.filter(i => !dansSesGouts(i)));
+  const l = range.slice(0, parRangee(7, 184));
   topReq = true;
   Promise.all(l.map(c => tmdb('/movie/'+c.id).catch(()=>null))).then(fs=>{
     ui.topBib = l.map((c,i)=>({ id:c.id, nom:c.nom,
