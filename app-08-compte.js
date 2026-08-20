@@ -464,7 +464,7 @@ function viewAttente(){
     '<p class="accsub">'+(refuse
       ? 'L\'administrateur n\'a pas donné suite à ta demande. '+
         'Si c\'est une erreur, parle-lui directement.'
-      : 'Ton profil est créé. L\'administrateur de Cinéflix a été prévenu : '+
+      : 'Ton profil est créé. L\'administrateur de Premier Rang a été prévenu : '+
         'il ouvrira ton accès, et tu recevras une notification.')+'</p>'+
     '<div class="card" style="padding:14px;margin-top:20px;text-align:left">'+
       '<div class="small muted">Ton profil</div>'+
@@ -513,7 +513,7 @@ function viewAuth(){
       '<p class="accsub">'+(a.motdepasse ? 'Ton mot de passe' : 'Compose ton code')+'</p>';
   }else{
     h += '<div class="acclogo">'+I.film+'</div>'+
-      '<h1>'+esc(CFG.nom||'Cinéflix')+'</h1>'+
+      '<h1>'+esc(CFG.nom||'Premier Rang')+'</h1>'+
       '<p class="accsub">Connecte-toi pour retrouver ta liste et tes demandes.</p>'+
       '<label class="fld" style="margin-top:22px"><span>Adresse e-mail</span>'+
         '<input type="text" id="acmail" inputmode="email" autocapitalize="off" '+
@@ -559,7 +559,7 @@ function viewInscription(a){
   return '<div class="acc">'+
     '<div class="acclogo">'+I.user+'</div>'+
     '<h1>Demander un accès</h1>'+
-    '<p class="accsub">Cinéflix est privé. Ta demande part à l\'administrateur du '+
+    '<p class="accsub">Premier Rang est privé. Ta demande part à l\'administrateur du '+
     'foyer, qui ouvrira ton accès. Le code à six chiffres remplace le mot de passe : '+
     'plus simple à retenir, plus rapide à taper sur un canapé.</p>'+
     '<label class="fld" style="margin-top:20px"><span>Ton prénom</span>'+
@@ -832,7 +832,7 @@ function viewAcces(){
       '<button class="btn ghost" onclick="chargerAcces()">Réessayer</button></div>';
   if(!acces.lignes.length)
     return html + '<div class="empty">'+I.user+'<h3>Aucune demande</h3>'+
-      '<p>Personne n\'attend d\'accès à Cinéflix pour le moment.</p></div>';
+      '<p>Personne n\'attend d\'accès à Premier Rang pour le moment.</p></div>';
 
   html += '<div class="list">'+acces.lignes.map(l =>
     '<div class="lrow">'+
@@ -848,7 +848,7 @@ function viewAcces(){
 
   return html + '<div class="wrap tiny muted center" style="padding-bottom:26px">'+
     'Tant que tu n\'as pas ouvert l\'accès, ces personnes ne voient rien de '+
-    'Cinéflix — le catalogue leur est fermé côté serveur.</div>';
+    'Premier Rang — le catalogue leur est fermé côté serveur.</div>';
 }
 
 /* ============================ Écran : la file (admin) ============================ */
@@ -986,7 +986,7 @@ function ligneFile(g){
   const dispo = surCineflix(g.type, g.tmdb_id);
   const cls = dispo ? 'dispo' : g.statut === 'refuse' ? 'refuse'
             : g.statut === 'encours' ? 'encours' : 'demande';
-  const lib = dispo ? 'Sur Cinéflix' : LIB_FILE[g.statut] || 'En attente';
+  const lib = dispo ? 'Sur Premier Rang' : LIB_FILE[g.statut] || 'En attente';
   /* Les têtes côte à côte : on voit d'un coup d'œil qu'un titre est réclamé
      par plusieurs — c'est une information, pas une répétition. */
   const tetes = g.qui.slice(0,4).map(q => avatarHtml(q.avatar, 'mini', q.pseudo)).join('');
