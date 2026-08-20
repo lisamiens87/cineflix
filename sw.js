@@ -1,11 +1,11 @@
 /* Service worker — démarrage instantané et fonctionnement hors-ligne.
    Réseau d'abord sur les fichiers de l'app (pour recevoir les mises à jour),
    repli sur le cache quand le réseau manque. Les appels TMDB ne sont jamais
-   mis en cache, et le catalogue Cinéflix non plus : une liste périmée
+   mis en cache, et le catalogue Premier Rang non plus : une liste périmée
    afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
 
    VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
-const BUILD = '3008p';
+const BUILD = '3008q';
 const CACHE = 'cineflix-' + BUILD;
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
                './app-base.css', './app-mobile.css', './app-site.css', './config.js', './suggestions-n4.json', './app-01-noyau.js', './app-02-outils.js',
@@ -66,7 +66,7 @@ self.addEventListener('message', e => { if(e.data === 'skipWaiting') self.skipWa
 self.addEventListener('push', e => {
   let d = {};
   try{ d = e.data ? e.data.json() : {}; }catch(err){}
-  e.waitUntil(self.registration.showNotification(d.titre || 'Cinéflix', {
+  e.waitUntil(self.registration.showNotification(d.titre || 'Premier Rang', {
     body: d.corps || '',
     /* La jaquette du titre en vignette quand le NAS la fournit,
        l'icône de l'app sinon. */
