@@ -75,6 +75,30 @@ body.accueil .app{padding-bottom:24px}
 .pas s{display:block;text-decoration:none;color:var(--muted);font-size:12.5px;
   line-height:1.4;margin-top:2px}
 
+/* ---- L'écran de citation (3008w) ----
+   Il couvre tout, y compris la barre du bas : c'est un rideau, pas un
+   bandeau. Le fondu est court des deux côtés — assez pour que ce ne soit
+   pas un clignotement, assez peu pour qu'on n'attende jamais. */
+.citec{position:fixed;inset:0;z-index:200;background:#0b0b0f;display:flex;
+  flex-direction:column;justify-content:center;padding:34px 30px;
+  opacity:0;transition:opacity .38s ease}
+.citec.on{opacity:1}
+.citmot{position:absolute;top:calc(64px + var(--safe-t));left:0;right:0;text-align:center;
+  font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-weight:700;
+  text-transform:uppercase;letter-spacing:.09em;color:#f1e6d2;font-size:16px;
+  padding-bottom:7px}
+.citmot:after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:0;
+  height:2px;width:48px;background:#c9a227;border-radius:2px}
+.cittxt{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:25px;
+  line-height:1.42;color:#f1e6d2;font-weight:400}
+.citg{color:#c9a227}
+.citsrc{margin-top:20px;font-size:12px;letter-spacing:.07em;text-transform:uppercase;
+  font-weight:750;color:var(--muted)}
+.citsrc i{font-style:normal;color:#c9a227}
+.citbas{position:absolute;left:0;right:0;bottom:calc(34px + var(--safe-b));text-align:center;
+  font-size:11px;color:#5a5a66}
+@media (max-width:359px){ .cittxt{font-size:22px} }
+
 .puces{display:flex;gap:7px;justify-content:center;margin-top:auto;padding-top:28px}
 .puces i{width:7px;height:7px;border-radius:50%;background:var(--line);transition:background .2s,width .2s}
 .puces i.on{background:var(--accent);width:20px;border-radius:4px}
