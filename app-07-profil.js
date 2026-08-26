@@ -367,6 +367,10 @@ async function boot(){
   }
   document.body.classList.remove('booting');
   render();
+  /* La citation, juste après le voile de démarrage : l'écran noir se pose
+     entre le logo et l'accueil, exactement là où Alexandre la voulait. Elle
+     ne s'affiche que si l'app a dormi au moins une heure (3008w). */
+  if(typeof citationSiRepos === 'function') citationSiRepos();
   /* La recherche du serveur ne bloque pas l'affichage : elle ne sert qu'au
      bouton « Regarder », qui n'apparaît que sur une fiche. */
   choisirJellyfin();
