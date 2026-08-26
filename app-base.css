@@ -89,6 +89,7 @@ body.accueil .app{padding-bottom:24px}
   padding-bottom:7px}
 .citmot:after{content:'';position:absolute;left:50%;transform:translateX(-50%);bottom:0;
   height:2px;width:48px;background:#c9a227;border-radius:2px}
+.citin{text-align:center}
 .cittxt{font-family:'Playfair Display',Georgia,'Times New Roman',serif;font-size:25px;
   line-height:1.42;color:#f1e6d2;font-weight:400}
 .citg{color:#c9a227}
