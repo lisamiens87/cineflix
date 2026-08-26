@@ -167,7 +167,13 @@ async function chargerSuggestions(){
     s.loading = false; s.charge = false;
     s.err = 'Impossible de charger les suggestions';
   }
-  if(view === 'liste') render();
+  /* Le rendu de fin. Cette ligne testait `view === 'liste'` : l'écran vivait
+     sous Ma liste jusqu'en 3008p, il est passé sous Cinéma (vue `sorties`)
+     et le test est resté en arrière. Résultat : la liste arrivait bien, mais
+     rien ne la dessinait et le voile « Lecture des suggestions… » ne se
+     levait jamais. Panne signalée par Alexandre le 26/08.
+     On redessine dès que l'écran affiché est l'un de ceux qui la montrent. */
+  if(view === 'sorties' || view === 'liste') render();
 }
 
 function suggVisibles(){
