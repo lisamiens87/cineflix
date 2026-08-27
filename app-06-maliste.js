@@ -240,8 +240,12 @@ function corpsSuggestions(){
     r.films.push(f);
   });
 
+  /* Le texte ne porte plus de date : il en portait une (« du 18/08 »), écrite
+     en dur, qui est devenue fausse à la fournée suivante. Ce qui compte tient
+     dans la phrase, pas dans le jour du scan. */
   let html = '<div class="wrap sgintro">'+vis.length+' idées pour la vidéothèque, '+
-    'd\'après l\'analyse du N4 du 18/08. Un film acquis disparaît au scan suivant.</div>';
+    'd\'après l\'analyse de ta bibliothèque N4. Un film acquis disparaît au scan '+
+    'suivant.</div>';
   rayons.forEach(r=>{
     html += '<div class="sgrt"><span>'+(EMO_CAT[r.cat] ? EMO_CAT[r.cat]+' ' : '')+
       esc(r.sous)+'</span><i>'+esc(r.cat)+'</i></div>'+
