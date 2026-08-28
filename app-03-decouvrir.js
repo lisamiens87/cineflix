@@ -255,8 +255,16 @@ function discParams(){
               page:String(ui.presence === 'soir' ? (d.pageT || 1) : d.page) };
   /* Vue « Ce soir », côté plateformes : TMDB filtre lui-même sur les
      abonnements du profil, en France. La bibliothèque arrive par l'autre
-     versant de chargerSoir. */
-  if(ui.presence === 'soir'){
+     versant de chargerSoir.
+
+     3008z — ZÉRO abonnement veut dire ZÉRO. On envoyait jusqu'ici
+     `with_watch_providers=` VIDE, en croyant filtrer sur rien : TMDB ignore
+     un paramètre vide et répond « tout ce qui est en illimité en France »,
+     soit 13 110 films (mesuré sur le compte d'Alexandre le 28/08). La
+     Cinémathèque se remplissait donc exactement des plateformes qu'on venait
+     de décocher. Sans plateforme, on n'envoie plus ces paramètres — et
+     chargerSoir n'appelle plus TMDB du tout. */
+  if(ui.presence === 'soir' && platsFilms().length){
     p.watch_region = db.region || 'FR';
     p.with_watch_providers = platsFilms().join('|');
     p.with_watch_monetization_types = 'flatrate';
@@ -457,7 +465,11 @@ async function chargerLocale(suite){
 async function chargerSoir(suite){
   const d = ui.disc, type = d.type;
   const seq = ++discSeq;
-  const MOITIE = Math.floor(CIBLE_GRILLE / 2);
+  /* Sans aucune plateforme cochée, la grille ne se remplit que de la
+     bibliothèque : elle en prend la pleine part, pas la moitié réservée au
+     partage avec les plateformes. */
+  const platsSoir = platsFilms();
+  const MOITIE = platsSoir.length ? Math.floor(CIBLE_GRILLE / 2) : CIBLE_GRILLE;
   if(!suite){
     d.page = 0; d.pageT = 0; d.pagesT = 1; d.res = []; d.pages = 1;
     d.locale = catalogueFiltre();
@@ -479,7 +491,10 @@ async function chargerSoir(suite){
     /* Versant plateformes. Les titres déjà chez soi en sont retirés : ils
        arrivent par le versant bibliothèque, avec de meilleures données. */
     const plat = [];
-    if(d.pageT === 0 || d.pageT < d.pagesT){
+    /* Aucun abonnement : aucun versant plateformes. `pagesT = 0` coupe aussi
+       le « voir plus » de ce côté-là. */
+    if(!platsSoir.length){ d.pageT = 0; d.pagesT = 0; }
+    else if(d.pageT === 0 || d.pageT < d.pagesT){
       let tours = 0;
       do{
         d.pageT += 1;
