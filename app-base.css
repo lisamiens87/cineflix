@@ -579,9 +579,18 @@ body.vue-compacte .grid.rangee .gcard{width:92px;flex:0 0 92px}
 .acc.large{max-width:520px}
 .avgrid{display:flex;flex-wrap:wrap;justify-content:center;gap:20px 26px;margin-top:26px}
 .avcase{width:96px;text-align:center}
-.avbtn{position:relative;background:none;border:0;padding:0;cursor:pointer;
-  transition:transform .15s}
-.avbtn:active{transform:scale(.94)}
+/* Les têtes de l'écran d'accueil. Elles s'appelaient `.avbtn` comme le
+   bouton d'avatar des en-têtes : même nom, deux composants, et la règle
+   `.avbtn{display:none}` posée plus bas pour le bureau (2907z) éteignait
+   AUSSI celles-ci. Sur grand écran, l'écran « Qui regarde ce soir ? »
+   n'affichait donc plus que des noms sans visages, et rien n'était
+   cliquable. Invisible pendant un mois parce qu'on ne voit cet écran, sur le
+   bureau, que déconnecté. Corrigé en 3108e par un nom qui n'appartient qu'à
+   lui. Au passage, `.avbtn .av{width:32px}` rapetissait les avatars de
+   l'accueil même sur téléphone : ils retrouvent leurs 88 px. */
+.avchoix{display:block;position:relative;background:none;border:0;padding:0;
+  cursor:pointer;transition:transform .15s}
+.avchoix:active{transform:scale(.94)}
 .avnom{margin-top:8px;font-size:14px;font-weight:600;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .avx{position:absolute;right:-2px;top:-2px;width:26px;height:26px;border-radius:50%;
