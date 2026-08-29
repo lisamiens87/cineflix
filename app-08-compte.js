@@ -514,6 +514,7 @@ async function apresConnexion(){
   await Promise.all([ catalogueDepuisSupabase().catch(e=>{ CAT.erreur = e.message; }),
                       chargerElements().catch(()=>{}),
                       chargerGouts().catch(()=>{}),
+                      chargerEcartes().catch(()=>{}),
                       verifierAdmin() ]);
   await pousserEnAttente();
   choisirJellyfin();
@@ -823,6 +824,7 @@ async function supprimerMembre(uid, qui){
        le reste s'en va en cascade. */
     try{ await sbFetch('/rest/v1/gouts?user_id=eq.'+encodeURIComponent(uid), {method:'DELETE'}); }catch(e){}
     try{ await sbFetch('/rest/v1/elements?user_id=eq.'+encodeURIComponent(uid), {method:'DELETE'}); }catch(e){}
+    try{ await sbFetch('/rest/v1/ecartes?user_id=eq.'+encodeURIComponent(uid), {method:'DELETE'}); }catch(e){}
     const r = await sbFetch('/rest/v1/profils?user_id=eq.'+encodeURIComponent(uid),
       {method:'DELETE', headers:{ Prefer:'return=representation' }});
     /* Une politique RLS manquante ne lève pas d'erreur : PostgREST répond 200
