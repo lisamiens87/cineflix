@@ -156,6 +156,22 @@ function actionsFiche(o, type){
     '" onclick="basculerFavori('+ref+',\''+type+'\');render()" aria-label="Favori">'+
     (fav ? I.coeurPlein : I.coeur)+'</button>';
 
+  /* La croix de la fiche (3009a). Alexandre : « il faut proposer la même
+     chose quand on veut en savoir plus sur le film : je lis le synopsis,
+     j'aime pas, donc croix ou cœur ».
+
+     Elle ne s'affiche QUE si le titre fait partie des suggestions du moment :
+     sur un film du catalogue ou une sortie cinéma, « écarter » ne voudrait
+     rien dire. Et elle porte le MÊME style en ligne que le cœur, sinon
+     `.actions .btn{flex:1}` (app-base.css) l'étire à toute la largeur —
+     c'est ce qui est arrivé sur la première maquette. */
+  const ecartable = type === 'movie' &&
+    typeof estUneSuggestion === 'function' && estUneSuggestion(o.id);
+  const croix = ecartable
+    ? '<button class="btn ghost" style="flex:0 0 54px;color:#ff6b6b" '+
+      'onclick="ecarter('+o.id+');goBack()" aria-label="Pas celui-là">'+I.close+'</button>'
+    : '';
+
   /* Le posséder passe avant tout : inutile d'envoyer vers Netflix un film
      qui est déjà chez soi, en meilleure qualité et sans abonnement. */
   const toutes = st === 'obtenu' ? [] : platsDuTitre(o);
@@ -190,7 +206,7 @@ function actionsFiche(o, type){
           'Demande refusée</button>'
         : '<button class="btn ghost block" onclick="demander('+ref+',\''+type+'\');render()">'+
           I.envoi+' Le demander aussi sur Premier Rang</button>';
-    return '<div class="actions plats">'+boutons+coeur+'</div>'+
+    return '<div class="actions plats">'+boutons+coeur+croix+'</div>'+
            '<div class="wrap" style="padding:10px 16px 0">'+second+'</div>';
   }
 
@@ -220,7 +236,7 @@ function actionsFiche(o, type){
       ailleurs.map(pf => '<button class="lienplat enligne" onclick="ouvrirPlateforme('+
         pf.id+')">'+esc(pf.nom)+'</button>').join(', ')+'.</div>'
     : '';
-  return '<div class="actions">'+principal+coeur+'</div>'+note;
+  return '<div class="actions">'+principal+coeur+croix+'</div>'+note;
 }
 
 /* Le bouton « Demander » a besoin de l'objet complet pour retenir titre et
