@@ -439,6 +439,35 @@ nav{position:fixed;bottom:0;left:0;right:0;z-index:40;background:rgba(15,17,21,.
   border-radius:8px;background:var(--accent);color:#fff;font-size:10px;font-weight:750;
   display:grid;place-items:center;padding:0 4px}
 
+/* ---------- L'affiche en grand (3108c) ----------
+   La visionneuse d'affiche : plein écran, fond noir, pincement écrit à la
+   main (voir app-13-affiche.js). `touch-action:none` est indispensable —
+   sans lui, le navigateur s'empare des deux doigts avant nous. */
+.affv{position:fixed;inset:0;z-index:120;touch-action:none;overflow:hidden;
+  display:flex;align-items:center;justify-content:center}
+.afffond{position:absolute;inset:0;background:#000}
+.affimg{position:relative;max-width:calc(100vw - 32px);max-height:calc(100vh - 32px);
+  object-fit:contain;will-change:transform;transform-origin:center center;
+  -webkit-user-drag:none;user-select:none;border-radius:4px;
+  box-shadow:0 24px 60px rgba(0,0,0,.7)}
+.affbar{position:absolute;top:0;left:0;right:0;z-index:3;display:flex;
+  align-items:center;gap:12px;padding:calc(10px + var(--safe-t)) 14px 26px;
+  background:linear-gradient(to bottom,rgba(0,0,0,.8),transparent);
+  transition:opacity .2s}
+.affbar.discret{opacity:0}
+.affx{width:38px;height:38px;flex:0 0 38px;border-radius:50%;border:0;cursor:pointer;
+  background:rgba(255,255,255,.15);color:#fff;font-size:18px;line-height:1;
+  display:flex;align-items:center;justify-content:center}
+.affnom{color:rgba(255,255,255,.78);font-size:13.5px;font-weight:600;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Pendant qu'une affiche est ouverte, la fiche ne défile plus derrière. */
+body.affon{overflow:hidden}
+/* La jaquette de la fiche s'ouvre au toucher. Aucun indice visuel : « pas de
+   loupe, c'est instinctif » (Alexandre, 29/08). La classe n'est posée que là
+   où le geste existe — les affiches de saison et les photos d'acteurs
+   gardent le curseur ordinaire. */
+.poster.ouvrable{cursor:zoom-in}
+
 /* ---------- Divers ---------- */
 .toast{position:fixed;left:50%;transform:translateX(-50%);width:max-content;
   bottom:calc(84px + var(--safe-b));background:var(--surface2);border:1px solid var(--line);
