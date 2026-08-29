@@ -80,7 +80,7 @@ code (`outils-nas/`) et un dossier de configuration CI (`.github/`).
 ├── app-site.css               grand écran (min-width), chargé en dernier
 ├── app.css                    vestige : ne contient plus qu'une note de découpage
 │
-├── cineflix.json              catalogue d'exemple (identifiants TMDB)
+├── cineflix.json              catalogue d'exemple (identifiants TMDB + fiches)
 ├── suggestions-n4.json        suggestions éditoriales (~140 Ko, servi avec l'app)
 ├── suggestions-historique.json  identifiants déjà proposés, pour ne pas se répéter
 │
