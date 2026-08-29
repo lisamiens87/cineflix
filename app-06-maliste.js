@@ -176,11 +176,38 @@ async function chargerSuggestions(){
   if(view === 'sorties' || view === 'liste') render();
 }
 
+/* ---------- Les films écartés ----------
+   Demande d'Alexandre le 29/08 : « il y a des films qui ne m'intéressent pas,
+   tout du moins pour le moment ; rajoute une croix, mais on peut les
+   reproposer dans six mois ». D'où une DATE et pas un simple drapeau : c'est
+   elle qui fait revenir le film toute seule, sans que personne y pense.
+
+   Le serveur fait foi (table `ecartes`), parce qu'écarter un film sur le
+   téléphone et le revoir sur le bureau n'aurait aucun sens. Le cache local
+   sert d'écho immédiat : le geste se voit avant l'aller-retour réseau. */
+const ECART_DUREE = 183 * 24 * 3600 * 1000;   /* six mois */
+
+const ecarteJusqua = ts => ts + ECART_DUREE;
+const encoreEcarte = ts => (Date.now() - ts) < ECART_DUREE;
+
+/* Le jour où le PREMIER film écarté revient — c'est celui-là qu'on annonce,
+   pas le dernier : c'est la prochaine date qui intéresse. */
+function prochainRetour(){
+  const t = Object.values(db.ecartes||{}).filter(encoreEcarte);
+  if(!t.length) return null;
+  return new Date(ecarteJusqua(Math.min.apply(null, t)));
+}
+const enFrancais = d => d.toLocaleDateString('fr-FR',
+  {day:'numeric', month:'long', year:'numeric'});
+
 function suggVisibles(){
   const acquis = db.acquis || [];
+  const ec = db.ecartes || {};
   return (ui.sugg.l||[]).filter(f =>
-    !surCineflix('movie', f.id) && acquis.indexOf(f.id) < 0);
+    !surCineflix('movie', f.id) && acquis.indexOf(f.id) < 0 &&
+    !(ec[f.id] && encoreEcarte(ec[f.id])));
 }
+const estUneSuggestion = id => !!(ui.sugg.l||[]).find(x => Number(x.id) === Number(id));
 
 /* L'émoji de chaque catégorie — ceux de la maquette validée. */
 const EMO_CAT = { 'Crime & Mafia':'🕴️', 'Action':'💥', 'Comédie':'🎭',
@@ -188,16 +215,89 @@ const EMO_CAT = { 'Crime & Mafia':'🕴️', 'Action':'💥', 'Comédie':'🎭',
   'Drame & Biopic':'🏆', 'Animation':'🎨', 'Américains années 90':'📼',
   'Comédies françaises':'🇫🇷' };
 
-function marquerAcquis(id){
-  db.acquis = db.acquis || [];
-  if(db.acquis.indexOf(id) < 0) db.acquis.push(id);
-  saveDB(); render();
-  toast('Marqué acquis — retiré des suggestions');
-}
+/* Le bouton ✓ « Acquis » a disparu en 3009a. Alexandre : « suggestion =
+   films que je n'ai pas, donc le coche ne doit pas exister, c'est cœur ou
+   croix ». Il avait raison : le jour où il achète le film, le scan du NAS
+   le fait sortir tout seul. `retablirAcquis` reste pour défaire les
+   marquages faits avant, sinon ils resteraient masqués pour toujours. */
 function retablirAcquis(){
   db.acquis = [];
   saveDB(); render();
-  toast('Suggestions rétablies');
+  toast('Films acquis rétablis');
+}
+
+/* Écarter, annuler, tout rétablir. Chaque geste écrit d'abord en local pour
+   que l'écran réponde tout de suite, puis pousse vers le serveur. */
+function ecarter(id){
+  id = Number(id);
+  db.ecartes = db.ecartes || {};
+  db.ecartes[id] = Date.now();
+  saveDB(); render();
+  pousserEcart(id).catch(()=>{});
+  bandeauAnnuler(id);
+}
+function annulerEcart(id){
+  id = Number(id);
+  if(db.ecartes) delete db.ecartes[id];
+  saveDB(); fermerBandeau(); render();
+  retirerEcart(id).catch(()=>{});
+}
+function retablirEcartes(){
+  const n = Object.keys(db.ecartes||{}).length;
+  db.ecartes = {};
+  saveDB(); render();
+  viderEcarts().catch(()=>{});
+  toast(n ? n+' film'+(n>1?'s':'')+' rétabli'+(n>1?'s':'') : 'Rien à rétablir');
+}
+
+/* Le garde-fou. Une croix touchée au pouce dans une rangée qui défile, ça
+   arrive ; sans ce bandeau le film disparaîtrait pour six mois sans recours. */
+let bandeauMinuteur = null;
+function fermerBandeau(){
+  const el = document.getElementById('ecartbar');
+  if(el) el.remove();
+  if(bandeauMinuteur){ clearTimeout(bandeauMinuteur); bandeauMinuteur = null; }
+}
+function bandeauAnnuler(id){
+  fermerBandeau();
+  const f = (ui.sugg.l||[]).find(x => Number(x.id) === id);
+  const el = document.createElement('div');
+  el.id = 'ecartbar'; el.className = 'ecartbar';
+  el.innerHTML = '<span>' + esc((f && f.titre) || 'Film') +
+    ' écarté — revient dans six mois</span>' +
+    '<button onclick="annulerEcart(' + id + ')">Annuler</button>';
+  document.body.appendChild(el);
+  void el.offsetWidth;
+  el.classList.add('on');
+  bandeauMinuteur = setTimeout(fermerBandeau, 6000);
+}
+
+/* ---------- Le va-et-vient avec le serveur ---------- */
+async function chargerEcartes(){
+  if(!sbPret() || !connecte()) return;
+  const l = await sbFetch('/rest/v1/ecartes?select=tmdb_id,ecarte_le&user_id=eq.'+
+                          encodeURIComponent(db.auth.uid), {});
+  const neuf = {};
+  (l||[]).forEach(e => { neuf[e.tmdb_id] = Date.parse(e.ecarte_le) || Date.now(); });
+  db.ecartes = neuf;
+  saveDB();
+}
+async function pousserEcart(id){
+  if(!sbPret() || !connecte()) return;
+  await sbFetch('/rest/v1/ecartes', {method:'POST',
+    headers:{ Prefer:'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ user_id: db.auth.uid, tmdb_id: id,
+                           ecarte_le: new Date(db.ecartes[id]).toISOString() })});
+}
+async function retirerEcart(id){
+  if(!sbPret() || !connecte()) return;
+  await sbFetch('/rest/v1/ecartes?user_id=eq.'+encodeURIComponent(db.auth.uid)+
+                '&tmdb_id=eq.'+id, {method:'DELETE', headers:{ Prefer:'return=minimal' }});
+}
+async function viderEcarts(){
+  if(!sbPret() || !connecte()) return;
+  await sbFetch('/rest/v1/ecartes?user_id=eq.'+encodeURIComponent(db.auth.uid),
+                {method:'DELETE', headers:{ Prefer:'return=minimal' }});
 }
 
 /* Le cœur d'une suggestion fait exactement ce qu'il fait ailleurs : le film
@@ -222,11 +322,18 @@ function corpsSuggestions(){
 
   const vis = suggVisibles();
   const masquesAcquis = (db.acquis||[]).length;
-  const masquesCat = (s.l||[]).length - vis.length - masquesAcquis;
+  const ecartes = Object.values(db.ecartes||{}).filter(encoreEcarte).length;
+  const masquesCat = (s.l||[]).length - vis.length - masquesAcquis - ecartes;
+  const retour = prochainRetour();
 
+  /* Un écran vide sans explication laisse croire à une panne. On dit
+     pourquoi il n'y a rien, et quand ça revient. */
   if(!vis.length)
     return '<div class="empty">'+I.check+'<h3>Plus rien à suggérer</h3>'+
-      '<p>Tout est acquis ou déjà sur Premier Rang. Beau travail.</p>'+
+      '<p>Tout est déjà sur Premier Rang, ou écarté pour le moment.'+
+      (retour ? '<br>Les films écartés reviendront à partir du '+esc(enFrancais(retour))+'.' : '')+
+      '</p>'+
+      (ecartes ? '<button class="btn ghost" onclick="retablirEcartes()">Rétablir les films écartés</button>' : '')+
       (masquesAcquis ? '<button class="btn ghost" onclick="retablirAcquis()">Rétablir les films marqués acquis</button>' : '')+
       '</div>';
 
@@ -252,11 +359,19 @@ function corpsSuggestions(){
       '<div class="sgrow">'+r.films.map(carteSugg).join('')+'</div>';
   });
 
+  /* Deux lignes distinctes en bas d'écran, parce que ce sont deux choses
+     différentes : ce qui est masqué pour toujours (le film est chez toi) et
+     ce qui est écarté pour six mois (le film ne te disait rien ce jour-là). */
   const nMasques = masquesAcquis + Math.max(0, masquesCat);
   if(nMasques)
     html += '<div class="credit">'+nMasques+' film'+(nMasques>1?'s':'')+' masqué'+(nMasques>1?'s':'')+
       ' (acquis ou déjà sur Premier Rang)'+
       (masquesAcquis ? ' · <a href="#" onclick="event.preventDefault();retablirAcquis()">rétablir les acquis</a>' : '')+
+      '</div>';
+  if(ecartes)
+    html += '<div class="credit">'+ecartes+' film'+(ecartes>1?'s':'')+' écarté'+(ecartes>1?'s':'')+
+      (retour ? ' · le premier revient le '+esc(enFrancais(retour)) : '')+
+      ' · <a href="#" onclick="event.preventDefault();retablirEcartes()">tout rétablir maintenant</a>'+
       '</div>';
   return html + '<div style="height:26px"></div>';
 }
@@ -266,10 +381,16 @@ function carteSugg(f){
   const fav = !!(it && it.fav);
   return '<div class="sgc" onclick="ouvrirFiche('+f.id+',\'movie\')">'+
     '<div class="wrapimg">'+posterEl(f.poster,'w342','',f.titre)+
-      '<div class="sgact">'+
-        '<button onclick="event.stopPropagation();marquerAcquis('+f.id+')" aria-label="Marquer acquis">✓</button>'+
-        '<button class="'+(fav?'on':'')+'" onclick="event.stopPropagation();coeurSugg('+f.id+')" aria-label="Favori">'+
+      /* Cœur à GAUCHE, croix à DROITE, aux deux bords de l'affiche : le
+         geste positif d'un côté, le négatif de l'autre, cent six pixels
+         entre les deux. Collés, on écarte au pouce un film qu'on voulait
+         aimer — c'est la raison d'être de cet écartement. */
+      '<div class="sgact sgg">'+
+        '<button class="'+(fav?'on':'')+'" onclick="event.stopPropagation();coeurSugg('+f.id+')" aria-label="Je le veux">'+
           (fav ? '♥' : '♡')+'</button>'+
+      '</div>'+
+      '<div class="sgact">'+
+        '<button class="no" onclick="event.stopPropagation();ecarter('+f.id+')" aria-label="Pas celui-là">✕</button>'+
       '</div>'+
     '</div>'+
     '<div class="sgnom">'+esc(f.titre)+' <span class="sgy">'+esc(String(f.annee||''))+'</span></div>'+
