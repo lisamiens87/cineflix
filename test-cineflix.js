@@ -4,11 +4,23 @@ const { chromium } = require('playwright');
 const CAT_MOVIES = [550, 27205, 155, 603, 680];   // extrait du cineflix.json livré
 const dansCat = id => CAT_MOVIES.includes(id);
 
+/* La sortie Blu-ray doit rester À VENIR : elle était écrite en dur (2026-08-12)
+   et le test se périmait tout seul le jour venu — « date future en couleur
+   d'accent » devenait faux sans que rien n'ait bougé dans l'app. */
+const dansNJours = n => new Date(Date.now() + n*86400000).toISOString();
+
+/* Un titre absent du serveur ET d'aucune plateforme : c'est le seul cas où
+   « Demander » est vraiment la bonne proposition (3007d). */
+const SANS_PLAT = [999001];
+
 function film(id, titre){
   return { id, title: titre, name: titre, poster_path:'/p'+id+'.jpg',
            backdrop_path:'/b'+id+'.jpg', release_date:'2024-03-0'+((id%9)+1),
            first_air_date:'2024-03-01', vote_average:7.5, vote_count:1200,
            overview:'Synopsis de '+titre, genres:[{id:28,name:'Action'}],
+           /* /discover rend des `genre_ids` ; sans eux un candidat venu des
+              plateformes arrive sans genre et traverse le filtre des goûts. */
+           genre_ids:[28],
            runtime:124, number_of_seasons:3, number_of_episodes:30, status:'Released' };
 }
 
@@ -18,6 +30,9 @@ let dernierTri = null;             // le sort_by du dernier /discover
 let derniereBorne = null;          // le primary_release_date.gte du dernier /discover
 let dernierRegion = null;          // le paramètre region du dernier /discover
 let dernierOrigine = null;         // le with_origin_country du dernier /discover
+let dernierWatchRegion = null;     // le watch_region du dernier /discover
+let dernierMonet = null;           // le with_watch_monetization_types du dernier /discover
+let nbDiscover = 0;                // combien de /discover ont été demandés en tout
 
 (async () => {
   const browser = await chromium.launch();
@@ -45,6 +60,9 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
       derniereBorne = u.searchParams.get('primary_release_date.gte');
       dernierRegion = u.searchParams.get('region');
       dernierOrigine = u.searchParams.get('with_origin_country');
+      dernierWatchRegion = u.searchParams.get('watch_region');
+      dernierMonet = u.searchParams.get('with_watch_monetization_types');
+      nbDiscover++;
       const page_ = Number(u.searchParams.get('page')||1);
       // 20 résultats par page ; seuls les 5 premiers ids de la page 1 sont au catalogue
       const res = [];
@@ -52,7 +70,14 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
         const id = page_ === 1 && i < 5 ? CAT_MOVIES[i] : 900000 + page_*100 + i;
         res.push(film(id, 'Titre '+id));
       }
-      body = { page:page_, total_pages:5, results:res };
+      /* TMDB filtre lui-même sur les genres demandés : tous les titres du banc
+         sont de l'action, une requête qui demande autre chose ne doit donc
+         rien rendre. Sans ça, le versant plateformes renvoyait des titres qui
+         ne correspondaient pas à l'envie, et les contrôles de goûts passaient
+         sur des candidats que le vrai TMDB n'aurait jamais rendus. */
+      const gDem = (u.searchParams.get('with_genres')||'').split(',').filter(Boolean);
+      const gardes = gDem.length && gDem.indexOf('28') < 0 ? [] : res;
+      body = { page:page_, total_pages: gardes.length ? 5 : 1, results:gardes };
     }
     else if(p.startsWith('/search/person'))
       body = { results:[{ id:777, name:'Sean Connery', profile_path:'/sc.jpg',
@@ -62,7 +87,7 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
       body = { results:[{ iso_3166_1:'FR', release_dates:[
         { type:3, release_date:'2024-03-06T00:00:00.000Z' },
         { type:4, release_date:'2024-05-14T00:00:00.000Z' },
-        { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
+        { type:5, release_date: dansNJours(180) } ]}] };
     }
     else if(/\/tv\/\d+\/season\/\d+$/.test(p)){
       const n = Number(p.split('/').pop());
@@ -101,9 +126,10 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
                     crew:[{id:888, name:'R. Réalisateur', job:'Director', profile_path:''}] };
       d.release_dates = { results:[{ iso_3166_1:'FR', release_dates:[
         { type:3, release_date:'2024-03-06T00:00:00.000Z' },
-        { type:5, release_date:'2026-08-12T00:00:00.000Z' } ]}] };
-      d['watch/providers'] = { results:{ FR:{ link:'https://x',
-        flatrate:[{provider_id:8, provider_name:'Netflix', logo_path:'/n.jpg'}] } } };
+        { type:5, release_date: dansNJours(180) } ]}] };
+      d['watch/providers'] = SANS_PLAT.includes(id) ? { results:{} }
+        : { results:{ FR:{ link:'https://x',
+            flatrate:[{provider_id:8, provider_name:'Netflix', logo_path:'/n.jpg'}] } } };
       /* Une saison sans épisode et des « Spéciaux » en tête : l'app doit
          écarter la première et renvoyer les seconds à la fin. */
       d.seasons = [
@@ -131,6 +157,12 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.route('**://image.tmdb.org/**', r => r.fulfill({status:200, contentType:'image/gif',
     body: Buffer.from('R0lGODlhAQABAAAAACw=','base64')}));
 
+  // les polices : servies vides, pour que la suite tourne aussi hors ligne
+  await page.route('**://fonts.googleapis.com/**', r =>
+    r.fulfill({status:200, contentType:'text/css', body:''}));
+  await page.route('**://fonts.gstatic.com/**', r =>
+    r.fulfill({status:200, contentType:'font/woff2', body:''}));
+
   // le lecteur YouTube : simulé, pour que la suite reste hermétique au réseau
   await page.route('**://www.youtube-nocookie.com/**', r => r.fulfill({status:200,
     contentType:'text/html', body:'<!doctype html><title>bande-annonce</title>'}));
@@ -150,59 +182,147 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
 
   const url = 'http://localhost:8123/index.html';
   await page.goto(url);
-  await page.waitForSelector('.gcard', {timeout:8000});
 
   const ok = (nom, cond) => { if(!cond) echecs.push('ÉCHEC — '+nom); else console.log('  ok  '+nom); };
 
-  // 1. Grille et onglets
-  ok('4 onglets de navigation', await page.locator('nav .tab').count() === 4);
+  // 1. La couverture, puis le catalogue
+  /* Découvrir s'ouvre désormais sur la COUVERTURE — le grand visuel, la
+     vitrine, le Top — et la grille vit derrière les pilules Films et Séries
+     (`ouvrirCatalogue`, app-02-outils.js). Cette suite attendait `.gcard` dès
+     le chargement : elle mourait là, et tout ce qui suit devenait
+     inatteignable. Elle passe donc la porte, comme une vraie personne. */
+
+  /* L'annonce au démarrage a été RETIRÉE le 01/08 : son drapeau `notifie` est
+     local alors que db.items est resynchronisé depuis Supabase, donc le
+     bandeau revenait à CHAQUE démarrage (« Chasse gardée », signalé par
+     Alexandre — app-01-noyau.js). La bonne nouvelle passe désormais par
+     l'onglet « Arrivés » de Ma liste. On vérifie donc la bascule elle-même —
+     « c'est le catalogue qui fait foi, jamais un clic » — et l'écran qui la
+     montre est vérifié plus bas, section 5. */
+  await page.waitForFunction(() => typeof lots === 'function' && CAT.charge,
+                             null, {timeout:15000});
+  ok('une demande dont le titre est au catalogue bascule en « arrivée »',
+     await page.evaluate(() => lots().arrives.some(it => it.id === 550) &&
+                               !lots().demandes.some(it => it.id === 550)));
+
+  await page.waitForSelector('.vsl', {timeout:20000});
+  ok('l\'accueil est une couverture, pas une grille',
+     await page.locator('.gcard').count() === 0 &&
+     await page.locator('.vsl').count() === 5 &&
+     /top de ta biblioth/i.test(await page.locator('#app').innerText()));
+
+  /* Sept onglets dans le DOM, jamais les mêmes à l'écran : `tel` et `dsk`
+     (app-02-outils.js) donnent Guide-moi au téléphone, et Films, Séries et
+     Profil au bureau. Compter les nœuds revenait à tester le DOM ; ce sont
+     les onglets VISIBLES qui font la navigation. */
+  const ongletsVus = async () =>
+    (await page.locator('nav .tab:visible').allInnerTexts()).join(' | ').replace(/\s+/g,' ');
+  ok('quatre onglets sur le téléphone, dont Guide-moi',
+     await page.locator('nav .tab:visible').count() === 4 &&
+     (await ongletsVus()).includes('Guide-moi'));
+  await page.setViewportSize({width:1280, height:900});
+  await page.waitForTimeout(500);
+  const dsk = await ongletsVus();
+  ok('le bureau échange Guide-moi contre Films, Séries et Profil',
+     await page.locator('nav .tab:visible').count() === 6 &&
+     dsk.includes('Films') && dsk.includes('Séries') && dsk.includes('Profil') &&
+     !dsk.includes('Guide-moi'));
+  await page.setViewportSize({width:390, height:844});
+  await page.waitForTimeout(500);
+
+  await page.click('.pilules .pil:has-text("Films")');
+  await page.waitForSelector('.gcard', {timeout:15000});
   ok('grille remplie', await page.locator('.gcard').count() >= 20);
   ok('le tri par défaut est la date de sortie',
      dernierTri === 'primary_release_date.desc');
-  ok('une demande arrivée est annoncée au démarrage',
-     (await page.locator('.toast').textContent()).includes('disponible') &&
-     await page.evaluate(() => db.items['movie:550'].notifie === 1));
   ok('pastille « Cinéflix » sur les titres du catalogue',
      await page.locator('.tag.dispo').count() === 5);
 
-  // 2. Les trois sources — le geste central
-  ok('trois puces : Cinéma / Plateformes / Cinéflix',
-     await page.locator('.souschips .chip').count() === 3 &&
-     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Cinéma' &&
-     await page.locator('.souschips .chip:has-text("Plateformes")').count() === 1);
-
-  await page.click('.souschips .chip:has-text("Plateformes")');
-  await page.waitForTimeout(900);
-  ok('« Plateformes » interroge TMDB avec les fournisseurs français',
-     dernierFournisseurs === '8|119|337|381');
-  ok('« Plateformes » remplit la grille', await page.locator('.gcard').count() >= 20);
-
-  // 2 a. Couleurs et libellés des puces
-  ok('plus de point vert — des contours colorés à la place',
-     await page.locator('.souschips .pt').count() === 0 &&
-     await page.locator('.souschips .chip.c-flix').count() === 1 &&
-     await page.locator('.souschips .chip.c-plats').count() === 1 &&
+  // 2. Les deux volets — le geste central
+  /* Les trois sources (Cinéma / Plateformes / Cinéflix) sont devenues deux
+     volets, « Cinémathèque » et « Tout », portés par l'interrupteur
+     `.presdeux` : « à deux choix exclusifs, la forme doit dire l'un OU
+     l'autre » (PRESENCES, app-03-decouvrir.js). */
+  ok('deux volets : Cinémathèque et Tout',
+     await page.locator('.presdeux button').count() === 2 &&
+     (await page.locator('.presdeux button').allInnerTexts()).join('|') ===
+       'Cinémathèque|Tout');
+  ok('« Tout » est le volet ouvert par défaut',
+     (await page.locator('.presdeux button.on').innerText()).trim() === 'Tout');
+  ok('chaque type garde sa couleur',
      await page.locator('.chips.types .chip.c-films').count() === 1 &&
      await page.locator('.chips.types .chip.c-series').count() === 1);
-  await page.click('.chips.types .chip:has-text("Séries")');
-  await page.waitForTimeout(700);
-  ok('en mode séries, la puce du bas dit « Séries » (plus « Cinéma »)',
-     (await page.locator('.souschips .chip').first().innerText()).trim() === 'Séries');
-  await page.click('.chips.types .chip:has-text("Films")');
-  await page.waitForTimeout(900);
 
-  // 2 b. Fiche ouverte depuis Plateformes : boutons des plateformes
-  await page.locator('.gcard:not(:has(.tag.dispo))').first().click();
+  // 2 a. Les plateformes viennent du PROFIL, plus de la navigation
+  /* 3008h et 3008z : le filtrage par fournisseur n'est plus un mode de
+     navigation. Il s'applique sur « Cinémathèque », à partir des abonnements
+     déclarés dans Mes goûts — et zéro abonnement veut dire zéro, sans quoi
+     TMDB répond « tout ce qui est en illimité en France ». */
+  const auVolet = async lab => {
+    await page.click('.presdeux button:has-text("'+lab+'")');
+    await page.waitForTimeout(1000);
+  };
+  await page.evaluate(() => { GOUTS.d = { aimes:[], fuis:[], totems:[],
+    plats:[8,119,337,381], platsDit:true }; GOUTS.charge = true; });
+  await auVolet('Cinémathèque');
+  ok('« Cinémathèque » interroge TMDB avec les abonnements du profil',
+     dernierFournisseurs === '8|119|337|381' &&
+     dernierWatchRegion === 'FR' && dernierMonet === 'flatrate');
+  ok('« Cinémathèque » remplit la grille',
+     await page.locator('.gcard').count() >= 20);
+
+  await auVolet('Tout');
+  await page.evaluate(() => { GOUTS.d = { aimes:[], fuis:[], totems:[],
+    plats:[], platsDit:true }; });
+  dernierFournisseurs = null;
+  const discAvant = nbDiscover;
+  await auVolet('Cinémathèque');
+  await page.waitForTimeout(600);
+  ok('zéro abonnement veut dire zéro : aucun /discover, aucun fournisseur',
+     dernierFournisseurs === null && nbDiscover === discAvant);
+  ok('sans abonnement, la grille se remplit de la seule bibliothèque',
+     await page.locator('.gcard').count() > 0 &&
+     await page.locator('.gcard:not(:has(.tag.dispo))').count() === 0);
+
+  // 2 b. Le bouton de la fiche suit le FILM, plus la porte d'entrée
+  /* Jusqu'en 3007d, « Netflix » ou « Demander sur Premier Rang » dépendait de
+     l'onglet ouvert en dernier : le même film changeait de bouton selon la
+     porte. Vérifié le 06/08 sur « The Debt Collector ». Ce test-ci ouvre donc
+     le MÊME titre par deux portes et attend le même bouton. */
+  await page.evaluate(() => { GOUTS.d = { aimes:[], fuis:[], totems:[],
+    plats:[8,119,337,381], platsDit:true }; });
+  await auVolet('Tout');
+  const absent = page.locator('.gcard:not(:has(.tag.dispo))').first();
+  const idAbsent = Number((((await absent.getAttribute('onclick'))||'')
+    .match(/ouvrirFiche\((\d+)/)||[])[1]);
+  ok('la grille propose un titre absent du serveur', idAbsent > 0);
+  await absent.click();
   await page.waitForSelector('.actions', {timeout:5000});
-  ok('les boutons des plateformes remplacent « Demander »',
+  /* La plateforme prend le bouton PRINCIPAL — mais la demande reste offerte
+     juste en dessous (« Le demander aussi sur Premier Rang », app-05-fiche.js).
+     Le contrôle d'origine disait « les plateformes remplacent Demander » et ne
+     passait que parce qu'il comparait « Demander » à un libellé mis en
+     capitales par la CSS : il était vrai pour une mauvaise raison. */
+  ok('un titre absent mais disponible en abonnement montre la plateforme',
      await page.locator('.btn.plat').count() === 1 &&
-     (await page.locator('.btn.plat').innerText()).includes('Netflix') &&
-     !(await page.locator('#app').innerText()).includes('Demander'));
+     /netflix/i.test(await page.locator('.btn.plat').innerText()) &&
+     /netflix/i.test(await page.locator('.actions .btn').first().innerText()));
+  ok('la demande reste offerte, en second',
+     /le demander aussi sur premier rang/i.test(
+       await page.locator('#app').innerText()));
   ok('le bouton porte le sigle et la couleur Netflix',
      await page.locator('.btn.plat.p-netflix').count() === 1 &&
      await page.locator('.btn.plat .plogo').count() === 1);
   ok('« Aussi en streaming » a disparu sur cette vue',
-     !(await page.locator('#app').innerText()).includes('Aussi en streaming'));
+     !/aussi en streaming/i.test(await page.locator('#app').innerText()));
+
+  await page.evaluate(() => go2Decouvrir());
+  await page.waitForSelector('.vsl', {timeout:10000});
+  await page.evaluate(id => ouvrirFiche(id, 'movie'), idAbsent);
+  await page.waitForSelector('.actions', {timeout:5000});
+  ok('le même titre montre le même bouton depuis la couverture',
+     await page.locator('.btn.plat.p-netflix').count() === 1 &&
+     /netflix/i.test(await page.locator('.actions .btn').first().innerText()));
 
   // 2 b'. La filmographie : réalisateur en tête, personnes cliquables
   ok('la réalisation apparaît avec le casting',
@@ -231,20 +351,54 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.waitForSelector('.actions', {timeout:5000});
   ok('le retour rouvre la fiche du titre',
      await page.locator('.btn.plat').count() === 1);
-  await page.click('header .iconbtn');                 // retour vers la grille
-  await page.waitForTimeout(700);
+  /* Revenir jusqu'à un REPÈRE plutôt que de compter les crans : depuis que la
+     couverture et le catalogue sont deux pages, le retour a un niveau de plus,
+     et un test de navigation ne devrait pas se casser à chaque niveau ajouté.
+     `#fbtn`, le bouton des filtres, ne vit que dans le catalogue. */
+  const auCatalogue = async (type) => {
+    for(let n = 0; n < 5 && !(await page.locator('#fbtn').count()); n++){
+      await page.evaluate(() => goBack());
+      await page.waitForTimeout(500);
+    }
+    if(!(await page.locator('#fbtn').count()) || type){
+      await page.evaluate(t => ouvrirCatalogue(t || 'movie'), type || null);
+      await page.waitForSelector('.gcard', {timeout:15000});
+    }
+  };
+  await auCatalogue();
 
-  // 2 c. Filtrer par plateforme
+  // 2 c. Les plateformes se cochent depuis les filtres, et le profil suit
+  /* Le panneau ne montre les plateformes que sur « Cinémathèque » : ailleurs,
+     filtrer par abonnement n'a pas de sens. Et une puce n'est plus une case à
+     cocher passagère — elle modifie le PROFIL (`bascPlateforme`), pour qu'on
+     puisse retirer une plateforme le jour où on s'en désabonne. Décocher est
+     donc le geste à vérifier, pas cocher. */
+  await auVolet('Cinémathèque');
   await page.click('#fbtn');
   await page.waitForTimeout(400);
   ok('le filtre par plateforme est proposé',
      await page.locator('.chip:text-is("Disney+")').count() === 1 &&
      await page.locator('.chip:text-is("Canal+")').count() === 1);
-  await page.click('.chip:text-is("Netflix")');
-  await page.waitForTimeout(900);
-  ok('cocher Netflix ne demande que Netflix à TMDB', dernierFournisseurs === '8');
-  await page.click('.chip:text-is("Netflix")');          // on décoche
-  await page.waitForTimeout(900);
+  await page.click('.chip:text-is("Disney+")');
+  await page.waitForTimeout(1000);
+  ok('décocher Disney+ le retire de la requête TMDB',
+     dernierFournisseurs === '8|119|381');
+  ok('et le retire du profil, pas seulement de l\'écran',
+     await page.evaluate(() => (GOUTS.d.plats||[]).indexOf(337) < 0 &&
+                               GOUTS.d.platsDit === true));
+  /* Retirée du profil, la plateforme quitte aussi la liste courte : on ne
+     garde sous les yeux que ses propres abonnements, et « + Ajouter » ouvre
+     le catalogue complet pour en reprendre une. */
+  ok('la plateforme retirée quitte la liste courte',
+     await page.locator('.chip:text-is("Disney+")').count() === 0 &&
+     await page.locator('.chip:text-is("+ Ajouter")').count() === 1);
+  await page.click('.chip:text-is("+ Ajouter")');
+  await page.waitForTimeout(400);
+  await page.click('.chip:text-is("Disney+")');          // on la reprend
+  await page.waitForTimeout(1000);
+  ok('la reprendre la rend à la requête',
+     dernierFournisseurs.split('|').sort().join('|') === '119|337|381|8');
+  /* La feuille des filtres reste ouverte : la section suivante y travaille. */
 
   // 2 d. Décennies, façon Infuse — et le filtre SUIT le changement de catégorie
   ok('les décennies vont de 1920 à 2020',
@@ -262,9 +416,8 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      dernierRegion === null);
   await page.click('button:has-text("Voir les résultats")');
   await page.waitForTimeout(400);
-  await page.click('.souschips .chip:has-text("Cinéma")');   // changement de catégorie
-  await page.waitForTimeout(900);
-  ok('le filtre années 90 survit au passage Plateformes → Cinéma',
+  await auVolet('Tout');                                   // changement de volet
+  ok('le filtre années 90 survit au passage Cinémathèque → Tout',
      derniereBorne === '1990-01-01');
   ok('le résumé l\'affiche', /années 90/.test(await page.locator('.resume').innerText()));
   await page.click('#fbtn');
@@ -289,9 +442,8 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.waitForTimeout(900);
   await page.click('button:has-text("Voir les résultats")');
   await page.waitForTimeout(400);
-  await page.click('.souschips .chip:has-text("Plateformes")');   // changement de catégorie
-  await page.waitForTimeout(900);
-  ok('le filtre France survit au passage Cinéma → Plateformes', dernierOrigine === 'FR');
+  await auVolet('Cinémathèque');                                 // changement de volet
+  ok('le filtre France survit au passage Tout → Cinémathèque', dernierOrigine === 'FR');
   ok('le résumé affiche la région', /france/.test(await page.locator('.resume').innerText()));
   // Le filtre local de la vue Cinéflix (les pays viennent des fiches du NAS)
   const orig = await page.evaluate(() => {
@@ -360,8 +512,7 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   ok('un titre jamais critiqué n\'affiche rien', tlrHors.rien === null);
   ok('une série ne récupère pas la note du film homonyme', tlrHors.serie === null);
   ok('les vignettes de Cinéma portent les T', tlrHors.carteT === 3);
-  await page.click('.souschips .chip:has-text("Cinéma")');
-  await page.waitForTimeout(900);
+  await auVolet('Tout');
   await page.click('#fbtn');
   await page.waitForTimeout(400);
   await page.click('#forig .chip:text-is("Europe + Amér. N")');   // retour au défaut
@@ -388,11 +539,17 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.click('.qclear');                          // on referme la recherche
   await page.waitForTimeout(400);
 
-  await page.click('.souschips .chip:has-text("Cinéflix")');
-  await page.waitForTimeout(900);
+  /* La source « Cinéflix », qui ne montrait QUE le serveur, n'existe plus
+     comme choix de navigation : « Cinémathèque » mêle les deux versants —
+     la bibliothèque et les abonnements — « les titres déjà chez soi sont
+     retirés du versant plateformes, ils arrivent par l'autre, avec de
+     meilleures données » (chargerSoir). Le cas « rien que la bibliothèque »
+     reste couvert, section 2 a : il survient quand on n'a aucun abonnement. */
+  await auVolet('Cinémathèque');
   const nDispo = await page.locator('.gcard').count();
   const nTagDispo = await page.locator('.tag.dispo').count();
-  ok('« Cinéflix » ne montre que le catalogue ('+nDispo+' titres)', nDispo > 0 && nDispo === nTagDispo);
+  ok('« Cinémathèque » mêle la bibliothèque et les plateformes ('+nDispo+' titres)',
+     nTagDispo > 0 && nDispo > nTagDispo);
   ok('la pastille verte est la version discrète (coche seule)',
      await page.locator('.tag.dispo.mini').count() === nTagDispo);
 
@@ -406,9 +563,9 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
               s.getBoundingClientRect().top >= 0;
      }));
   ok('les tris façon Jellyfin sont proposés',
-     await page.locator('.chip:has-text("Nom")').count() === 1 &&
-     await page.locator('.chip:has-text("Aléatoire")').count() === 1 &&
-     await page.locator('.chip:has-text("Date de sortie")').count() === 1);
+     await page.locator('.chip:text-is("Nom")').count() === 1 &&
+     await page.locator('.chip:text-is("Aléatoire")').count() === 1 &&
+     await page.locator('.chip:text-is("Date de sortie")').count() === 1);
   ok('le sens croissant / décroissant est proposé',
      await page.locator('.chip:text-is("Croissant")').count() === 1 &&
      await page.locator('.chip:text-is("Décroissant")').count() === 1);
@@ -425,8 +582,7 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.waitForTimeout(300);
 
   // 3. Fiche + dates de sortie
-  await page.click('.souschips .chip:has-text("Cinéma")');
-  await page.waitForTimeout(900);
+  await auVolet('Tout');
   await page.locator('.gcard').first().click();
   await page.waitForSelector('.sorties', {timeout:5000});
   const lignes = await page.locator('.sorties .srt').count();
@@ -485,17 +641,24 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   ok('le retour depuis une saison rouvre la fiche de la série',
      await page.evaluate(() => view === 'fiche' && ui.fiche.type === 'tv'));
 
-  // 4. Demander un titre absent — depuis « Cinéma », une carte sans pastille
-  await page.click('header .iconbtn');           // retour
-  await page.waitForTimeout(600);
+  // 4. Demander un titre absent de partout
+  /* Depuis 3007d, un titre absent du serveur mais disponible en abonnement
+     montre la PLATEFORME, pas « Demander » (cf. section 2 b). Pour vérifier
+     « Demander », il faut donc un titre qu'on ne peut voir nulle part : c'est
+     « Inconnu » (SANS_PLAT), qu'on atteint par la recherche. */
+  await auCatalogue('movie');
+  await page.click('.chip.chipico');
+  await page.waitForTimeout(300);
+  await page.fill('#q', 'inconnu');
+  await page.waitForTimeout(1000);
   await page.locator('.gcard:not(:has(.tag.dispo))').first().click();
   await page.waitForSelector('.actions', {timeout:5000});
-  ok('titre absent → bouton Demander',
-     (await page.locator('.actions .btn').first().innerText()).includes('Demander'));
+  ok('titre absent de partout → bouton Demander',
+     /demander/i.test(await page.locator('.actions .btn').first().innerText()));
   await page.locator('.actions .btn').first().click();
   await page.waitForTimeout(400);
   ok('après demande, le bouton dit « Demandé »',
-     (await page.locator('.actions .btn').first().innerText()).includes('Demandé'));
+     /demandé/i.test(await page.locator('.actions .btn').first().innerText()));
   ok('la pastille de navigation compte la demande',
      (await page.locator('nav .pastille-nav').innerText()) === '1');
 
@@ -505,7 +668,7 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.click('.opt.danger');                            // Annuler ma demande
   await page.waitForTimeout(400);
   ok('annuler la demande rend le bouton « Demander »',
-     (await page.locator('.actions .btn').first().innerText()).includes('Demander'));
+     /demander/i.test(await page.locator('.actions .btn').first().innerText()));
   ok('la pastille de navigation s\'éteint',
      await page.locator('nav .pastille-nav').count() === 0);
   await page.locator('.actions .btn').first().click();       // on la redemande
@@ -520,16 +683,33 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.click('.chips .chip:has-text("Demandes")');
   await page.waitForTimeout(300);
   ok('la demande est dans l\'onglet Demandes', await page.locator('.lrow').count() === 1);
+  /* L'autre moitié du contrôle du démarrage (cf. section 1) : la bonne
+     nouvelle a un écran, et c'est celui-ci. */
+  await page.click('.chips .chip:has-text("Arrivés")');
+  await page.waitForTimeout(300);
+  ok('le titre demandé puis arrivé s\'affiche dans « Arrivés »',
+     await page.locator('.lrow, .gcard').count() >= 1 &&
+     (await page.locator('#app').innerText()).includes('Fight Club'));
 
   // 6. Sorties
-  await page.click('nav .tab:has-text("Sorties")');
-  await page.waitForSelector('.crow, .empty h3', {timeout:15000});
-  ok('le calendrier des sorties se remplit', await page.locator('.crow').count() > 0);
+  /* Le téléphone montre les sorties en GRILLE d'affiches (app-04-sorties.js) ;
+     les lignes `.crow` sont la forme du grand écran — et celle du calendrier
+     physique du NAS, vérifié juste après. */
+  await page.click('nav .tab:has-text("Cinéma")');
+  await page.waitForSelector('.pgrid .gcard, .crow, .empty h3', {timeout:15000});
+  ok('le calendrier des sorties se remplit',
+     await page.locator('.pgrid .gcard, .crow').count() > 0);
   ok('la coche verte marque les sorties déjà sur Cinéflix',
-     await page.locator('.crow .cfx').count() > 0);
+     await page.locator('.pgrid .tag.dispo, .crow .cfx').count() > 0);
   ok('les modes de sortie sont proposés', await page.locator('.chips .chip').count() === 3);
 
   // 6 bis. Le calendrier des sorties physiques FR relevé par le NAS
+  /* Édition, prix, badge 4K, ligne inerte, source : tout cela vit dans les
+     LIGNES du calendrier, que seul le grand écran affiche (`cineEtroit`,
+     app-04-sorties.js — le téléphone, lui, montre les affiches en grille).
+     On passe donc au bureau le temps de cette section. */
+  await page.setViewportSize({width:1280, height:900});
+  await page.waitForTimeout(400);
   await page.evaluate(() => {
     SORTIES.l = [
       { titre:'Le Comte de Monte-Cristo', vo:'', annee:'2024', date:isoDecale(7),
@@ -560,18 +740,26 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   ok('la source affichée est bien le calendrier français',
      /4k-ultra-hd\.fr/.test(await page.locator('.credit').innerText()));
   await page.evaluate(() => { SORTIES.l = []; SORTIES.charge = false; });
+  await page.setViewportSize({width:390, height:844});
+  await page.waitForTimeout(400);
 
   // 7. Persistance
+  /* Au rechargement, l'app revient sur la COUVERTURE : c'est la vitrine qui
+     dit que le démarrage est allé au bout, plus la grille. */
   await page.reload();
-  await page.waitForSelector('.gcard, .empty', {timeout:8000});
+  await page.waitForSelector('.vsl, .empty', {timeout:20000});
   ok('la demande survit au rechargement',
      (await page.locator('nav .pastille-nav').innerText()) === '1');
   ok('la taille d\'affiches choisie survit aussi',
      await page.evaluate(() => document.body.classList.contains('vue-compacte')));
 
   // 8. Profil
-  await page.click('nav .tab:has-text("Profil")');
-  await page.waitForTimeout(400);
+  /* Sur téléphone, Profil n'est pas dans la barre du bas : c'est l'avatar,
+     en haut à droite, qui y mène (l'onglet n'existe qu'au bureau). */
+  /* Deux avatars dans le DOM — celui de la couverture et celui du bandeau
+     compact — dont un seul est à l'écran selon la largeur. */
+  await page.locator('.avbtn:visible').first().click();
+  await page.waitForTimeout(600);
   ok('le profil annonce la taille du catalogue',
      (await page.locator('.card').first().innerText()).includes('50 films'));
 
@@ -582,17 +770,26 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   const ctx2 = await browser.newContext({ viewport:{width:390,height:844} });
   const p2 = await ctx2.newPage();
   p2.on('pageerror', e => echecs.push('pageerror(2): '+e.message));
-  await p2.route('**://api.themoviedb.org/**', r =>
+  /* Un corps qui répond à tout : la liste des genres, une page de résultats,
+     et une vraie fiche de film — sans quoi la couverture reste sans image et
+     la vitrine ne peut pas se construire. */
+  await p2.route('**://api.themoviedb.org/**', r => {
+    const f = film(550, 'Fight Club');
     r.fulfill({status:200, contentType:'application/json',
-      body: JSON.stringify({page:1,total_pages:1,results:[film(550,'Fight Club')],genres:[],images:{}})}));
+      body: JSON.stringify(Object.assign({page:1, total_pages:1, results:[f],
+                                          genres:[], images:{}}, f))});
+  });
   await p2.route('**://image.tmdb.org/**', r => r.fulfill({status:200, contentType:'image/gif',
     body: Buffer.from('R0lGODlhAQABAAAAACw=','base64')}));
   await p2.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
     body: "window.CINEFLIX={tmdbKey:'cle-du-serveur',jellyfinHosts:[],catalogue:'./cineflix.json',region:'FR'};"}));
   await p2.goto(url);
   await p2.waitForSelector('.acc', {timeout:8000});
-  ok('parcours d\'accueil : 8 étapes quand la clé vient du serveur',
-     await p2.locator('.puces i').count() === 8);
+  /* Sept écrans depuis 3008a, plus huit : « Deux ou trois détails » a été
+     supprimé — « aucune de ses questions ne valait d'être posée, et la VO
+     n'était branchée sur rien » (etapesBienvenue, app-09-profils.js). */
+  ok('parcours d\'accueil : 7 étapes quand la clé vient du serveur',
+     await p2.locator('.puces i').count() === 7);
   ok('la première étape demande le prénom',
      await p2.locator('#bvnom').count() === 1);
   await p2.fill('#bvnom', 'Lolo');
@@ -622,29 +819,35 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      await p2.locator('#bvq').count() === 1);
   await p2.click('.accliens button:has-text("Passer")');
   await p2.waitForTimeout(150);
-  ok('étape 6 : les quatre plateformes',
-     await p2.locator('.gchips .chip.plat').count() === 4);
+  /* Onze plateformes aujourd'hui, quatre à l'époque : on compte ce que la
+     table PLATEFORMES contient, plus Premier Rang, plutôt qu'un nombre écrit
+     en dur qui se périme à chaque abonnement ajouté. */
+  ok('étape 6 : Premier Rang et toutes les plateformes',
+     await p2.locator('.gchips .chip.plat').count() ===
+       await p2.evaluate(() => PLATEFORMES.length + 1));
   await p2.click('.gchips .chip.plat:has-text("Netflix")');
   ok('un abonnement se coche',
      await p2.evaluate(() => BROUILLON.plats.indexOf(8) >= 0));
   await p2.click('.accliens button:has-text("Passer")');
   await p2.waitForTimeout(150);
-  ok('étape 7 : trois réglages, et PAS la question du compte serveur',
-     await p2.locator('.rgbloc').count() === 3 &&
-     !(await p2.locator('.acc').innerText()).toLowerCase().includes('compte sur le serveur'));
-  ok('la version originale se répond par oui ou non, pas par « j’adore »',
-     (await p2.locator('.rgbloc').first().innerText()).match(/\bOUI\b/i) !== null &&
-     !(await p2.locator('.rgbloc').first().innerText()).toLowerCase().includes('adore'));
-  await p2.click('.accliens button:has-text("Passer")');
-  await p2.waitForTimeout(150);
-  ok('l\'écran final propose le guide',
-     (await p2.locator('.acc .btn.block').innerText()).includes('guide'));
+  /* L'écran des réglages n'existe plus : des abonnements, on va droit à la
+     fin. Les deux contrôles qui l'inspectaient (trois blocs, « oui / non »
+     plutôt que « j'adore ») sont donc remplacés par celui-ci. */
+  ok('le parcours ne pose plus les réglages',
+     await p2.locator('.rgbloc').count() === 0);
+  /* 3008a encore : « plus de choix abstrait entre guider et explorer à la
+     toute fin ». Un seul bouton ouvre l'app, le guide reste à un doigt dans
+     la barre du bas. */
+  ok('l\'écran final n\'a qu\'un bouton, et il ouvre l\'app',
+     /c.est parti/i.test(await p2.locator('.acc .btn.block').innerText()) &&
+     await p2.locator('.acc .btn.block').count() === 1);
   ok('le prénom saisi a bien été retenu',
      await p2.evaluate(() => BROUILLON.pseudo === 'Lolo'));
-  await p2.click('.accliens button:has-text("Explorer par moi-même")');
-  await p2.waitForSelector('.gcard', {timeout:8000});
+  await p2.click('.acc .btn.block');
+  await p2.waitForSelector('.vsl, .gcard', {timeout:20000});
   ok('le catalogue se charge sans que l\'utilisateur ait saisi de clé',
-     await p2.locator('.gcard').count() >= 1);
+     await p2.evaluate(() => CAT.charge && CAT.items.length > 0) &&
+     await p2.locator('.vsl, .gcard').count() >= 1);
   ok('les goûts déclarés sont conservés en mémoire',
      await p2.evaluate(() => (GOUTS.d||{}).aimes.indexOf(35) >= 0 &&
                              (GOUTS.d||{}).fuis.indexOf(27) >= 0 &&
@@ -736,33 +939,52 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   ok('statut inconnu = on laisse passer (le verrou est en base)',
      await page.evaluate(()=>{ ui.monProfil = null; return accesValide(); }));
 
-  // 11. Le moteur : comprendre l'humeur
-  ok('« rire sans me prendre la tête » donne la comédie', await page.evaluate(()=>{
-     const r = lireHumeur("j'ai envie de rire sans me prendre la tête");
-     return !!r && r.titre === 'Rire un bon coup' && r.genres.indexOf(35) >= 0;
-  }));
-  ok('« action sans se poser de questions » donne l’action', await page.evaluate(()=>{
-     const r = lireHumeur("un film d'action sans se poser de questions");
-     return !!r && r.genres.indexOf(28) >= 0 && r.genres.indexOf(12) >= 0;
-  }));
-  ok('« quelque chose de court » raccourcit la sélection', await page.evaluate(()=>{
-     const r = lireHumeur("une comédie mais quelque chose de court");
-     return !!r && r.duree <= 110 && r.dits.indexOf('court') >= 0;
-  }));
-  ok('« une série récente » bascule sur les séries', await page.evaluate(()=>{
-     const r = lireHumeur("une série récente");
-     return !!r && r.type === 'tv' && r.apres >= 2018;
-  }));
-  ok('« un film français » restreint l’origine', await page.evaluate(()=>{
-     const r = lireHumeur("un thriller français");
-     return !!r && r.pays === 'FR' && r.genres.indexOf(53) >= 0;
-  }));
-  ok('un texte incompris ne bluffe pas et se déclare', await page.evaluate(()=>
-     lireHumeur('azerty qwerty foobar') === null));
-  ok('« un film sur la guerre » ne déclenche pas « valeur sûre »', await page.evaluate(()=>{
-     const r = lireHumeur('un film sur la guerre');
-     return !r || r.titre !== 'Une valeur sûre';
-  }));
+  // 11. Le moteur : les envies
+  /* Le guide ne lit plus une phrase : « une puce dit exactement ce qu'elle
+     fait ; une phrase promettait ce qu'elle ne tenait pas » (app-10-guide.js).
+     `lireHumeur` est parti avec elle, et les sept contrôles qui l'exerçaient
+     n'ont plus d'objet. Ce qui les remplace vérifie les trois règles
+     « apprises à trois reprises, sur verdicts d'Alexandre » — c'est là que ce
+     moteur est fragile, et c'est là qu'il a déjà cédé.
+
+     RÈGLE 1 — une envie qui NOMME un genre l'exige (`g`, un ET) au lieu de
+     l'offrir (`genres`, un OU) : « horreur OU thriller » laissait entrer
+     Le Pont des espions dans « Me faire peur ». */
+  ok('« Rire un bon coup » exige la comédie, il ne l\'offre pas',
+     await page.evaluate(()=>{
+       const r = recetteHumeur(HUMEURS.find(h=>h.id==='rire'));
+       return r.g.indexOf(35) >= 0 && r.genres.length === 0;
+     }));
+  /* RÈGLE 2 — ce qui gâche une envie, c'est le genre VOISIN qu'on n'a pas
+     exclu : le drame dans la comédie, la guerre dans les pleurs. */
+  ok('« Rire un bon coup » écarte le drame, la guerre et l\'horreur',
+     await page.evaluate(()=>{
+       const r = recetteHumeur(HUMEURS.find(h=>h.id==='rire'));
+       return [18,10752,27].every(g => r.sans.indexOf(g) >= 0);
+     }));
+  ok('« Pleurer un bon coup » écarte la guerre, le western et le polar',
+     await page.evaluate(()=>{
+       const r = recetteHumeur(HUMEURS.find(h=>h.id==='pleurer'));
+       return [10752,37,80].every(g => r.sans.indexOf(g) >= 0);
+     }));
+  ok('toute envie sauf « valeur sûre » exclut ses voisins',
+     await page.evaluate(()=> HUMEURS.every(h =>
+       h.id === 'sure' || (h.sans||[]).length > 0)));
+  /* RÈGLE 3 — sur une envie qui promet du PLAISIR et non de la qualité, le
+     classement par acclamation la retourne : « Rire un bon coup » rendait
+     The Truman Show. `simple` annule ces primes. */
+  ok('les envies de plaisir annulent la prime aux films acclamés',
+     await page.evaluate(()=> ['rire','action'].every(id =>
+       recetteHumeur(HUMEURS.find(h=>h.id===id)).simple === true)));
+  ok('« Une valeur sûre » ne juge que la note, jamais le genre',
+     await page.evaluate(()=>{
+       const r = recetteHumeur(HUMEURS.find(h=>h.id==='sure'));
+       return r.genres.length === 0 && r.g.length === 0 &&
+              r.note >= 7.5 && r.votes >= 1000;
+     }));
+  ok('chaque envie a son libellé et son émoji, pour la puce qui la porte',
+     await page.evaluate(()=> HUMEURS.length >= 10 &&
+       HUMEURS.every(h => !!h.id && !!h.label && !!h.emo)));
 
   // 12. Le moteur : score et périmètre
   ok('les genres de la bibliothèque sont reconnus', await page.evaluate(()=>{
@@ -804,17 +1026,24 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   }));
   ok('la raison cite le film aimé quand elle en vient un', await page.evaluate(()=>
      raisonDe({reco:'Heat', genres:[], flix:false}).indexOf('Heat') >= 0));
-  ok('le guide propose trois sources, comme Découvrir', await page.evaluate(()=>
-     PERIMS.length === 3 && PERIMS.map(p=>p.id).join(',') === 'flix,plats,tout'));
-  ok('la portée annoncée change avec la source', await page.evaluate(()=>{
-     ouvrirGuide();
-     ui.guide.perim = 'flix';  const a = portee();
-     ui.guide.perim = 'plats'; const b = portee();
-     ui.guide.perim = 'tout';  const c = portee();
-     ui.guide.perim = 'flix';
-     return /serveur/i.test(a) && /illimit/i.test(b) && /demander/i.test(c) &&
-            a !== b && b !== c;
-  }));
+  /* Le guide ne choisit plus sa source : il suit les abonnements du profil,
+     et 3008h en distingue TROIS cas — j'ai des abonnements, je n'en ai aucun
+     (choix assumé), je n'ai pas encore répondu. C'est ce que la phrase de
+     portée doit dire, « rien n'agace plus qu'un guide dont on ignore la
+     portée » (app-10-guide.js). */
+  ok('la portée annoncée suit les abonnements, en trois cas',
+     await page.evaluate(()=>{
+       const memo = GOUTS.d;
+       GOUTS.d = { aimes:[], fuis:[], totems:[], plats:[8], platsDit:true };
+       const avec = portee();
+       GOUTS.d = { aimes:[], fuis:[], totems:[], plats:[], platsDit:true };
+       const sans = portee();
+       GOUTS.d = { aimes:[], fuis:[], totems:[], plats:[] };
+       const muet = portee();
+       GOUTS.d = memo;
+       return /abonnements/i.test(avec) && /aucun abonnement/i.test(sans) &&
+              /toutes les/i.test(muet) && avec !== sans && sans !== muet;
+     }));
   ok('hors Cinéflix, la raison annonce « à demander »', await page.evaluate(()=>
      raisonDe({genres:[18], principal:18, flix:false, plat:null, vu:0,
                annee:2020, pays:[], mc:null}, {}).indexOf('à demander') >= 0));
@@ -830,7 +1059,9 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
        {t:'movie', id:2, nom:'Comédie US', sortie:'1960-01-01', note:8.2, duree:125,
         genres:['Comédie','Drame'], pays:['US'], vu:0, noteCrit:93}
      ];
-     const r = lireHumeur('film français drole');
+     /* « Comédie française » est un rangement de la taxonomie : c'est lui qui
+        porte le pays, depuis que le guide ne lit plus de phrase. */
+     const r = taxoRecette('comedie-francaise');
      const v = vivierCineflix(r, false);
      return r.pays === 'FR' && v.length === 1 && v[0].titre === 'Comédie FR';
   }));
@@ -861,23 +1092,30 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
 
 
   // 12 bis. Les sujets (mots-clés TMDB) — du genre au SUJET
-  ok('« un film de braquage » devient un sujet, pas un genre', await page.evaluate(()=>{
-     const r = lireHumeur('un film de braquage');
-     return !!r && r.mc.indexOf(10051) >= 0 && r.genres.length === 0 &&
+  /* Un sujet ne s'attrape plus dans une phrase mais dans la TAXONOMIE
+     (app-11-taxo.js), où chaque rangement porte ses mots-clés. Le lexique
+     SUJETS n'a plus de porte d'entrée par le texte ; ce qu'il fallait
+     protéger — un sujet est un mot-clé, pas un genre — se vérifie sur la
+     recette que produit le rangement. */
+  ok('« Casse et braquage » est un sujet, pas un genre', await page.evaluate(()=>{
+     const r = taxoRecette('casse-braquage');
+     return !!r && r.mc.indexOf(10051) >= 0 && r.g.length === 0 &&
             /braquage/i.test(r.titre);
   }));
-  ok('« un huis clos » et « une histoire vraie » sont reconnus', await page.evaluate(()=>{
-     const a = lireHumeur('un huis clos'), b = lireHumeur('une histoire vraie');
-     return !!a && a.mc.indexOf(162914) >= 0 && !!b && b.mc.indexOf(9672) >= 0;
-  }));
-  ok('un sujet se combine à une humeur', await page.evaluate(()=>{
-     const r = lireHumeur('une comédie de braquage');
-     return !!r && r.genres.indexOf(35) >= 0 && r.mc.indexOf(10051) >= 0;
-  }));
-  ok('un sujet se combine à un modificateur', await page.evaluate(()=>{
-     const r = lireHumeur('un film de vengeance français');
-     return !!r && r.mc.indexOf(9748) >= 0 && r.pays === 'FR';
-  }));
+  ok('« Histoire vraie » demande le fait et refuse la biographie',
+     await page.evaluate(()=>{
+       const r = taxoRecette('histoire-vraie');
+       return !!r && r.mc.indexOf(9672) >= 0 && r.sansMc.indexOf(5565) >= 0;
+     }));
+  /* La règle délibérée du document : « Militaire » vit sous Action, mais Zero
+     Dark Thirty porte Drame/Thriller/Histoire — hériter du genre du parent le
+     ferait disparaître. */
+  ok('une sous-catégorie n\'hérite PAS du genre qui la contient',
+     await page.evaluate(()=>{
+       const parent = taxoRecette('action'), enfant = taxoRecette('militaire');
+       return parent.g.indexOf(28) >= 0 && enfant.g.length === 0 &&
+              enfant.gUn.indexOf(28) >= 0;
+     }));
   ok('le sujet filtre la bibliothèque quand elle est couverte', await page.evaluate(()=>{
      CAT.items = [
        {t:'movie', id:1, nom:'Le Casse', sortie:'2014-01-01', note:7, duree:100,
@@ -885,10 +1123,10 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
        {t:'movie', id:2, nom:'Autre chose', sortie:'2014-01-01', note:8, duree:100,
         genres:['Thriller'], pays:['FR'], vu:0, noteCrit:0, mc:[6054]}
      ];
-     const v = vivierCineflix(lireHumeur('un film de braquage'), false);
+     const v = vivierCineflix(taxoRecette('casse-braquage'), false);
      return v.length === 1 && v[0].titre === 'Le Casse';
   }));
-  ok('un film pas encore enrichi n’est pas puni tant que la collecte est en cours',
+  ok('un film pas encore enrichi n\'est pas puni tant que la collecte est en cours',
      await page.evaluate(()=>{
      CAT.items = [
        {t:'movie', id:1, nom:'Enrichi', sortie:'2014-01-01', note:7, duree:100,
@@ -898,7 +1136,7 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      ];
      /* Couverture 50 % : sous le seuil, on garde les deux. */
      return couvertureMC() === 0.5 &&
-            vivierCineflix(lireHumeur('un film de braquage'), false).length === 2;
+            vivierCineflix(taxoRecette('casse-braquage'), false).length === 2;
   }));
   ok('le sujet pèse plus que le genre dans le score', await page.evaluate(()=>{
      GOUTS.d = { aimes:[], fuis:[], plats:[], totems:[] };
@@ -923,10 +1161,13 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      db.items = {};
      ouvrirGuide();
   });
-  await page.waitForSelector('.chip.humeur');
-  ok('le guide propose dix humeurs plus « selon mes goûts »',
-     await page.locator('.chip.humeur').count() === 11);
-  await page.click('.chip.humeur:has-text("Rire")');
+  /* Les envies ne sont plus des puces parmi d'autres : elles ont leur propre
+     forme (`.envie`), « dix envies, vingt genres et quarante-trois rayons
+     disent exactement ce qu'ils font » (app-10-guide.js). */
+  await page.waitForSelector('.envie');
+  ok('le guide propose dix envies plus « selon mes goûts »',
+     await page.locator('.envie').count() === 11);
+  await page.click('.envie:has-text("Rire")');
   await page.waitForSelector('.grid .gcard', {timeout:8000});
   ok('toutes les suggestions sont dans le périmètre', await page.evaluate(()=>
      ui.guide.res.length > 0 && ui.guide.res.every(c => c.flix)));
