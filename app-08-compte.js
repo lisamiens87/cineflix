@@ -230,27 +230,81 @@ async function chargerMonProfil(){
 }
 
 /* ---------- Catalogue ---------- */
-async function catalogueDepuisSupabase(){
-  const r = await sbFetch('/rest/v1/catalogue?select=movies,tv,maj,items&id=eq.1', {});
-  const d = (Array.isArray(r) && r[0]) || {};
+/* Poser le catalogue en mémoire. Séparé de sa LECTURE depuis le 3108d :
+   la même opération sert au paquet qui arrive du serveur et à celui qui
+   dormait dans le cache de l'appareil. */
+function poserCatalogue(d){
+  d = d || {};
   CAT.movie = new Set((d.movies||[]).map(Number));
   CAT.tv    = new Set((d.tv||[]).map(Number));
   CAT.items = Array.isArray(d.items) ? d.items : [];
   CAT.maj   = d.maj ? String(d.maj).slice(0,10) : null;
   CAT.charge = true; CAT.erreur = '';
+}
+
+/* Le catalogue, en ne redemandant que ce qui a changé (3108d).
+   On interroge d'abord la seule colonne qui dit si quelque chose a bougé :
+   `maj`. Trente octets contre un mégaoctet. Si la date est celle du paquet
+   déjà rangé sur l'appareil, on ne télécharge rien.
+
+   Si le serveur ne répond pas du tout, on sert le cache plutôt qu'un écran
+   d'erreur : c'est ce qui fait marcher l'app dans le métro. */
+async function catalogueDepuisSupabase(){
+  const garde = (typeof cacheLire === 'function') ? await cacheLire('catalogue') : null;
+  const utilisable = !!(garde && garde.d);
+
+  let maj = null, joignable = true;
+  try{
+    const t = await sbFetch('/rest/v1/catalogue?select=maj&id=eq.1', {});
+    maj = ((Array.isArray(t) && t[0]) || {}).maj || null;
+  }catch(e){
+    if(!utilisable) throw e;        /* rien en réserve : la panne est réelle */
+    joignable = false;
+  }
+
+  const memeDate = utilisable && String(garde.maj||'') === String(maj||'');
+  const recent   = utilisable && cacheFrais(garde, CACHE_PLAFOND);
+  if(utilisable && (!joignable || (memeDate && recent))){
+    poserCatalogue(garde.d);
+  }else{
+    const r = await sbFetch('/rest/v1/catalogue?select=movies,tv,maj,items&id=eq.1', {});
+    const d = (Array.isArray(r) && r[0]) || {};
+    poserCatalogue(d);
+    if(typeof cacheEcrire === 'function')
+      await cacheEcrire('catalogue', { le:Date.now(), maj:(d.maj||maj||null), d:d });
+  }
   await notesTelerama();
   await sortiesPhysiques();
 }
 
 /* Le calendrier des sorties physiques FR relevé par le NAS. Quelques
-   centaines de lignes au plus : on prend tout d'un coup. */
+   centaines de lignes au plus : on prend tout d'un coup — mais une fois par
+   jour seulement (3108d). Cette table n'a pas de date de version à
+   interroger : c'est donc l'âge du cache qui décide, et une journée est
+   déjà large pour un calendrier qui bouge une fois par semaine. */
 async function sortiesPhysiques(){
   try{
+    if(typeof cacheLire === 'function'){
+      const g = await cacheLire('sorties');
+      if(cacheFrais(g, CACHE_JOUR) && Array.isArray(g.l)){
+        SORTIES.l = g.l; SORTIES.charge = true; return;
+      }
+    }
     const l = await lireTout('/rest/v1/sorties_phys?select=titre,vo,annee,date,'+
       'edition,uhd,prix,tmdb_id,poster&order=date.asc');
     if(!Array.isArray(l)) return;
     SORTIES.l = l; SORTIES.charge = true;
-  }catch(e){ /* sans calendrier, l'onglet Sorties retombe sur TMDB */ }
+    if(typeof cacheEcrire === 'function')
+      await cacheEcrire('sorties', { le:Date.now(), l:l });
+  }catch(e){
+    /* Sans réseau, le cache périmé vaut mieux que rien : un calendrier
+       d'hier reste juste. Et sans cache du tout, l'onglet Sorties retombe
+       sur TMDB, comme avant. */
+    try{
+      const g = await cacheLire('sorties');
+      if(g && Array.isArray(g.l)){ SORTIES.l = g.l; SORTIES.charge = true; }
+    }catch(e2){}
+  }
 }
 
 /* Lit une table ENTIÈRE, par pages.
@@ -277,14 +331,32 @@ async function lireTout(chemin, taille){
    c'est elle qui permet d'afficher les T sur Cinéma et Plateformes. On ne
    charge que les titres NOTÉS (les autres n'ont rien à montrer). Une panne
    ici ne doit rien casser : l'app marche exactement pareil, sans les T. */
+function poserTelerama(l){
+  const m = new Map();
+  (l||[]).forEach(r => { if(r && r.cle) m.set(r.cle, { jt:r.t, jv:r.verdict||'' }); });
+  TLR.m = m; TLR.charge = true;
+}
 async function notesTelerama(){
   try{
+    /* Sept requêtes de mille lignes à chaque ouverture, c'était le plus gros
+       poste de trafic après le catalogue (3108d). Une fois par jour suffit :
+       une note de journal ne change pas dans l'après-midi. */
+    if(typeof cacheLire === 'function'){
+      const g = await cacheLire('telerama');
+      if(cacheFrais(g, CACHE_JOUR) && Array.isArray(g.l)){ poserTelerama(g.l); return; }
+    }
     const l = await lireTout('/rest/v1/telerama?select=cle,t,verdict&t=gt.0');
     if(!Array.isArray(l)) return;
-    const m = new Map();
-    l.forEach(r => { if(r && r.cle) m.set(r.cle, { jt:r.t, jv:r.verdict||'' }); });
-    TLR.m = m; TLR.charge = true;
-  }catch(e){ /* sans notes, l'app fonctionne à l'identique */ }
+    poserTelerama(l);
+    if(typeof cacheEcrire === 'function')
+      await cacheEcrire('telerama', { le:Date.now(), l:l });
+  }catch(e){
+    /* Hors connexion, des notes d'hier valent mieux que pas de notes. */
+    try{
+      const g = await cacheLire('telerama');
+      if(g && Array.isArray(g.l)) poserTelerama(g.l);
+    }catch(e2){ /* sans notes, l'app fonctionne à l'identique */ }
+  }
 }
 
 /* ---------- Éléments : favoris et demandes ---------- */
