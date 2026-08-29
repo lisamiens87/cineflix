@@ -1037,6 +1037,86 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
      nomsDemandeurs([{pseudo:'A'},{pseudo:'B'},{pseudo:'C'},{pseudo:'D'}])
        === 'A, B et 2 autres'));
 
+  // 17. Le bouton « Ma liste » de la vitrine dit où en est le film
+  /* Il ajoutait sans jamais le dire : le toast passait, le bouton restait
+     « + Ma liste », et un film déjà en favori s'ouvrait comme les autres.
+     La vitrine a son propre contexte parce qu'elle a besoin d'un catalogue
+     avec de vraies fiches (`items`) — le fichier d'exemple du dépôt n'en a
+     pas — et de cinq titres exactement, pour que le tirage au sort des cinq
+     propositions du soir soit sans surprise. */
+  const ctx4 = await browser.newContext({ viewport:{width:390,height:844},
+                                          serviceWorkers:'block' });
+  const p4 = await ctx4.newPage();
+  const fiches = [];
+  for(let i=0;i<5;i++) fiches.push({ t:'movie', id:700000+i, nom:'Film du soir '+i,
+    sortie:'2021-05-0'+(i+1), duree:110, note:7.8, noteCrit:88, vu:0,
+    genres:['Drame'], pays:['FR'], jf:'jf'+i });
+  await p4.addInitScript(() => {
+    localStorage.setItem('cineflix.v1', JSON.stringify({
+      apiKey:'k', pseudo:'Alexandre', onboarde:true, region:'FR', items:{} }));
+  });
+  await p4.route('**/cineflix.json*', r => r.fulfill({status:200, contentType:'application/json',
+    body: JSON.stringify({ maj:'2026-08-29', movies:fiches.map(f=>f.id), tv:[], items:fiches })}));
+  await p4.route('**://api.themoviedb.org/**', r => {
+    /* Un corps qui répond à tout : la liste des genres, une page de résultats,
+       et la fiche du film que la vitrine va chercher pour son décor. */
+    const f = film(700000, 'Film du soir 0');
+    r.fulfill({status:200, contentType:'application/json',
+      body: JSON.stringify(Object.assign({page:1, total_pages:1, results:[f],
+                                          genres:[], images:{}}, f))});
+  });
+  await p4.route('**://image.tmdb.org/**', r => r.fulfill({status:200, contentType:'image/gif',
+    body: Buffer.from('R0lGODlhAQABAAAAACw=','base64')}));
+  await p4.route('**://100.95.13.53*/**', r => r.fulfill({status:200, body:'{}'}));
+  await p4.route('**/config.js*', r => r.fulfill({status:200, contentType:'application/javascript',
+    body: "window.CINEFLIX={tmdbKey:'',jellyfinHosts:[],catalogue:'./cineflix.json',"+
+          "region:'FR',nom:'Cinéflix',supabase:{url:'',key:''}};"}));
+  await p4.goto(url);
+  await p4.waitForSelector('.vsl', {timeout:15000});
+
+  const vb = p4.locator('.vsl .vb2').nth(2);          // la troisième proposition
+  ok('au repos, le bouton de la vitrine dit « Ma liste »',
+     (await vb.innerText()).trim() === 'Ma liste' &&
+     (await vb.getAttribute('aria-pressed')) === 'false');
+
+  /* On se place sur la troisième carte : l'appui ne doit pas ramener le
+     carrousel au début — c'est ce qu'un render() ferait. */
+  await p4.evaluate(() => { const c = document.getElementById('vcar');
+    c.scrollLeft = c.firstChild.getBoundingClientRect().width * 2 + 24; });
+  await p4.waitForTimeout(300);
+  const posAvant = await p4.evaluate(() => document.getElementById('vcar').scrollLeft);
+
+  await vb.click();
+  await p4.waitForTimeout(300);
+  ok('après l’appui, le bouton passe à « Dans ma liste »',
+     (await vb.innerText()).trim() === 'Dans ma liste' &&
+     (await vb.getAttribute('class')).includes('on') &&
+     (await vb.getAttribute('aria-pressed')) === 'true');
+  ok('le cœur du bouton se remplit',
+     await vb.locator('svg[fill="currentColor"]').count() === 1);
+  ok('le film est bien passé en favori',
+     await p4.evaluate(() => Object.values(db.items).filter(i => i.fav).length === 1));
+  ok('le carrousel n’a pas bougé sous le doigt',
+     Math.abs((await p4.evaluate(() => document.getElementById('vcar').scrollLeft)) - posAvant) < 2);
+  ok('les autres propositions restent au repos',
+     await p4.locator('.vsl .vb2.on').count() === 1);
+
+  await vb.click();
+  await p4.waitForTimeout(300);
+  ok('un second appui retire le film et rend le bouton au repos',
+     (await vb.innerText()).trim() === 'Ma liste' &&
+     !(await vb.getAttribute('class')).includes('on') &&
+     await p4.evaluate(() => Object.values(db.items).every(i => !i.fav)));
+
+  await vb.click();
+  await p4.waitForTimeout(300);
+  await p4.reload();
+  await p4.waitForSelector('.vsl', {timeout:15000});
+  ok('au rechargement, un film déjà dans la liste s’affiche marqué',
+     await p4.locator('.vsl .vb2.on').count() === 1);
+  await ctx4.close();
+
+
   await browser.close();
 
   console.log('');
