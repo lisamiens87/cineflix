@@ -16,6 +16,17 @@ function film(id, titre){
 const echecs = [];
 const appels = [];                       // trace des écritures vers Supabase
 
+/* La file d'un proche, telle que la base la rendrait — et qu'elle CHANGE
+   quand l'administrateur traite une demande. */
+const file = [
+  { user_id:'autre-uid', type:'movie', tmdb_id:990001, titre:'Demande d\'un proche',
+    poster:'/x.jpg', sortie:'2025-01-01', statut:'demande', pseudo:'Camille',
+    cree_le:new Date(Date.now()-2*86400000).toISOString() },
+  { user_id:'autre-uid', type:'movie', tmdb_id:550, titre:'Fight Club',
+    poster:'/y.jpg', sortie:'1999-10-15', statut:'demande', pseudo:'Camille',
+    cree_le:new Date(Date.now()-9*86400000).toISOString() }
+];
+
 (async () => {
   const browser = await chromium.launch();
   /* Service worker désactivé : ses requêtes échappent à l'interception de
@@ -24,6 +35,12 @@ const appels = [];                       // trace des écritures vers Supabase
                                        serviceWorkers:'block' });
   page.on('console', m => { if(m.type() === 'error') echecs.push('console: '+m.text()); });
   page.on('pageerror', e => echecs.push('pageerror: '+e.message));
+
+  // les polices : servies vides, pour que le banc tourne aussi hors ligne
+  await page.route('**://fonts.googleapis.com/**', r =>
+    r.fulfill({status:200, contentType:'text/css', body:''}));
+  await page.route('**://fonts.gstatic.com/**', r =>
+    r.fulfill({status:200, contentType:'font/woff2', body:''}));
 
   // --- TMDB ---
   await page.route('**://api.themoviedb.org/**', route => {
@@ -59,7 +76,14 @@ const appels = [];                       // trace des écritures vers Supabase
 
     if(p === '/auth/v1/token')
       return j({ access_token:'jeton', refresh_token:'refresh', user:{id:UID, email:'alex@exemple.fr'} });
-    if(p === '/rest/v1/profils')  return route.fulfill({status:204, body:''});
+    if(p === '/rest/v1/profils'){
+      /* Un profil déjà enregistré, et déjà passé par le parcours d'accueil.
+         Sans lui, la connexion enchaîne sur l'inscription — couverte par
+         test-cineflix — et ce banc-ci n'atteint jamais son sujet. */
+      if(m === 'GET') return j([{ user_id:UID, pseudo:'Alex', avatar:'',
+                                  jellyfin:'', onboarde:true, statut:'valide' }]);
+      return route.fulfill({status:204, body:''});
+    }
     if(p === '/rest/v1/catalogue')
       return j([{ movies:CAT_MOVIES, tv:[1396], maj:'2026-07-27T08:00:00Z',
         /* fiches façon export enrichi : durées croissantes avec l'id, pour
@@ -71,19 +95,34 @@ const appels = [];                       // trace des écritures vers Supabase
           .concat([{ t:'tv', id:1396, nom:'Série', sortie:'2008-01-20',
             ajout:'2026-07-01', duree:47, cert:'FR-16', note:9,
             noteCrit:96, vu:3, lu:'2026-07-10', genres:['Drame'] }]) }]);
+    /* Un profil qui a DÉJÀ répondu. Sans goûts en base, la connexion enchaîne
+       sur le parcours d'inscription — couvert par test-cineflix — et ce
+       banc-ci n'atteint jamais son sujet : les comptes, la file, le catalogue
+       distant. Zéro abonnement déclaré, pour que « Cinémathèque » se limite à
+       la bibliothèque (3008z) et que les comptes soient exacts. */
+    if(p === '/rest/v1/gouts')
+      return j([{ data:{ aimes:[28], fuis:[], totems:[], plats:[], platsDit:true } }]);
     if(p === '/rest/v1/admins')   return j([{ user_id:UID }]);       // on teste le cas admin
     if(p === '/rest/v1/elements'){
       if(m === 'GET') return j(elements);
       if(m === 'POST'){ elements.push(JSON.parse(req.postData()||'{}')); return route.fulfill({status:201, body:''}); }
-      if(m === 'PATCH' || m === 'DELETE') return route.fulfill({status:204, body:''});
+      if(m === 'PATCH'){
+        /* Deux raisons de faire vrai ici. La base APPLIQUE le changement — un
+           banc qui répond toujours la même chose ferait revenir la demande
+           traitée « en attente ». Et `changerStatut` demande
+           `Prefer: return=representation` puis COMPTE les lignes rendues :
+           « une écriture bloquée par une règle de sécurité répond 200 avec une
+           liste vide » (app-08-compte.js). Un 204 sans corps était donc lu
+           comme un refus, et rien ne bougeait à l'écran. */
+        const cible = Number((u.searchParams.get('tmdb_id')||'').replace('eq.',''));
+        const corps = JSON.parse(req.postData()||'{}');
+        const touchees = file.filter(d => d.tmdb_id === cible);
+        touchees.forEach(d => { if(corps.statut) d.statut = corps.statut; });
+        return j(touchees);
+      }
+      if(m === 'DELETE') return route.fulfill({status:204, body:''});
     }
-    if(p === '/rest/v1/file_demandes')
-      return j([{ user_id:'autre-uid', type:'movie', tmdb_id:990001, titre:'Demande d\'un proche',
-                  poster:'/x.jpg', sortie:'2025-01-01', statut:'demande', pseudo:'Camille',
-                  cree_le:new Date(Date.now()-2*86400000).toISOString() },
-                { user_id:'autre-uid', type:'movie', tmdb_id:550, titre:'Fight Club',
-                  poster:'/y.jpg', sortie:'1999-10-15', statut:'demande', pseudo:'Camille',
-                  cree_le:new Date(Date.now()-9*86400000).toISOString() }]);
+    if(p === '/rest/v1/file_demandes') return j(file);
     return j({});
   });
 
@@ -99,13 +138,23 @@ const appels = [];                       // trace des écritures vers Supabase
   await page.waitForSelector('.acc', {timeout:8000});
 
   // 1. Porte d'entrée
-  ok('sans session, l\'app ouvre sur la connexion',
-     (await page.locator('.acc h1').innerText()).includes('Cinéflix'));
+  /* Première visite : l'app n'ouvre plus sur le formulaire de connexion mais
+     sur un accueil qui explique le parcours en trois pas et propose de créer
+     son profil ; la connexion est derrière « J'ai déjà un profil »
+     (viewPremiereVisite, app-08-compte.js). */
+  ok('sans session, l\'app ouvre sur l\'accueil de première visite',
+     /bienvenue chez nous/i.test(await page.locator('.acc h1').innerText()) &&
+     /cinéflix/i.test(await page.locator('.motacc').innerText()));
   ok('la barre de navigation est masquée', !(await page.locator('nav').isVisible()));
-  await page.click('.accliens button');                 // « Créer un compte »
-  ok('on peut basculer vers la création de compte',
-     (await page.locator('.acc .btn').innerText()).includes('Créer'));
-  await page.click('.accliens button');                 // retour connexion
+  ok('la porte principale est la création de profil',
+     /créer mon profil/i.test(await page.locator('.acc .btn').innerText()));
+  await page.click('.accliens button:has-text("J\'ai déjà un profil")');
+  await page.waitForTimeout(400);
+  ok('« J\'ai déjà un profil » mène à la connexion',
+     await page.locator('#acmail').count() === 1 &&
+     /se connecter/i.test(await page.locator('.acc .btn').innerText()));
+  ok('et la création reste à portée depuis la connexion',
+     await page.locator('.accliens button:has-text("Créer un profil")').count() === 1);
 
   // 2. Refus des champs vides
   await page.click('.acc .btn');
@@ -118,16 +167,28 @@ const appels = [];                       // trace des écritures vers Supabase
   await page.fill('#acmail', 'alex@exemple.fr');
   await page.fill('#acpass', 'motdepasse');
   await page.click('.acc .btn');
-  await page.waitForSelector('.gcard', {timeout:8000});
+  /* La connexion ouvre la COUVERTURE — le grand visuel — et la grille vit
+     derrière les pilules Films et Séries (`ouvrirCatalogue`, app-02-outils.js). */
+  await page.waitForSelector('.vsl, .pilules', {timeout:20000});
+  ok('la connexion mène à l\'app, pas à l\'écran de connexion',
+     await page.locator('.acc').count() === 0);
+  await page.click('.pilules .pil:has-text("Films")');
+  await page.waitForSelector('.gcard', {timeout:15000});
   ok('la connexion mène au catalogue', await page.locator('.gcard').count() >= 20);
   ok('le catalogue vient de Supabase, pas du fichier',
      appels.includes('GET /rest/v1/catalogue'));
   ok('les pastilles « Cinéflix » utilisent le catalogue distant',
      await page.locator('.tag.dispo').count() === 5);
 
-  // 3 bis. Les tris de bibliothèque sur la vue Cinéflix (données du NAS)
-  await page.click('.souschips .chip:has-text("Cinéflix")');
-  await page.waitForTimeout(900);
+  // 3 bis. Les tris de bibliothèque sur « Cinémathèque » (données du NAS)
+  /* La source « Cinéflix » n'existe plus : « Cinémathèque » mêle bibliothèque
+     et abonnements, et c'est en n'en déclarant AUCUN qu'on la réduit au
+     serveur seul — « zéro abonnement veut dire zéro » (3008z). C'est aussi ce
+     qui rend les comptes exacts : cinq titres, ceux du NAS. */
+  await page.evaluate(() => { GOUTS.d = { aimes:[], fuis:[], totems:[],
+    plats:[], platsDit:true }; GOUTS.charge = true; });
+  await page.click('.presdeux button:has-text("Cinémathèque")');
+  await page.waitForTimeout(1200);
   await page.click('#fbtn');
   await page.waitForTimeout(400);
   ok('les tris de bibliothèque apparaissent sur la vue Cinéflix',
@@ -149,13 +210,20 @@ const appels = [];                       // trace des écritures vers Supabase
   await page.waitForTimeout(600);
   ok('l\'ordre croissant inverse la bibliothèque',
      ((await page.locator('.gcard').first().getAttribute('onclick'))||'').includes('ouvrirFiche(550'));
-  // retour à l'état attendu par la suite du test
+  /* Retour à l'état attendu par la suite. La popularité ne se choisit PAS sur
+     « Cinémathèque » — « la seule donnée que la bibliothèque n'a pas ; sur Ce
+     soir on trie sur ce que les deux mondes partagent » (setPresence) — on
+     repasse donc sur « Tout » avant de la reprendre. */
   await page.click('#fbtn'); await page.waitForTimeout(400);
   await page.click('.chip:text-is("Décroissant")'); await page.waitForTimeout(400);
-  await page.click('.chip:has-text("Popularité")'); await page.waitForTimeout(600);
   await page.click('button:has-text("Voir les résultats")'); await page.waitForTimeout(400);
-  await page.click('.souschips .chip:has-text("Cinéma")');
-  await page.waitForTimeout(1000);
+  await page.click('.presdeux button:has-text("Tout")');
+  await page.waitForTimeout(1200);
+  await page.click('#fbtn'); await page.waitForTimeout(400);
+  ok('la popularité n\'est proposée qu\'en dehors de la Cinémathèque',
+     await page.locator('.chip:has-text("Popularité")').count() === 1);
+  await page.click('.chip:has-text("Popularité")'); await page.waitForTimeout(600);
+  await page.click('button:has-text("Voir les résultats")'); await page.waitForTimeout(600);
 
   // 4. Une demande part vers le serveur — une carte absente du catalogue
   await page.locator('.gcard:not(:has(.tag.dispo))').first().click();
@@ -168,7 +236,7 @@ const appels = [];                       // trace des écritures vers Supabase
   ok('la demande porte le bon utilisateur et le bon titre',
      env.user_id === UID && env.demande === true && env.statut === 'demande');
   ok('le bouton passe à « Demandé »',
-     (await page.locator('.actions .btn').first().innerText()).includes('Demandé'));
+     /demandé/i.test(await page.locator('.actions .btn').first().innerText()));
 
   // 5. Le favori aussi
   await page.locator('.actions .btn').nth(1).click();
@@ -178,7 +246,7 @@ const appels = [];                       // trace des écritures vers Supabase
      elements[elements.length-1].fav === true);
 
   // 6. La file, côté administrateur
-  await page.click('nav .tab:has-text("Profil")');
+  await page.locator('.avbtn:visible').first().click();
   await page.waitForTimeout(400);
   ok('l\'administrateur voit l\'entrée « File de demandes »',
      (await page.locator('.btn:has-text("File de demandes")').count()) === 1);
@@ -214,19 +282,22 @@ const appels = [];                       // trace des écritures vers Supabase
 
   // 7. La session survit au rechargement
   await page.reload();
-  await page.waitForSelector('.gcard', {timeout:8000});
+  await page.waitForSelector('.vsl, .pilules', {timeout:20000});
   ok('la session est retrouvée sans redemander le mot de passe',
      await page.locator('.acc').count() === 0);
 
   // 8. Déconnexion
-  await page.click('nav .tab:has-text("Profil")');
+  await page.locator('.avbtn:visible').first().click();
   await page.waitForTimeout(400);
   await page.click('.btn:has-text("Se déconnecter")');
   await page.waitForSelector('.sheet.show', {timeout:3000});
   await page.click('.opt.danger');
   await page.waitForSelector('.acc', {timeout:5000});
-  ok('la déconnexion ramène à l\'écran de connexion',
-     await page.locator('.acc .btn').count() === 1);
+  /* L'appareil se souvient des profils du foyer : se déconnecter rend la main
+     au choix du profil, plus au formulaire de connexion. */
+  ok('la déconnexion ramène au choix du profil',
+     /qui regarde ce soir/i.test(await page.locator('.acc').innerText()) &&
+     await page.evaluate(() => !(db.auth && db.auth.jeton)));
 
   // 9. Session zombie : le compte a été supprimé côté serveur.
   //    L'app présente un jeton mort, le renouvellement échoue aussi —
