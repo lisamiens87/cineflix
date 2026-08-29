@@ -251,6 +251,9 @@ function currentBack(){
   return null;
 }
 function goBack(){
+  /* Une affiche ouverte se referme AVANT tout : la flèche et le geste retour
+     doivent sortir de l'image, pas de la fiche qu'on était en train de lire. */
+  if(typeof afficheOuverte === 'function' && afficheOuverte()) return fermerAffiche();
   if(document.getElementById('sheet').classList.contains('show')) return closeSheet();
   /* Depuis la fiche d'une personne, on revient sur la fiche du titre qui
      l'a ouverte — ses coordonnées sont rangées dans l'état de la personne,
@@ -282,6 +285,11 @@ try{
        passer par `goBack`. On remet aussitôt une entrée : une entrée
        d'historique par étage de la pile, c'est ce qui garde les deux comptes
        alignés. */
+    if(typeof afficheOuverte === 'function' && afficheOuverte()){
+      fermerAffiche();
+      try{ history.pushState({cf:pileNav.length}, ''); }catch(e2){}
+      return;
+    }
     const sh = document.getElementById('sheet');
     if(sh && sh.classList.contains('show')){
       closeSheet();
