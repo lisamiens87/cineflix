@@ -1089,7 +1089,7 @@ function vitrineHtml(){
             (meta ? '<div class="hsmeta">'+esc(meta)+'</div>' : '')+
             '<div class="vbt">'+
               '<button class="vb1" onclick="event.stopPropagation();regarderSoir('+i+')">▶ Regarder</button>'+
-              '<button class="vb2" onclick="event.stopPropagation();listerSoir('+i+')">+ Ma liste</button>'+
+              boutonListeHtml(i, estDansListe(h))+
             '</div>'+
           '</div>'+
         '</div>';
@@ -1110,11 +1110,43 @@ function vitrinePoint(){
   const n = Math.max(0, Math.min(p.children.length - 1, Math.round(c.scrollLeft / pas)));
   for(let i = 0; i < p.children.length; i++) p.children[i].className = i === n ? 'on' : '';
 }
-function listerSoir(i){
+/* ---------- Le bouton « Ma liste » de la vitrine ----------
+   Il ajoutait le film sans jamais le dire : le toast passait, le bouton
+   restait « + Ma liste », et un film DÉJÀ en favori s'ouvrait avec le même
+   libellé que les autres. Alexandre : « le film est bien ajouté aux favoris,
+   mais le bouton reste identique — rien n'indique que c'est fait ».
+
+   Le bouton reprend le signe que la fiche emploie déjà (app-05-fiche.js) :
+   cœur vide → cœur plein, blanc → couleur d'accent. Le libellé passe de
+   « Ma liste » à « Dans ma liste » : il dit un ÉTAT, pas une action, donc le
+   deuxième appui — celui qui retire — ne surprend plus. */
+function estDansListe(h){
+  const it = item('movie', h.id);
+  return !!(it && it.fav);
+}
+function contenuBoutonListe(fav){
+  return (fav ? I.coeurPlein : I.coeur)+
+         '<span>'+(fav ? 'Dans ma liste' : 'Ma liste')+'</span>';
+}
+function boutonListeHtml(i, fav){
+  return '<button class="vb2'+(fav ? ' on' : '')+'" aria-pressed="'+(fav ? 'true' : 'false')+'" '+
+    'onclick="event.stopPropagation();listerSoir('+i+',this)">'+
+    contenuBoutonListe(fav)+'</button>';
+}
+/* La mise à jour se fait SUR PLACE, jamais par render() : redessiner la vue
+   reconstruit le carrousel, qui repart alors à la première carte — le film
+   qu'on regardait disparaîtrait sous le doigt au moment même où on l'ajoute. */
+function majBoutonListe(btn, fav){
+  btn.classList.toggle('on', fav);
+  btn.setAttribute('aria-pressed', fav ? 'true' : 'false');
+  btn.innerHTML = contenuBoutonListe(fav);
+}
+function listerSoir(i, btn){
   const h = (ui.heroSoirs||[])[i||0];
   if(!h) return;
   basculerFavori({ id:h.id, title:h.nom, poster_path:h.aff || null,
                    release_date:h.date || '' }, 'movie');
+  if(btn) majBoutonListe(btn, estDansListe(h));
 }
 
 /* Les pilules : où l'on est, et par où l'on sort. « Tout » est la couverture
