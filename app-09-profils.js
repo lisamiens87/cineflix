@@ -71,7 +71,7 @@ function viewAccueil(){
 
   l.forEach(p=>{
     h += '<div class="avcase">'+
-      '<button class="avbtn" onclick="'+(gere
+      '<button class="avchoix" onclick="'+(gere
         ? 'foyerOublier(\''+esc(p.email).replace(/'/g,"\\'")+'\')'
         : 'choisirProfil(\''+esc(p.email).replace(/'/g,"\\'")+'\')')+'">'+
         avatarHtml(p.avatar, 'grand', p.pseudo)+
@@ -83,7 +83,7 @@ function viewAccueil(){
 
   if(!gere)
     h += '<div class="avcase">'+
-      '<button class="avbtn" onclick="nouveauProfil()">'+
+      '<button class="avchoix" onclick="nouveauProfil()">'+
         '<span class="av grand vide">'+I.plus+'</span></button>'+
       '<div class="avnom muted">Ajouter</div>'+
     '</div>';
