@@ -685,7 +685,7 @@ let dernierOrigine = null;         // le with_origin_country du dernier /discove
   await page.waitForTimeout(150);
   ok('en mode gestion, chaque tête porte une croix',
      await page.locator('.avx').count() === 3);
-  await page.click('.avcase .avbtn');
+  await page.click('.avcase .avchoix');
   await page.waitForTimeout(200);
   ok('retirer un profil le retire de cet appareil',
      await page.evaluate(()=> db.foyer.length === 2));
