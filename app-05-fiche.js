@@ -652,7 +652,12 @@ function viewFiche(){
   let html = header(titre, {back:back});
   html += '<div class="hero">'+(d.backdrop_path?'<img src="'+IMG(d.backdrop_path,'w780')+'" alt="">':'')+'</div>';
   html += '<div class="dhead">'+
-    '<div style="width:92px;flex:none">'+posterEl(d.poster_path,'w342','',titre)+'</div>'+
+    /* La jaquette ouvre l'affiche en grand (3108c). Aucun indice visuel :
+       « pas de loupe, c'est instinctif » (Alexandre, 29/08). Le geste
+       n'existe que s'il y a une affiche à montrer. */
+    '<div style="width:92px;flex:none"'+
+      (d.poster_path ? ' onclick="ouvrirAfficheFiche()"' : '')+'>'+
+      posterEl(d.poster_path,'w342',(d.poster_path?'ouvrable':''),titre)+'</div>'+
     '<div class="dmeta">'+
       '<h2>'+esc(titre)+'</h2>'+
       '<div class="small muted">'+esc(year(date))+
