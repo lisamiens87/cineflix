@@ -284,3 +284,57 @@
   .t7c .aff img,.gcard .aff img{transition:filter .18s}
   .t7c:hover .aff img,.gcard:hover .aff img{filter:brightness(1.1)}
 }
+
+/* ---- La fiche sur grand écran (28/08) ----
+   Verdict d'Alexandre sur la fiche de Traffic : « c'est vraiment pas très
+   beau ». En regardant de près, ce n'était pas qu'une affaire de goût.
+
+   1. Le titre était imprimé SUR l'affiche. Le HTML met l'image dans une boîte
+      de 92 px (largeur écrite en dur dans app-05-fiche.js) mais la règle
+      `.dhead .poster{width:150px}` du palier 860 — la mienne — la forçait à
+      150. L'image débordait de 58 px et recouvrait le bloc titre, qui
+      commence à 136 px. On donne donc à la BOÎTE la largeur de l'affiche.
+   2. « Demander sur Premier Rang » faisait 1 742 px de large. Un bouton fait
+      la largeur de son texte : 325 px.
+   3. Les trois cases « Quand peut-on le voir » prenaient chacune toute la
+      largeur ; elles passent côte à côte, et perdent le cadre de fond dont la
+      marge intérieure les décalait de 17 px par rapport au texte.
+   4. Le synopsis s'arrêtait à 72 caractères au milieu du vide : il va
+      maintenant jusqu'au bord droit de la dernière case (1493 px des deux
+      côtés, mesuré).
+   5. Quand le film est sur une plateforme abonnée, les boutons de plateformes
+      et « le demander aussi » tenaient sur deux lignes : ils tiennent sur une.
+
+   Rien de tout ça sur téléphone : la fiche y garde sa colonne unique. */
+@media (min-width:1200px){
+  .app:has(> .dhead){max-width:1180px;margin:0 auto}
+  .hero{height:420px;width:100vw;margin-left:calc(50% - 50vw);border-radius:0}
+  .hero img{object-position:center 30%}
+
+  /* L'affiche repose sur le bas du bandeau, et sa boîte fait sa taille. */
+  .dhead{gap:28px;margin-top:-140px;align-items:flex-end;padding:0 24px}
+  .dhead > div:first-child{width:210px!important;flex:0 0 210px!important}
+  .dhead .poster{width:210px!important;height:315px!important;border-radius:10px;
+    box-shadow:0 18px 44px rgba(0,0,0,.65)}
+  .dmeta{padding-top:0;padding-bottom:4px}
+  .dmeta h2{font-size:36px;line-height:1.08;margin-bottom:10px}
+  .dmeta .small{font-size:14px}
+
+  /* Une seule ligne d'actions, des boutons à la largeur de leur texte. */
+  .actions{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:26px 24px 0}
+  .actions .btn{max-width:none;width:auto;flex:0 0 auto;padding:11px 20px;font-size:13.5px}
+  .actions .btn.block{width:auto;display:inline-flex}
+  .actions.plats{display:inline-flex;vertical-align:middle;padding-bottom:0}
+  .actions.plats + .wrap{display:inline-flex;vertical-align:middle;
+    padding:26px 0 0 10px!important}
+  .credit{padding:10px 24px 0;font-size:13.5px}
+
+  /* Les trois échéances côte à côte, alignées sur la même gouttière que le texte. */
+  .sorties{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;
+    padding:0 24px!important;background:none;border:0;border-radius:0;margin:0}
+  .srt{display:block;padding:14px 16px;border-radius:12px;min-height:0}
+  .srt .ic{margin-bottom:8px}
+  .srt .val{text-align:left;margin-top:6px}
+
+  .overview{font-size:16px;line-height:1.62;max-width:none;padding:0;margin:14px 24px 0}
+}
