@@ -64,6 +64,11 @@ let db = {
      réécrit sous l'identité d'un compte connecté dans un autre onglet.
      Arrivé pour de vrai le 29/07. */
   itemsUid:'',
+  /* Les suggestions écartées (3009a) : « id TMDB » → l'instant du geste.
+     Une date, pas un drapeau, parce que le film revient de lui-même au bout
+     de six mois. Le serveur fait foi (table `ecartes`), ceci n'est que
+     l'écho local qui fait répondre l'écran sans attendre le réseau. */
+  ecartes:{},
   onboarde:false, v:1
 };
 
