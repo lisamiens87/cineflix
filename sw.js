@@ -5,14 +5,14 @@
    afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
 
    VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
-const BUILD = '3108c';
+const BUILD = '3108d';
 const CACHE = 'cineflix-' + BUILD;
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
                './app-base.css', './app-mobile.css', './app-site.css', './config.js', './suggestions-n4.json', './app-01-noyau.js', './app-02-outils.js',
                './app-03-decouvrir.js', './app-04-sorties.js', './app-05-fiche.js',
                './app-06-maliste.js', './app-07-profil.js', './app-08-compte.js',
                './app-09-profils.js', './app-10-guide.js', './app-11-taxo.js',
-               './app-12-citation.js', './app-13-affiche.js']
+               './app-12-citation.js', './app-13-affiche.js', './app-14-cache.js']
   .map(p => p.endsWith('.js') || p.endsWith('.css') ? p + '?b=' + BUILD : p);
 
 self.addEventListener('install', e => {
