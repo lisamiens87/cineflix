@@ -200,10 +200,10 @@ rien, même en trafiquant l'app.
 
 | Table / vue | Contenu |
 |---|---|
-| `profils` | Un prénom par compte. Lisible par les connectés (la file affiche un nom). |
+| `profils` | Un prénom, une tête, un compte serveur, et le `statut` qui ouvre ou ferme l'accès. Lisible par les connectés (la file affiche un nom). |
 | `admins` | Qui traite la file. Fonction `est_admin()` en `security definer` pour éviter la récursion entre politiques. |
 | `elements` | Favoris et demandes, un par utilisateur et par titre. |
-| `catalogue` | Les identifiants TMDB présents sur le NAS, poussés par l'export. |
+| `catalogue` | Une seule ligne : les identifiants TMDB présents sur le NAS, plus les fiches compactes (`items`) qui font le tri de la Cinémathèque. |
 | `gouts` | Les réponses du parcours d'accueil. |
 | `file_demandes` | Vue : la file d'administration, demandes groupées par titre. |
 
@@ -213,11 +213,37 @@ jamais les simples favoris. C'est écrit dans la politique RLS d'`elements`.
 La clé `anon` vit dans `config.js` — c'est fait pour. La clé `service_role`
 ne quitte jamais le NAS.
 
-> ⚠️ **Écart connu** : l'app et l'export utilisent aussi les tables
-> `ecartes`, `telerama`, `sorties_phys`, `push_abonnements`, `journal_nas` et
-> `motscles_films`, qui **ne figurent pas** dans `supabase-cineflix.sql`.
-> Elles ont été créées à la main au fil des builds. Une base repartie du seul
-> fichier SQL sera donc incomplète.
+Six autres tables complètent le tableau, alimentées par l'export du NAS et
+lues par l'app :
+
+| Table | Contenu |
+|---|---|
+| `ecartes` | Les suggestions écartées, datées : le film revient de lui-même à six mois. |
+| `telerama` | Les notes qui font les « T » sur les vignettes. La ligne `__semis__` n'est pas une note : elle range la progression du balayage TMDB. |
+| `sorties_phys` | Le calendrier Blu-ray / 4K, apparié à TMDB quand c'est possible. |
+| `push_abonnements` | Un appareil, une ligne. L'endpoint du navigateur fait la clé. |
+| `journal_nas` | Bloc-notes clé → valeur écrit par l'export, dont `comptes_jf`. |
+| `motscles_films` | Cache des mots-clés TMDB pour la taxonomie. L'app ne le lit jamais. |
+
+Deux règles de lecture traversent tout le schéma :
+
+- **Ce qui vient du NAS se lit, ne s'écrit pas.** `catalogue`, `telerama`,
+  `sorties_phys` et `motscles_films` n'ont aucune politique d'écriture : seule
+  la clé `service_role`, restée sur le NAS, les alimente.
+- **Effacer n'est pas lire.** L'administrateur peut supprimer les goûts et les
+  écarts d'un membre qui s'en va — la fenêtre de confirmation le promet — sans
+  jamais pouvoir les consulter.
+
+Un **déclencheur** sur `profils` complète les politiques RLS : un nouveau
+compte naît toujours en attente, et seul un administrateur peut changer
+`statut`. Sans lui, chacun pourrait se valider soi-même d'un simple PATCH — la
+politique RLS autorise chacun à modifier sa ligne, et elle ne sait pas
+distinguer une colonne d'une autre.
+
+> ℹ️ Le fichier est **rejouable** : `if not exists` partout, `drop policy if
+> exists` avant chaque politique. Le rejouer sur une base en service n'écrase
+> aucune donnée. L'ordre compte en revanche — la vue `file_demandes` est
+> définie en fin de fichier, après les colonnes qu'elle sélectionne.
 
 ---
 
