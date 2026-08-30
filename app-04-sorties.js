@@ -222,7 +222,10 @@ function chipsModes(sous){
    ce n'est que le titre et le contenu qui changent. */
 function voletsCine(){
   const v = [{ id:'sorties', label:'Sorties' }];
-  if(typeof estAdmin !== 'undefined' && estAdmin) v.push({ id:'sugg', label:'Suggestions' });
+  if(typeof estAdmin !== 'undefined' && estAdmin){
+    v.push({ id:'sugg', label:'Suggestions' });
+    v.push({ id:'vth',  label:'Ma vidéothèque' });
+  }
   if(!v.some(x => x.id === ui.cineVolet)) ui.cineVolet = 'sorties';
   if(v.length < 2) return '';          /* un seul volet ne se choisit pas */
   return '<div class="chips volets">'+v.map(x=>
@@ -246,7 +249,8 @@ const cineEtroit = ()=> {
 /* L'entrée de la barre du bas : on ouvre toujours sur les sorties, et on
    lance le chargement qui manque plutôt que d'afficher un écran vide. */
 function allerCinema(){
-  if(ui.cineVolet === 'sugg' && !(typeof estAdmin !== 'undefined' && estAdmin))
+  if((ui.cineVolet === 'sugg' || ui.cineVolet === 'vth') &&
+     !(typeof estAdmin !== 'undefined' && estAdmin))
     ui.cineVolet = 'sorties';
   go('sorties');
 }
@@ -255,6 +259,8 @@ function viewSorties(){
   const volets = voletsCine();
   if(ui.cineVolet === 'sugg')
     return header('Cinéma', {sub:volets}) + corpsSuggestions();
+  if(ui.cineVolet === 'vth')
+    return header('Cinéma', {sub:volets}) + viewVideotheque();
   return header('Cinéma', {sub: volets + chipsModes(true)}) + banniereCle() +
     (cineEtroit() ? corpsSortiesGrille() : corpsSorties());
 }
