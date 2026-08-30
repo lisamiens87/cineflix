@@ -1358,6 +1358,115 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await ctx4.close();
 
 
+  // 18. Ma videtheque : la couleur d'abord, le rendu par lots ensuite
+  /* Le calcul de la couleur est une fonction PURE : elle ne lit que ses trois
+     arguments. C'est ce qui permet de l'eprouver ici, en mode local, sans
+     Supabase ni les 2 300 lignes — la lecture des tables, elle, est verifiee
+     par test-supabase.js. */
+  const vthCouleur = async (film, edition, corr) => await page.evaluate(
+    a => couleurFilm(a[0], a[1], a[2]).cl, [film, edition, corr]);
+
+  const DVD   = { palier:'DVD' },        BR = { palier:'BLURAY' };
+  const HD    = { palier:'HD_COMPRESSE' }, BAS = { palier:'BAS' };
+  const UHD   = { palier:'UHD4K' };
+  const edDVD = { meilleur_support:'DVD' }, edBR = { meilleur_support:'BLURAY' };
+  const edUHD = { meilleur_support:'UHD4K' };
+
+  ok('le support egal au palier est au maximum',
+     await vthCouleur(BR, edBR, null) === 'vert');
+  ok('un support meilleur que le palier est ameliorable',
+     await vthCouleur(BR, edUHD, null) === 'orange');
+  ok('un support moins bon que le palier reste au maximum',
+     await vthCouleur(UHD, edDVD, null) === 'vert');
+  /* DVD et HD_COMPRESSE partagent le rang 1 : un DVD du commerce n'ameliore
+     pas un 1080p compresse. */
+  ok('DVD et HD_COMPRESSE sont au meme rang',
+     await vthCouleur(HD, edDVD, null) === 'vert' &&
+     await vthCouleur(DVD, edDVD, null) === 'vert');
+  ok('« verifie, qualite maximum » gagne sur tout le reste',
+     await vthCouleur(DVD, edUHD, {statut:'VERIFIE_MAX'}) === 'vert');
+  ok('la pastille d\'un film verifie ne porte pas le support du marche',
+     await page.evaluate(()=> couleurFilm({palier:'DVD'}, {meilleur_support:'UHD4K'},
+       {statut:'VERIFIE_MAX'}).libelle) === 'Au maximum');
+  ok('le support force prime la jointure',
+     await vthCouleur(DVD, edUHD, {support_force:'DVD'}) === 'vert');
+  ok('« a revoir plus tard » ne change pas la couleur',
+     await vthCouleur(BR, null, {statut:'A_REVOIR'}) === 'rouge');
+  /* Regle 4, la file de travail : sans edition connue, seuls les paliers
+     BLURAY et HD_COMPRESSE partent en rouge. */
+  ok('sans edition, Blu-ray et HD partent a rapprocher',
+     await vthCouleur(BR, null, null) === 'rouge' &&
+     await vthCouleur(HD, null, null) === 'rouge');
+  ok('sans edition, les autres paliers restent non references',
+     await vthCouleur(BAS, null, null) === 'gris' &&
+     await vthCouleur(DVD, null, null) === 'gris' &&
+     await vthCouleur(UHD, null, null) === 'gris');
+  ok('un palier inconnu ne passe pas pour un maximum',
+     await vthCouleur({palier:'ZZZ'}, edDVD, null) === 'orange');
+
+  // 18 bis. L'ecran : 2 300 lignes ne se rendent pas d'un coup
+  await page.evaluate(()=>{
+     estAdmin = true;
+     const films = [], edts = [];
+     for(let i = 0; i < 250; i++){
+       const cle = 'film ' + i + '|2020';
+       films.push({ cle:cle, titre:'Film ' + String(i).padStart(3,'0'), annee:'2020',
+                    palier: i % 2 ? 'BLURAY' : 'DVD', dossier: i % 2 ? '4K' : 'DVD',
+                    chemin:'\\\\nas\\Films\\f' + i + '.mkv', taille_octets: 2147483648 });
+       if(i % 2 === 0) edts.push({ cle:cle, titre:'Film ' + String(i).padStart(3,'0'),
+                                   annee:'2020', editeur:'Editeur', meilleur_support:'UHD4K' });
+     }
+     /* Un titre accentue, pour verifier que la recherche ignore les accents. */
+     films.push({ cle:'amelie|2001', titre:'Amélie', annee:'2001', palier:'BLURAY',
+                  dossier:'Full Bluray', chemin:'\\\\nas\\Films\\a.mkv',
+                  taille_octets: 1073741824 });
+     ui.vth.films = films; ui.vth.edts = edts;
+     ui.vth.edtsParCle = {}; edts.forEach(e => { e._n = normVth(e.titre);
+                                                 ui.vth.edtsParCle[e.cle] = e; });
+     ui.vth.corr = {}; ui.vth.dossiers = ['4K','DVD','Full Bluray'];
+     films.forEach(f => { f._n = normVth(f.titre); });
+     films.sort((a,b)=> String(a.titre).localeCompare(String(b.titre), 'fr'));
+     ui.vth.filtre = ''; ui.vth.q = ''; ui.vth.dossier = ''; ui.vth.page = 0;
+     ui.vth.charge = true; ui.vth.loading = false; ui.vth.err = '';
+     recalculerCouleursVth();
+     ui.cineVolet = 'vth';
+     go('sorties');
+  });
+  await page.waitForSelector('.vtrow', {timeout:10000});
+  ok('le volet Ma videotheque s\'affiche pour un administrateur',
+     (await page.locator('.chips.volets .chip').allInnerTexts()).join(' ').toLowerCase()
+       .indexOf('vid') >= 0);
+  ok('cent lignes rendues sur 251, pas les 251',
+     await page.locator('.vtrow').count() === 100 &&
+     await page.locator('.plus .btn').count() === 1);
+  await page.click('.plus .btn');
+  await page.waitForTimeout(200);
+  ok('« Voir plus » ajoute un lot de cent',
+     await page.locator('.vtrow').count() === 200);
+  ok('les quatre compteurs sont la, et comptent tout le catalogue',
+     await page.locator('#vthcpt .chip').count() === 4 &&
+     await page.evaluate(()=> ui.vth.compte.ameli === 125 && ui.vth.compte.rappr === 126));
+  await page.click('#vthcpt .chip:has-text("Ameliorable"), #vthcpt .chip:has-text("Améliorable")');
+  await page.waitForTimeout(200);
+  ok('un filtre de couleur ne garde que sa couleur',
+     await page.locator('.vtrow .vtp.orange').count() === 100 &&
+     await page.locator('.vtrow .vtp.rouge').count() === 0);
+  await page.click('#vthcpt .chip.on');
+  await page.waitForTimeout(200);
+  ok('un second appui sur le meme filtre l\'annule',
+     await page.evaluate(()=> ui.vth.filtre === '') &&
+     await page.locator('.vtrow .vtp.rouge').count() > 0);
+  await page.fill('#vthq', 'amelie');
+  await page.waitForTimeout(300);
+  ok('la recherche ignore les accents',
+     await page.locator('.vtrow').count() === 1 &&
+     (await page.locator('.vtrow .cname2').innerText()).indexOf('Am') === 0);
+  ok('le champ de recherche garde le curseur pendant la frappe',
+     await page.evaluate(()=> document.activeElement && document.activeElement.id === 'vthq'));
+  await page.fill('#vthq', '');
+  await page.waitForTimeout(200);
+
+
   await browser.close();
 
   console.log('');

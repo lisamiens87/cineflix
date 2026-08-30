@@ -154,6 +154,7 @@ icône, plein écran, pas de barre de navigateur.
 | `app-06-maliste.js` | favoris, demandes, arrivés |
 | `app-07-profil.js` | profil, réglages, mise en route, démarrage |
 | `app-08-compte.js` | comptes Supabase, synchronisation, file d'administration |
+| `app-15-videotheque.js` | **Ma vidéothèque** (administration) : l'inventaire du NAS face aux éditions physiques du commerce |
 
 ### Les deux axes
 

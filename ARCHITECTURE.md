@@ -72,8 +72,8 @@ code (`outils-nas/`) et un dossier de configuration CI (`.github/`).
 ├── manifest.json              manifeste PWA (nom, icônes, mode standalone)
 ├── sw.js                      service worker : coquille hors-ligne
 │
-├── app-01-noyau.js …          les 14 modules de l'application (voir §4)
-├── app-14-cache.js
+├── app-01-noyau.js …          les 15 modules de l'application (voir §4)
+├── app-15-videotheque.js
 │
 ├── app-base.css               tronc commun, mobile-first
 ├── app-mobile.css             affinages petits écrans (max-width)
@@ -120,6 +120,7 @@ l'inverse n'est vrai que par appel différé (`render()`, un `onclick`).
 | `app-11-taxo.js` | La **taxonomie** : 20 genres et 43 sous-catégories, écrits comme des *recettes* (genres, mots-clés, pays, durée, note) pour s'appliquer aussi bien au catalogue local qu'à une requête `/discover`. |
 | `app-12-citation.js` | La **citation d'ouverture** : au démarrage à froid *et* au retour d'arrière-plan après une heure d'inactivité. Liste embarquée, fonctionne hors ligne. |
 | `app-13-affiche.js` | La **visionneuse d'affiche** : pincer-zoomer, écrit à la main parce que l'app interdit volontairement le zoom du navigateur. Trois définitions successives, jamais d'écran vide. |
+| `app-15-videotheque.js` | **Ma vidéothèque**, troisième volet de l'écran Cinéma, réservé à l'administration : les films du NAS confrontés au catalogue des éditions physiques. Trois tables Supabase lues une fois et gardées en mémoire, une couleur par film (au maximum / améliorable / à rapprocher / non référencé), et les corrections manuelles — la seule écriture de l'app hors `elements`, `profils` et `gouts`. |
 | `app-14-cache.js` | Le **cache des données lourdes** (IndexedDB) : catalogue, notes Télérama, sorties physiques. Ne change rien à l'affichage, seulement le moment où l'app redemande — né d'un dépassement de quota Supabase. |
 
 ### État global

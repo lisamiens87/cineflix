@@ -131,8 +131,13 @@ let ui = {
   searchQ:'', searchRes:null, searchPers:null, searching:false, searchErr:'',
   sorties:{ mode:'bluray', res:[], loading:false, err:'', charge:false },
   listeTab:'favoris',
-  cineVolet:'sorties',                   // écran Cinéma : Sorties | Suggestions (3008p)
+  cineVolet:'sorties',                   // écran Cinéma : Sorties | Suggestions | Ma vidéothèque
   sugg:{ l:[], plie:{}, loading:false, err:'', charge:false },
+  /* Ma vidéothèque (app-15) : les trois tables sont lourdes, elles sont donc
+     lues une fois et gardées ici pour toute la session. */
+  vth:{ films:[], edts:[], edtsParCle:{}, corr:{}, dossiers:[], compte:null,
+        filtre:'', q:'', dossier:'', page:0, ouvert:-1, statutChoisi:'', qDvd:'',
+        loading:false, err:'', charge:false },
   fiche:null,
   saison:null,
   auth:{ mode:'connexion', err:'', occupe:false },
@@ -419,6 +424,8 @@ function render(){
      doit relancer le chargement qui manque, selon le volet ouvert. */
   if(view === 'sorties' && ui.cineVolet === 'sugg' && !ui.sugg.charge && !ui.sugg.loading)
     chargerSuggestions();
+  if(view === 'sorties' && ui.cineVolet === 'vth' && !ui.vth.charge && !ui.vth.loading)
+    chargerVideotheque();
 }
 
 /* La page principale est une COUVERTURE (le grand visuel, rien d'autre) ;
