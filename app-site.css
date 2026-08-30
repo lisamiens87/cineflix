@@ -338,3 +338,15 @@
 
   .overview{font-size:16px;line-height:1.62;max-width:none;padding:0;margin:14px 24px 0}
 }
+
+
+/* ---- Ma vidéothèque : la pastille reprend sa place à droite ----
+   Sous 860 px elle passe à la ligne (app-base.css) ; ici la largeur suffit
+   pour la ranger en bout de ligne, où l'œil la retrouve d'une colonne. */
+@media (min-width:860px){
+  .vtrow{flex-wrap:nowrap;align-items:center}
+  .vtrow .cinfo{flex:1 1 auto}
+  .vtrow .vtp{margin-left:auto}
+  .vtfiltres input{flex:2 1 0}
+  .vtfiltres select{flex:1 1 0;max-width:260px}
+}
