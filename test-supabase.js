@@ -16,6 +16,24 @@ function film(id, titre){
 const echecs = [];
 const appels = [];                       // trace des écritures vers Supabase
 
+/* Les trois tables de Ma vidéothèque, aux VRAIES tailles : c'est le seul
+   moyen de prouver que la pagination franchit le plafond de PostgREST. */
+const VTH_FILMS = 2307, VTH_EDTS = 18113;
+const PALIERS = ['DVD','BLURAY','HD_COMPRESSE','UHD4K'];
+function ligneVth(table, i){
+  const cle = 'film ' + i + '|2000';
+  if(table === '/rest/v1/videotheque')
+    return { cle:cle, titre:'Film ' + i, annee:'2000', palier:PALIERS[i % 4],
+             dossier:PALIERS[i % 4], chemin:'\\\\nas\\Films\\f' + i + '.mkv',
+             taille_octets: 1073741824, date_modif:'2026-01-01' };
+  /* Une édition pour un film sur trois : le reste alimente la file rouge. */
+  return { cle:(i % 3 === 0 ? 'film ' + i + '|2000' : 'edition ' + i),
+           titre:'Film ' + i, annee:'2000', realisateur:'R. Realisateur',
+           editeur:'Editeur', meilleur_support:'UHD4K' };
+}
+let preferVth = '';                      // l'en-tête Prefer du dernier POST correction
+let refusVth  = true;                    // le premier POST est refusé en douce
+
 /* La file d'un proche, telle que la base la rendrait — et qu'elle CHANGE
    quand l'administrateur traite une demande. */
 const file = [
@@ -123,6 +141,30 @@ const file = [
       if(m === 'DELETE') return route.fulfill({status:204, body:''});
     }
     if(p === '/rest/v1/file_demandes') return j(file);
+
+    /* Le banc IMITE le plafond de PostgREST : 1 000 lignes par réponse au
+       maximum, quelle que soit la tranche demandée, et un 200 tout ce qu'il y
+       a de normal. C'est cette troncature muette que la pagination doit
+       franchir — sans le plafond ici, le test ne prouverait rien. */
+    if(p === '/rest/v1/videotheque' || p === '/rest/v1/editions_dvdfr'){
+      const total = (p === '/rest/v1/videotheque') ? VTH_FILMS : VTH_EDTS;
+      const rg = String(req.headers()['range'] || '0-999').split('-');
+      const d = Number(rg[0]) || 0;
+      const f = Math.min(Number(rg[1]) || (d + 999), d + 999);
+      const out = [];
+      for(let i = d; i <= f && i < total; i++) out.push(ligneVth(p, i));
+      return j(out);
+    }
+    if(p === '/rest/v1/videotheque_corrections'){
+      if(m === 'GET') return j([]);
+      if(m === 'POST'){
+        preferVth = String(req.headers()['prefer'] || '');
+        /* Le piège maison, joué pour de vrai : une écriture bloquée par RLS
+           répond 200 avec une LISTE VIDE. L'app doit compter les lignes. */
+        if(refusVth){ refusVth = false; return j([]); }
+        return j([ JSON.parse(req.postData() || '{}') ]);
+      }
+    }
     return j({});
   });
 
@@ -279,6 +321,42 @@ const file = [
   await page.waitForTimeout(300);
   ok('elle réapparaît sous « En cours »',
      (await page.locator('.pastille.encours').count()) === 1);
+
+  // 6 bis. Ma vidéothèque : lire 2 307 et 18 113 lignes, pas 1 000
+  await page.evaluate(()=>{ ui.cineVolet = 'vth'; go('sorties'); });
+  await page.waitForSelector('.vtrow', {timeout:60000});
+  ok('la vidéothèque est lue en entier malgré le plafond de 1 000 lignes',
+     await page.evaluate(()=> ui.vth.films.length) === VTH_FILMS);
+  ok('le catalogue des éditions aussi',
+     await page.evaluate(()=> ui.vth.edts.length) === VTH_EDTS);
+  ok('chaque table est demandée par tranches successives',
+     appels.filter(a => a === 'GET /rest/v1/videotheque').length === 3 &&
+     appels.filter(a => a === 'GET /rest/v1/editions_dvdfr').length === 19);
+  ok('cent lignes rendues, pas deux mille trois cents',
+     await page.locator('.vtrow').count() === 100);
+
+  // 6 ter. L'écriture : la seule table que l'app touche
+  const cleVth = await page.evaluate(async ()=>{
+     const f = ui.vth.films.filter(x => x._cl === 'rouge')[0];
+     ui.vth.ouvert = ui.vth.films.indexOf(f);
+     ui.vth.statutChoisi = 'VERIFIE_MAX';
+     await vthEnregistrerStatut();
+     return f.cle;
+  });
+  ok('l\'écriture demande la représentation et un upsert',
+     preferVth.includes('return=representation') && preferVth.includes('merge-duplicates'));
+  ok('un refus silencieux (200 + liste vide) ne passe pas pour un succès',
+     await page.evaluate(c => !ui.vth.corr[c], cleVth) &&
+     /refus/i.test(await page.locator('.toast').innerText()));
+  await page.evaluate(async ()=>{ await vthEnregistrerStatut(); });
+  await page.waitForTimeout(200);
+  ok('acceptée, la correction est retenue et le film passe au vert',
+     await page.evaluate(c => (ui.vth.corr[c]||{}).statut === 'VERIFIE_MAX' &&
+       ui.vth.films[ui.vth.ouvert]._cl === 'vert', cleVth));
+  ok('et la date du verdict est posée',
+     await page.evaluate(c => !!(ui.vth.corr[c]||{}).verifie_le, cleVth));
+  await page.evaluate(()=>{ ui.cineVolet = 'sorties'; go('sorties'); });
+  await page.waitForTimeout(300);
 
   // 7. La session survit au rechargement
   await page.reload();
