@@ -153,14 +153,22 @@ async function chargerVideotheque(){
 function couleurFilm(film, edition, correction){
   const c = correction || null;
 
-  /* 1. Le verdict humain prime sur tout le reste : « j'ai regardé, c'est
-        au maximum de ce qui existe pour ce film ». On n'affiche PAS le
-        support du marché sur cette pastille — dire « 4K » en vert sur un
-        film qu'on possède en DVD serait un contresens. */
+  /* 1. La 4K n'a rien au-dessus d'elle. Un film rangé en UHD4K est donc au
+        maximum par construction, et aucune jointure n'est nécessaire pour
+        l'affirmer — c'est même l'inverse : chercher une édition ne pouvait
+        que le faire passer à tort pour « non référencé » quand DVDFr ne le
+        connaissait pas. Cette règle passe avant toutes les autres. */
+  if(film.palier === 'UHD4K')
+    return { cl:'vert', libelle:VTH_LIB_SUPPORT.UHD4K, support:'UHD4K' };
+
+  /* 2. Le verdict humain prime sur le reste : « j'ai regardé, c'est au
+        maximum de ce qui existe pour ce film ». On n'affiche PAS le support
+        du marché sur cette pastille — dire « 4K » en vert sur un film qu'on
+        possède en DVD serait un contresens. */
   if(c && c.statut === 'VERIFIE_MAX')
     return { cl:'vert', libelle:'Au maximum', support:'' };
 
-  /* 2. Le meilleur support connu, par ordre de confiance : ce que j'ai
+  /* 3. Le meilleur support connu, par ordre de confiance : ce que j'ai
         corrigé à la main, puis l'édition que j'ai rattachée moi-même, puis
         la jointure automatique sur la clé. */
   let sup = '';
@@ -177,7 +185,7 @@ function couleurFilm(film, edition, correction){
              libelle: VTH_LIB_SUPPORT[sup], support: sup };
   }
 
-  /* 3. Rien trouvé. Un Blu-ray ou un 1080p sans édition connue est
+  /* 4. Rien trouvé. Un Blu-ray ou un 1080p sans édition connue est
         probablement un défaut de rapprochement, pas une absence du marché :
         il part dans la file à traiter. Les autres paliers restent gris. */
   if(film.palier === 'BLURAY' || film.palier === 'HD_COMPRESSE')
@@ -372,6 +380,19 @@ function sheetVthHtml(i){
     '<input id="vthqd" type="search" placeholder="Titre de l\'édition" '+
       'autocomplete="off" spellcheck="false" oninput="vthChercheDvdfr(this.value)">'+
     '<div id="vthdvd">'+resultatsDvdfrHtml()+'</div>'+
+    /* Troisième issue, quand DVDFr ne connaît pas le film mais que je sais,
+       moi, ce qui existe : « 88 minutes » est absent de la base et pourtant
+       il en existe un Blu-ray. Le film quitte alors la file et prend sa
+       couleur par comparaison des rangs, comme n'importe quel autre. */
+    '<div class="fgrp">Forcer le meilleur support</div>'+
+    '<select id="vthsup">'+
+      '<option value="">— support réel —</option>'+
+      Object.keys(VTH_RANG_SUPPORT).map(s=>'<option value="'+s+'"'+
+        ((c && c.support_force === s) ? ' selected' : '')+'>'+
+        VTH_LIB_SUPPORT[s]+'</option>').join('')+
+    '</select>'+
+    '<button class="btn ghost block" style="margin-top:8px" '+
+      'onclick="vthEnregistrerSupport()">Enregistrer ce support</button>'+
     '<div class="fgrp">Statut</div>'+
     '<div id="vthstat">'+statutVthHtml()+'</div>'+
     '<button class="btn block" style="margin-top:10px" onclick="vthEnregistrerStatut()">'+
