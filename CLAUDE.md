@@ -31,8 +31,8 @@ git push -u origin <branche>
 - **Une PR par sujet.** Deux sujets sans rapport font deux PR, quitte à ce que
   la seconde attende la première.
 - **La PR dit ce qui a été vérifié**, pas seulement ce qui a changé. « Testé »
-  n'est pas une vérification ; « `node test-cineflix.js` passe, 181 contrôles »
-  en est une.
+  n'est pas une vérification ; « les deux suites passent, tout est vert » en est
+  une, et nommer le contrôle qu'on a ajouté vaut mieux encore.
 - **La fusion se fait par commit de fusion** (`Merge pull request #N from …`),
   jamais en squash : c'est la convention de l'historique.
 
@@ -169,9 +169,14 @@ reste utilisable.
 
 ```bash
 python3 -m http.server 8123 &     # dans le dossier de l'app
-node test-cineflix.js             # mode local  — 181 contrôles au 3108f
-node test-supabase.js             # mode compte —  29 contrôles au 3108f
+node test-cineflix.js             # mode local
+node test-supabase.js             # mode compte
 ```
+
+Chaque contrôle s'affiche au passage ; la suite finit sur « Tout est vert. » et
+sort en erreur au premier échec. **Aucun chiffre n'est donné ici à dessein** :
+le nombre de contrôles monte à presque chaque build, et c'est le signe qu'on
+veut — un correctif s'accompagne du test qui l'aurait vu.
 
 Les deux suites simulent TMDB et Supabase et exécutent le vrai code de l'app.
 Elles vérifient des **mécanismes**. Pour le guide, la pertinence se mesure
