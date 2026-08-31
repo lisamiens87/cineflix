@@ -1487,15 +1487,46 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
      ouvrirFilmVth(ui.vth.films.indexOf(f));
   });
   await page.waitForSelector('.sheet.show', {timeout:5000});
-  const sheetVth = (await page.locator('#sheetin').innerText()).toLowerCase();
-  ok('le panneau d\'un film a traiter propose les trois issues',
-     sheetVth.indexOf('dvdfr') >= 0 &&
-     sheetVth.indexOf('forcer le meilleur support') >= 0 &&
-     sheetVth.indexOf('statut') >= 0);
-  ok('le support s\'y force avec le meme select que sur un film vert',
-     await page.locator('#sheetin #vthsup').count() === 1 &&
-     (await page.locator('#sheetin #vthsup option').allInnerTexts()).join('|')
-       .indexOf('Blu-ray') >= 0);
+  /* Le panneau est un ENCHAINEMENT : l'etape 2 ne s'ouvre qu'une fois la
+     recherche DVDFr epuisee. Forcer un support n'a de sens que la, puisqu'une
+     fiche rapprochee porte deja le sien. */
+  ok('l\'etape 1 est ouverte, la 2 est annoncee mais fermee',
+     await page.locator('#sheetin .vtetape').count() === 2 &&
+     await page.locator('#sheetin .vtetape.muet').count() === 1 &&
+     await page.locator('#sheetin .vtcarte').count() === 0 &&
+     await page.locator('#sheetin #vthsup').count() === 0);
+  await page.fill('#sheetin #vthqd', 'film 0');
+  await page.waitForTimeout(250);
+  ok('une recherche qui aboutit laisse l\'etape 2 fermee',
+     await page.locator('#sheetin .opt').count() > 0 &&
+     await page.locator('#sheetin .vtcarte').count() === 0);
+  await page.fill('#sheetin #vthqd', 'zzzzintrouvable');
+  await page.waitForTimeout(250);
+  ok('une recherche vide invite a passer a l\'etape 2, et l\'ouvre',
+     /passe a l.etape 2/i.test((await page.locator('#sheetin #vthdvd').innerText())
+       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')) &&
+     await page.locator('#sheetin .vtcarte').count() === 2 &&
+     await page.locator('#sheetin .vtetape.muet').count() === 0);
+  ok('un seul bouton Enregistrer, et un bouton Passer a cote',
+     (await page.locator('#sheetin .vtact .btn').allInnerTexts()).join('|')
+       .toLowerCase() === 'enregistrer|passer');
+  /* L'annonce du resultat est calculee par la meme fonction que la couleur
+     reelle : elle ne peut pas diverger du verdict. */
+  await page.selectOption('#sheetin #vthsup', 'UHD4K');
+  await page.waitForTimeout(200);
+  ok('choisir un support selectionne la carte A et annonce le resultat',
+     await page.locator('#sheetin .vtcarte.on').count() === 1 &&
+     /ameliorable/i.test((await page.locator('#sheetin .vtapercu').innerText())
+       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+  await page.selectOption('#sheetin #vthsup', 'DVD');
+  await page.waitForTimeout(200);
+  ok('un support au rang du palier annonce « Au maximum »',
+     /au maximum/i.test(await page.locator('#sheetin .vtapercu').innerText()));
+  await page.locator('#sheetin .vtcarte').nth(1).click();
+  await page.waitForTimeout(200);
+  ok('les deux cartes sont exclusives',
+     await page.locator('#sheetin .vtcarte.on').count() === 1 &&
+     await page.evaluate(()=> ui.vth.carte) === 'B');
   await page.evaluate(()=> closeSheet());
   await page.waitForTimeout(200);
 
