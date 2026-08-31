@@ -346,8 +346,8 @@ const file = [
   const cleVth = await page.evaluate(async ()=>{
      const f = ui.vth.films.filter(x => x._cl === 'rouge')[0];
      ui.vth.ouvert = ui.vth.films.indexOf(f);
-     ui.vth.statutChoisi = 'VERIFIE_MAX';
-     await vthEnregistrerStatut();
+     ui.vth.carte = 'B';
+     await vthEnregistrerEtape2();
      return f.cle;
   });
   ok('l\'écriture demande la représentation et un upsert',
@@ -355,7 +355,7 @@ const file = [
   ok('un refus silencieux (200 + liste vide) ne passe pas pour un succès',
      await page.evaluate(c => !ui.vth.corr[c], cleVth) &&
      /refus/i.test(await page.locator('.toast').innerText()));
-  await page.evaluate(async ()=>{ await vthEnregistrerStatut(); });
+  await page.evaluate(async ()=>{ await vthEnregistrerEtape2(); });
   await page.waitForTimeout(200);
   ok('acceptée, la correction est retenue et le film passe au vert',
      await page.evaluate(c => (ui.vth.corr[c]||{}).statut === 'VERIFIE_MAX' &&

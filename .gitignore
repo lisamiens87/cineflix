@@ -1,0 +1,4 @@
+# Playwright, installe localement pour faire tourner les deux bancs.
+# Le reste du depot est volontairement sans dependance : ni framework, ni
+# bundler, ni package.json. Ces binaires ne sont pas du code de l app.
+node_modules/

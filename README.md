@@ -196,8 +196,8 @@ Deux suites Playwright, TMDB et Supabase simulés, le reste est le vrai code :
 
 ```bash
 python3 -m http.server 8123 &     # dans le dossier de l'app
-node test-cineflix.js             # mode local  — 22 vérifications
-node test-supabase.js             # mode compte — 21 vérifications
+node test-cineflix.js             # mode local  — 225 vérifications
+node test-supabase.js             # mode compte — 45 vérifications
 ```
 
 ---

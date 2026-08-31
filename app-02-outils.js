@@ -136,7 +136,7 @@ let ui = {
   /* Ma vidéothèque (app-15) : les trois tables sont lourdes, elles sont donc
      lues une fois et gardées ici pour toute la session. */
   vth:{ films:[], edts:[], edtsParCle:{}, corr:{}, dossiers:[], compte:null,
-        filtre:'', q:'', dossier:'', page:0, ouvert:-1, statutChoisi:'', qDvd:'',
+        filtre:'', q:'', dossier:'', page:0, ouvert:-1, qDvd:'', carte:'', carteSup:'',
         loading:false, err:'', charge:false },
   fiche:null,
   saison:null,

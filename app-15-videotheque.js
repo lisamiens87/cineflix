@@ -347,8 +347,11 @@ function ouvrirFilmVth(i){
   const f = ui.vth.films[i];
   if(!f) return;
   ui.vth.ouvert = i;
-  ui.vth.statutChoisi = (ui.vth.corr[f.cle] || {}).statut || '';
   ui.vth.qDvd = '';
+  /* L'étape 2 repart vierge à chaque ouverture, sauf le support déjà forcé :
+     rouvrir un film corrigé doit montrer ce qui a été décidé. */
+  ui.vth.carteSup = (ui.vth.corr[f.cle] || {}).support_force || '';
+  ui.vth.carte = ui.vth.carteSup ? 'A' : '';
   openSheet(sheetVthHtml(i));
 }
 
@@ -383,35 +386,115 @@ function sheetVthHtml(i){
     return h;
   }
 
-  /* Rouge ou gris : la file de travail. */
+  /* Rouge ou gris : la file de travail, en DEUX ÉTAPES.
+
+     L'ancienne forme posait trois blocs concurrents et deux boutons
+     « Enregistrer » : on ne savait pas lequel faisait quoi, et la question
+     du statut restait posée même après avoir forcé un support. Vécu sur
+     « 5ème Set » (2021), possédé en 720p : je force « Blu-ray », et l'écran
+     me demande encore si j'ai la qualité maximum — alors que la réponse
+     vient d'être donnée, c'est non, le film est améliorable.
+
+     L'enchaînement supprime la contradiction : forcer un support n'a de sens
+     QUE si le film n'est rapproché à aucune fiche, puisqu'une fiche PORTE
+     déjà son support. L'étape 2 ne s'ouvre donc qu'une fois l'étape 1
+     épuisée. */
   h += '<div class="small muted">'+esc([f.annee || '', f.dossier || '',
         fmtOctets(f.taille_octets)].filter(Boolean).join(' · '))+'</div>'+
-    '<div class="fgrp">Chercher dans DVDFr</div>'+
+    '<div class="vtetape"><span class="vtnum">1</span>Chercher dans DVDFr</div>'+
     '<input id="vthqd" type="search" placeholder="Titre de l\'édition" '+
       'autocomplete="off" spellcheck="false" oninput="vthChercheDvdfr(this.value)">'+
     '<div id="vthdvd">'+resultatsDvdfrHtml()+'</div>'+
-    /* Troisième issue, quand DVDFr ne connaît pas le film mais que je sais,
-       moi, ce qui existe : « 88 minutes » est absent de la base et pourtant
-       il en existe un Blu-ray. Le film quitte alors la file et prend sa
-       couleur par comparaison des rangs, comme n'importe quel autre. */
-    '<div class="fgrp">Forcer le meilleur support</div>'+
-    '<select id="vthsup">'+
-      '<option value="">— support réel —</option>'+
-      Object.keys(VTH_RANG_SUPPORT).map(s=>'<option value="'+s+'"'+
-        ((c && c.support_force === s) ? ' selected' : '')+'>'+
-        VTH_LIB_SUPPORT[s]+'</option>').join('')+
-    '</select>'+
-    '<button class="btn ghost block" style="margin-top:8px" '+
-      'onclick="vthEnregistrerSupport()">Enregistrer ce support</button>'+
-    '<div class="fgrp">Statut</div>'+
-    '<div id="vthstat">'+statutVthHtml()+'</div>'+
-    '<button class="btn block" style="margin-top:10px" onclick="vthEnregistrerStatut()">'+
-      'Enregistrer</button>'+
-    '<button class="btn ghost block" style="margin-top:8px" onclick="vthSuivant()">'+
-      'Suivant</button>'+
+    '<div id="vthetape2">'+etape2Html(f)+'</div>';
+  return h;
+}
+
+/* L'étape 1 a-t-elle rendu les armes ? Deux lettres au moins ont été
+   tapées, et rien n'est remonté. Tant qu'on n'a pas cherché, l'étape 2
+   reste annoncée mais fermée : déclarer qu'un film est absent de DVDFr
+   sans avoir regardé n'aurait pas de sens. */
+function etape1Vide(){
+  return normVth(ui.vth.qDvd).length >= 2 && resultatsDvdfr().length === 0;
+}
+
+function etape2Html(f){
+  if(!etape1Vide())
+    return '<div class="vtetape muet"><span class="vtnum">2</span>'+
+        'Que sais-je de ce film ?</div>'+
+      '<div class="tiny muted">Cherche d\'abord dans DVDFr : cette étape '+
+        's\'ouvre si la recherche ne donne rien.</div>';
+
+  const v = ui.vth;
+  /* Le résultat annoncé est calculé par la MÊME fonction que la couleur
+     réelle, avec la correction qu'on s'apprête à écrire : impossible que
+     l'annonce et le verdict divergent. */
+  let apercu = '';
+  if(v.carteSup){
+    const r = couleurFilm(f, editionVth(f), { support_force: v.carteSup });
+    apercu = '<div class="vtapercu">→ Le film passera en '+
+      (r.cl === 'orange' ? 'Améliorable' : 'Au maximum')+'</div>';
+  }
+  return '<div class="vtetape"><span class="vtnum">2</span>'+
+      'Que sais-je de ce film ?</div>'+
+    '<div class="vtcarte'+(v.carte === 'A' ? ' on' : '')+'" role="button" tabindex="0" '+
+      'onclick="vthCarte(\'A\')">'+
+      '<b>Une meilleure édition existe</b>'+
+      '<select id="vthsup" onclick="event.stopPropagation()" '+
+        'onchange="vthCarteSupport(this.value)">'+
+        '<option value="">— support réel —</option>'+
+        Object.keys(VTH_RANG_SUPPORT).map(x=>'<option value="'+x+'"'+
+          (v.carteSup === x ? ' selected' : '')+'>'+VTH_LIB_SUPPORT[x]+'</option>').join('')+
+      '</select>'+ apercu +
+    '</div>'+
+    '<div class="vtcarte'+(v.carte === 'B' ? ' on' : '')+'" role="button" tabindex="0" '+
+      'onclick="vthCarte(\'B\')">'+
+      '<b>J\'ai déjà la qualité maximum</b>'+
+      '<s>Rien de mieux n\'existe · passera en Au maximum</s>'+
+    '</div>'+
+    '<div class="vtact">'+
+      '<button class="btn" onclick="vthEnregistrerEtape2()">Enregistrer</button>'+
+      '<button class="btn ghost" onclick="vthSuivant()">Passer</button>'+
+    '</div>'+
     '<div class="tiny muted center" style="margin-top:6px">'+
       resteVth()+' film(s) à traiter</div>';
-  return h;
+}
+
+function peindreEtape2(){
+  const f = ui.vth.films[ui.vth.ouvert];
+  const el = document.getElementById('vthetape2');
+  if(f && el) el.innerHTML = etape2Html(f);
+}
+function vthCarte(id){
+  ui.vth.carte = (ui.vth.carte === id) ? '' : id;
+  peindreEtape2();
+}
+function vthCarteSupport(val){
+  ui.vth.carteSup = val || '';
+  ui.vth.carte = val ? 'A' : ui.vth.carte;   /* choisir un support, c'est choisir la carte */
+  peindreEtape2();
+}
+
+/* Un seul bouton, une seule écriture : la carte choisie, et rien d'autre. */
+async function vthEnregistrerEtape2(){
+  const v = ui.vth, f = v.films[v.ouvert];
+  if(!f) return;
+  if(v.carte === 'A'){
+    if(!v.carteSup) return toast('Choisis un support.');
+    if(await vthEcrire(f.cle, { support_force: v.carteSup })){
+      closeSheet(); peindreVthTout();
+      toast('Support forcé : ' + VTH_LIB_SUPPORT[v.carteSup]);
+    }
+    return;
+  }
+  if(v.carte === 'B'){
+    if(await vthEcrire(f.cle, { statut:'VERIFIE_MAX',
+                                verifie_le:new Date().toISOString() })){
+      closeSheet(); peindreVthTout();
+      toast('Marqué au maximum');
+    }
+    return;
+  }
+  toast('Choisis l\'une des deux réponses.');
 }
 
 /* ---------- Revenir sur une décision ----------
@@ -470,37 +553,32 @@ async function vthAnnulerCorrection(){
   }
 }
 
-function statutVthHtml(){
-  const s = ui.vth.statutChoisi || '';
-  return '<button class="chip '+(s==='VERIFIE_MAX'?'on':'')+
-      '" onclick="vthChoisirStatut(\'VERIFIE_MAX\')">Vérifié, qualité maximum sur le NAS</button>'+
-    '<button class="chip '+(s==='A_REVOIR'?'on':'')+
-      '" onclick="vthChoisirStatut(\'A_REVOIR\')">À revoir plus tard</button>';
-}
-function vthChoisirStatut(s){
-  ui.vth.statutChoisi = (ui.vth.statutChoisi === s) ? '' : s;
-  const el = document.getElementById('vthstat');
-  if(el) el.innerHTML = statutVthHtml();
-}
-
 /* La recherche DVDFr travaille sur les 18 000 éditions déjà en mémoire :
    aucun appel réseau, et le titre normalisé a été calculé au chargement. */
 function vthChercheDvdfr(txt){
   ui.vth.qDvd = txt || '';
   const el = document.getElementById('vthdvd');
   if(el) el.innerHTML = resultatsDvdfrHtml();
+  peindreEtape2();          /* l'étape 2 s'ouvre ou se referme avec la recherche */
 }
-function resultatsDvdfrHtml(){
+function resultatsDvdfr(){
   const v = ui.vth;
   const q = normVth(v.qDvd);
-  if(q.length < 2)
-    return '<div class="tiny muted" style="padding:6px 0">Tape au moins deux lettres.</div>';
+  if(q.length < 2) return [];
   const res = [];
   for(let i = 0; i < v.edts.length && res.length < 30; i++){
     if((v.edts[i]._n || '').indexOf(q) >= 0) res.push(v.edts[i]);
   }
+  return res;
+}
+function resultatsDvdfrHtml(){
+  const q = normVth(ui.vth.qDvd);
+  if(q.length < 2)
+    return '<div class="tiny muted" style="padding:6px 0">Tape au moins deux lettres.</div>';
+  const res = resultatsDvdfr();
   if(!res.length)
-    return '<div class="tiny muted" style="padding:6px 0">Aucune édition trouvée.</div>';
+    return '<div class="tiny muted" style="padding:6px 0">'+
+           'Aucun résultat. Passe à l\'étape 2.</div>';
   return res.map(e=>'<button class="opt" onclick="vthRattacher(\''+
       esc(String(e.cle).replace(/'/g, '')) +'\')">'+
       esc(e.titre || '')+' <span class="muted">'+
@@ -554,20 +632,6 @@ async function vthRattacher(cleDvdfr){
   if(await vthEcrire(f.cle, { cle_dvdfr: cleDvdfr })){
     closeSheet(); peindreVthTout();
     toast('Édition rattachée');
-  }
-}
-
-async function vthEnregistrerStatut(){
-  const f = ui.vth.films[ui.vth.ouvert];
-  if(!f) return;
-  const s = ui.vth.statutChoisi;
-  if(!s) return toast('Choisis un statut.');
-  const champs = { statut: s };
-  /* La date n'a de sens que sur un verdict : elle dit QUAND j'ai regardé. */
-  if(s === 'VERIFIE_MAX') champs.verifie_le = new Date().toISOString();
-  if(await vthEcrire(f.cle, champs)){
-    closeSheet(); peindreVthTout();
-    toast(s === 'VERIFIE_MAX' ? 'Marqué au maximum' : 'Remis à plus tard');
   }
 }
 
