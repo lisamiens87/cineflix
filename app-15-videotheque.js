@@ -44,11 +44,18 @@ const VTH_FILTRES = [
 const VTH_CL_PAR_FILTRE = { max:'vert', ameli:'orange', rappr:'rouge', nonref:'gris' };
 
 /* ---------- Normalisation ----------
-   Même règle que la clé du NAS : minuscules, accents et ponctuation retirés.
-   Sans elle, « Amélie » ne trouve pas « Amelie » dans la recherche. */
+   Même règle que la clé du NAS : ligatures développées, minuscules, accents
+   et ponctuation retirés. Sans elle, « Amélie » ne trouve pas « Amelie »
+   dans la recherche.
+
+   Les ligatures sont traitées AVANT tout le reste, comme le fait
+   `Remove-Accents` côté NAS. Elles ne se décomposent pas en NFD : sans cette
+   ligne, « Cœur » finirait en « c ur », le œ tombant avec la ponctuation.
+   Ce n'est pas cosmétique — c'est cette chaîne qui sert de clé. */
 function normVth(s){
   if(!s) return '';
-  let t = String(s).toLowerCase();
+  let t = String(s).toLowerCase()
+    .replace(/œ/g, 'oe').replace(/æ/g, 'ae');
   try{
     t = t.normalize('NFD').replace(/[̀-ͯ]/g, '');
   }catch(e){}
@@ -56,11 +63,13 @@ function normVth(s){
 }
 
 /* ---------- La cle de rapprochement ----------
-   MIROIR EXACT de Get-TitreNormalise dans Scan_Catalogue_Qualite.ps1
-   (depot scripts-nas). Les deux fonctions DOIVENT bouger ensemble : la
-   jointure avec editions_dvdfr n'est qu'une egalite de chaines, donc si
-   l'une divergeait la jointure casserait en silence, sans la moindre
-   erreur - juste des films qui cessent d'etre rapproches.
+   MIROIR EXACT de Normalize-Titre dans Pousser_Videotheque_Supabase.ps1
+   (depot scripts-nas). C'est CE script-la qui fabrique les cles ecrites
+   dans les trois tables : c'est donc lui la reference, et aucun autre.
+   Les deux fonctions DOIVENT bouger ensemble : la jointure avec
+   editions_dvdfr n'est qu'une egalite de chaines, donc si l'une
+   divergeait la jointure casserait en silence, sans la moindre erreur -
+   juste des films qui cessent d'etre rapproches.
 
    Elle fait tout ce que normVth() fait, PLUS le retrait d'un article
    initial. C'est cette regle-la qui manque a normVth : « Le Parrain »

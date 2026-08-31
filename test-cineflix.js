@@ -1437,6 +1437,18 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
      await cle('The Last Emperor', '1987') === 'last emperor|1987');
   ok('un titre reduit a un article reste ce mot',
      await cle('Le', '2020') === 'le|2020');
+  /* Les ligatures ne se decomposent pas en NFD : sans traitement explicite,
+     le \u0153 tomberait avec la ponctuation et « C\u0153ur » donnerait « c ur »
+     quand la base ecrit « coeur ». La reference est Normalize-Titre, dans
+     Pousser_Videotheque_Supabase.ps1, le script qui ECRIT les cles. */
+  ok('les ligatures sont developpees, pas jetees',
+     await cle('C\u0153ur de tonnerre', '1992') === 'coeur de tonnerre|1992' &&
+     await cle('S\u0153urs', '2020') === 'soeurs|2020' &&
+     await cle('\u0152il pour \u0153il', '1957') === 'oeil pour oeil|1957' &&
+     await cle('L\u2019\u00c6uvre au noir', '1988') === 'aeuvre au noir|1988');
+  ok('la recherche developpe les ligatures elle aussi',
+     await page.evaluate(()=> normVth('C\u0153ur')) === 'coeur' &&
+     await page.evaluate(()=> normVth('\u0152uvre')) === 'oeuvre');
   ok('les accents et la ponctuation tombent comme dans normVth',
      await cle('Am\u00e9lie', '2001') === 'amelie|2001' &&
      await cle('Wall\u00b7E !', '2008') === 'wall e|2008');
