@@ -33,6 +33,7 @@ function ligneVth(table, i){
 }
 let preferVth = '';                      // l'en-tête Prefer du dernier POST correction
 let refusVth  = true;                    // le premier POST est refusé en douce
+let refusSuppr = true;                   // le premier DELETE aussi
 
 /* La file d'un proche, telle que la base la rendrait — et qu'elle CHANGE
    quand l'administrateur traite une demande. */
@@ -157,6 +158,12 @@ const file = [
     }
     if(p === '/rest/v1/videotheque_corrections'){
       if(m === 'GET') return j([]);
+      if(m === 'DELETE'){
+        preferVth = String(req.headers()['prefer'] || '');
+        /* Le meme piege qu'a l'ecriture, joue une fois : 200, liste vide. */
+        if(refusSuppr){ refusSuppr = false; return j([]); }
+        return j([{ cle:'efface' }]);
+      }
       if(m === 'POST'){
         preferVth = String(req.headers()['prefer'] || '');
         /* Le piège maison, joué pour de vrai : une écriture bloquée par RLS
@@ -355,6 +362,23 @@ const file = [
        ui.vth.films[ui.vth.ouvert]._cl === 'vert', cleVth));
   ok('et la date du verdict est posée',
      await page.evaluate(c => !!(ui.vth.corr[c]||{}).verifie_le, cleVth));
+
+  // 6 quater. Annuler une correction : la ligne est effacee, pas videe
+  await page.evaluate(async ()=>{ await vthAnnulerCorrection(); });
+  await page.waitForTimeout(200);
+  ok('la suppression demande la representation, elle aussi',
+     preferVth.includes('return=representation'));
+  ok('un refus silencieux ne fait pas disparaitre la correction',
+     await page.evaluate(c => !!ui.vth.corr[c], cleVth) &&
+     /refus/i.test(await page.locator('.toast').innerText()));
+  await page.evaluate(async ()=>{ await vthAnnulerCorrection(); });
+  await page.waitForTimeout(200);
+  ok('acceptee, la correction disparait et le film reprend sa couleur calculee',
+     await page.evaluate(c => !ui.vth.corr[c], cleVth) &&
+     await page.evaluate(()=> ui.vth.films[ui.vth.ouvert]._cl === 'rouge'));
+  ok('et il revient dans la file a traiter',
+     await page.evaluate(()=> fileVth().indexOf(ui.vth.films[ui.vth.ouvert]) >= 0));
+
   await page.evaluate(()=>{ ui.cineVolet = 'sorties'; go('sorties'); });
   await page.waitForTimeout(300);
 
