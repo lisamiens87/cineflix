@@ -1,7 +1,7 @@
 # Règles de travail
 
 Ce fichier dit **comment on travaille sur Premier Rang**. Pour comprendre
-comment le code est organisé — les quatorze modules, l'état global, le schéma
+comment le code est organisé — les modules `app-NN`, l'état global, le schéma
 Supabase — voir [ARCHITECTURE.md](ARCHITECTURE.md). Ici, seulement les règles
 qu'on applique en écrivant.
 
