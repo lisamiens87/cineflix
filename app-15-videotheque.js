@@ -33,7 +33,13 @@ const VTH_FILTRES = [
   { id:'max',    cl:'vert',   label:'Au maximum' },
   { id:'ameli',  cl:'orange', label:'Améliorable' },
   { id:'rappr',  cl:'rouge',  label:'À rapprocher' },
-  { id:'nonref', cl:'gris',   label:'Non référencé' }
+  { id:'nonref', cl:'gris',   label:'Non référencé' },
+  /* Le cinquième n'est pas une couleur mais une PROVENANCE : les films que
+     j'ai touchés à la main, quelle que soit la correction. C'est le seul
+     moyen de retrouver un film traité par erreur — traité, il a quitté sa
+     file, et aucune des quatre autres piles ne le distingue des films que
+     l'app a classés toute seule. */
+  { id:'corrige', cl:'corrige', label:'Corrigé' }
 ];
 const VTH_CL_PAR_FILTRE = { max:'vert', ameli:'orange', rappr:'rouge', nonref:'gris' };
 
@@ -207,7 +213,7 @@ function editionVth(f){
    fois, il serait absurde de la recalculer à chaque passage. */
 function recalculerCouleursVth(){
   const v = ui.vth;
-  v.compte = { max:0, ameli:0, rappr:0, nonref:0 };
+  v.compte = { max:0, ameli:0, rappr:0, nonref:0, corrige:0 };
   for(let i = 0; i < v.films.length; i++){
     const f = v.films[i];
     const r = couleurFilm(f, editionVth(f), v.corr[f.cle] || null);
@@ -216,17 +222,20 @@ function recalculerCouleursVth(){
     else if(r.cl === 'orange') v.compte.ameli++;
     else if(r.cl === 'rouge')  v.compte.rappr++;
     else                       v.compte.nonref++;
+    if(v.corr[f.cle]) v.compte.corrige++;
   }
 }
 
 /* ---------- Filtrage ---------- */
 function filmsVthFiltres(){
   const v = ui.vth;
-  const cl = v.filtre ? VTH_CL_PAR_FILTRE[v.filtre] : '';
+  const parCorrection = (v.filtre === 'corrige');
+  const cl = (v.filtre && !parCorrection) ? VTH_CL_PAR_FILTRE[v.filtre] : '';
   const q  = normVth(v.q);
   const res = [];
   for(let i = 0; i < v.films.length; i++){
     const f = v.films[i];
+    if(parCorrection && !v.corr[f.cle]) continue;
     if(cl && f._cl !== cl) continue;
     if(v.dossier && f.dossier !== v.dossier) continue;
     if(q && (f._n || '').indexOf(q) < 0) continue;
@@ -350,7 +359,8 @@ function sheetVthHtml(i){
 
   let h = '<h3>'+esc(f.titre || '(sans titre)')+'</h3>'+
     '<p class="small muted" style="margin:0 0 10px">'+
-      esc([f.annee || '', (edVue && edVue.realisateur) || ''].filter(Boolean).join(' · '))+'</p>';
+      esc([f.annee || '', (edVue && edVue.realisateur) || ''].filter(Boolean).join(' · '))+'</p>'+
+    correctionVthHtml(f, c);
 
   if(f._cl === 'vert' || f._cl === 'orange'){
     h += '<div class="fgrp">Ce que je possède</div>'+
@@ -402,6 +412,62 @@ function sheetVthHtml(i){
     '<div class="tiny muted center" style="margin-top:6px">'+
       resteVth()+' film(s) à traiter</div>';
   return h;
+}
+
+/* ---------- Revenir sur une décision ----------
+   Une correction traitée fait sortir le film de sa file : sans un moyen de
+   la lire et de l'annuler, une erreur devenait définitive — le film n'était
+   plus dans aucune pile où le retrouver. Le panneau dit donc TOUJOURS ce
+   qui a été décidé, et propose de le défaire. */
+function correctionVthHtml(f, c){
+  if(!c) return '';
+  const dits = [];
+  if(c.statut === 'VERIFIE_MAX')
+    dits.push('Vérifié au maximum' + (c.verifie_le ? ' le ' + fmtDateVth(c.verifie_le) : ''));
+  if(c.statut === 'A_REVOIR') dits.push('Marqué à revoir plus tard');
+  if(c.support_force && VTH_LIB_SUPPORT[c.support_force])
+    dits.push('Support forcé : ' + VTH_LIB_SUPPORT[c.support_force]);
+  if(c.cle_dvdfr){
+    const e = ui.vth.edtsParCle[c.cle_dvdfr];
+    dits.push('Rattaché à ' + (e ? (e.titre || c.cle_dvdfr) : c.cle_dvdfr));
+  }
+  if(!dits.length) dits.push('Correction enregistrée');
+  return '<div class="vtcorr">'+
+      '<div class="fgrp" style="margin-top:0">Correction en place</div>'+
+      '<div class="small">'+esc(dits.join(' · '))+'</div>'+
+      '<button class="btn ghost block" style="margin-top:8px" '+
+        'onclick="vthAnnulerCorrection()">Annuler la correction</button>'+
+    '</div>';
+}
+function fmtDateVth(iso){
+  const d = new Date(iso);
+  if(isNaN(d.getTime())) return String(iso).slice(0, 10);
+  return d.toLocaleDateString('fr-FR');
+}
+
+/* La ligne est SUPPRIMÉE, pas vidée : une correction annulée ne doit rien
+   laisser derrière elle, sinon le film garderait une ligne fantôme qui le
+   ferait compter comme « corrigé » alors qu'il ne l'est plus. */
+async function vthAnnulerCorrection(){
+  const f = ui.vth.films[ui.vth.ouvert];
+  if(!f || !ui.vth.corr[f.cle]) return;
+  try{
+    const r = await sbFetch('/rest/v1/videotheque_corrections?cle=eq.' +
+        encodeURIComponent(f.cle),
+      { method:'DELETE', headers:{ Prefer:'return=representation' } });
+    /* Même piège qu'à l'écriture : un refus RLS répond 200 avec une liste
+       vide. On compte les lignes effacées plutôt que de croire au silence. */
+    if(!Array.isArray(r) || !r.length){
+      toast('Refusé par le serveur — la correction est toujours là.');
+      return;
+    }
+    delete ui.vth.corr[f.cle];
+    recalculerCouleursVth();
+    closeSheet(); peindreVthTout();
+    toast('Correction annulée');
+  }catch(e){
+    toast('Échec : ' + ((e && e.message) || 'réessaie'));
+  }
 }
 
 function statutVthHtml(){
