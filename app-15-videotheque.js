@@ -55,6 +55,29 @@ function normVth(s){
   return t.replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+/* ---------- La cle de rapprochement ----------
+   MIROIR EXACT de Get-TitreNormalise dans Scan_Catalogue_Qualite.ps1
+   (depot scripts-nas). Les deux fonctions DOIVENT bouger ensemble : la
+   jointure avec editions_dvdfr n'est qu'une egalite de chaines, donc si
+   l'une divergeait la jointure casserait en silence, sans la moindre
+   erreur - juste des films qui cessent d'etre rapproches.
+
+   Elle fait tout ce que normVth() fait, PLUS le retrait d'un article
+   initial. C'est cette regle-la qui manque a normVth : « Le Parrain »
+   donne la cle « parrain|1972 », pas « le parrain|1972 ». normVth ne sert
+   qu'a la recherche, ou l'article n'a pas a etre retire ; ici on fabrique
+   une cle, et la regle compte. */
+const VTH_ARTICLES = ['le','la','les','l','un','une','the','a'];
+
+function cleVth(titre, annee){
+  const t = normVth(titre);
+  if(!t) return '';           /* sans titre lisible, pas de cle : rien a rapprocher */
+  const mots = t.split(' ');
+  /* Un seul article retire, jamais deux : « Le Un » donne « un ». */
+  if(mots.length > 1 && VTH_ARTICLES.indexOf(mots[0]) >= 0) mots.shift();
+  return mots.join(' ') + '|' + (annee || '');
+}
+
 function fmtOctets(n){
   const o = Number(n) || 0;
   if(o >= 1073741824) return (o / 1073741824).toFixed(1).replace('.', ',') + ' Go';
@@ -105,7 +128,8 @@ async function chargerVideotheque(){
   try{
     const lots = await Promise.all([
       vthTout('videotheque',
-              'cle,titre,annee,palier,dossier,chemin,taille_octets,date_modif'),
+              'cle,titre,titre_fr,titre_original,annee,palier,dossier,' +
+              'chemin,taille_octets,date_modif'),
       vthTout('editions_dvdfr',
               'cle,titre,annee,realisateur,editeur,meilleur_support'),
       vthTout('videotheque_corrections',
@@ -131,6 +155,12 @@ async function chargerVideotheque(){
     for(let i = 0; i < v.films.length; i++){
       const f = v.films[i];
       f._n = normVth(f.titre);
+      /* Les titres TMDb servent de SECONDE chance au rapprochement quand le
+         titre extrait du nom de fichier ne tombe pas juste. Les cles sont
+         calculees ici, une fois : les refaire a chaque rendu renormaliserait
+         2 300 titres a chaque repeint. */
+      f._cleFr   = f.titre_fr       ? cleVth(f.titre_fr, f.annee)       : '';
+      f._cleOrig = f.titre_original ? cleVth(f.titre_original, f.annee) : '';
       if(f.dossier && v.dossiers.indexOf(f.dossier) < 0) v.dossiers.push(f.dossier);
     }
     v.dossiers.sort();
@@ -199,13 +229,24 @@ function couleurFilm(film, edition, correction){
   return { cl:'gris', libelle:'Non référencé', support:'' };
 }
 
-/* L'édition qui fait foi pour un film : celle que j'ai rattachée à la main
-   s'il y en a une, sinon celle que la clé rapproche toute seule. Un
-   rattachement manuel est un fait, la jointure n'est qu'une présomption. */
+/* L'édition qui fait foi pour un film. Quatre tentatives, dans cet ordre :
+
+   1. le rattachement fait à la main, qui bat tout le reste — un
+      rattachement manuel est un fait, une jointure n'est qu'une présomption ;
+   2. le titre tiré du nom de fichier, le comportement d'origine ;
+   3. le titre français de TMDb ;
+   4. le titre original de TMDb.
+
+   Les trois derniers sont la MÊME comparaison sur trois clés différentes :
+   beaucoup de films ne se rapprochaient pas simplement parce que DVDFr les
+   range sous leur titre original, ou sous un titre français que le nom de
+   fichier n'écrit pas pareil. */
 function editionVth(f){
   const v = ui.vth, c = v.corr[f.cle];
   if(c && c.cle_dvdfr && v.edtsParCle[c.cle_dvdfr]) return v.edtsParCle[c.cle_dvdfr];
-  return v.edtsParCle[f.cle] || null;
+  return v.edtsParCle[f.cle] ||
+         (f._cleFr   && v.edtsParCle[f._cleFr])   ||
+         (f._cleOrig && v.edtsParCle[f._cleOrig]) || null;
 }
 
 /* La couleur est calculée une fois par film et rangée sur la ligne : le

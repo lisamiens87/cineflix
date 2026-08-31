@@ -1417,6 +1417,70 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   ok('un palier inconnu ne passe pas pour un maximum',
      await vthCouleur({palier:'ZZZ'}, edDVD, null) === 'orange');
 
+  /* 18 quater. La cle de rapprochement.
+     cleVth() est le miroir JS de Get-TitreNormalise (scripts-nas). Ce qui la
+     distingue de normVth(), et ce qui se casserait en silence si les deux
+     versions divergeaient, c'est le retrait d'UN article initial. */
+  const cle = async (t, a) => await page.evaluate(x => cleVth(x[0], x[1]), [t, a]);
+  ok('la cle retire l\'article initial francais',
+     await cle('Le Parrain', '1972') === 'parrain|1972' &&
+     await cle('La Haine', '1995') === 'haine|1995' &&
+     await cle('Les Choristes', '2004') === 'choristes|2004');
+  ok('elle retire aussi l\'article anglais',
+     await cle('The Matrix', '1999') === 'matrix|1999' &&
+     await cle('A Serious Man', '2009') === 'serious man|2009');
+  ok('l\'apostrophe est un separateur, et « l » un article',
+     await cle('L\'Etranger', '1942') === 'etranger|1942' &&
+     await cle('L\u2019\u00c9tranger', '1942') === 'etranger|1942');
+  ok('un seul article, jamais deux',
+     await cle('Le Un', '2020') === 'un|2020' &&
+     await cle('The Last Emperor', '1987') === 'last emperor|1987');
+  ok('un titre reduit a un article reste ce mot',
+     await cle('Le', '2020') === 'le|2020');
+  ok('les accents et la ponctuation tombent comme dans normVth',
+     await cle('Am\u00e9lie', '2001') === 'amelie|2001' &&
+     await cle('Wall\u00b7E !', '2008') === 'wall e|2008');
+  ok('sans titre lisible, pas de cle du tout',
+     await cle('', '2020') === '' && await cle('!!!', '2020') === '');
+  /* Sans annee, la cle garde sa barre : c'est la forme que la base ecrit. */
+  ok('une annee absente laisse la barre',
+     await cle('Le Parrain', '') === 'parrain|');
+
+  /* 18 quinquies. Les quatre tentatives de rapprochement, dans l'ordre. */
+  const edPour = async (film, edts, corr) => await page.evaluate(a => {
+     ui.vth.edts = a[1];
+     ui.vth.edtsParCle = {};
+     a[1].forEach(e => { ui.vth.edtsParCle[e.cle] = e; });
+     ui.vth.corr = a[2] ? { [a[0].cle]: a[2] } : {};
+     const e = editionVth(a[0]);
+     return e ? e.editeur : null;
+  }, [film, edts, corr]);
+  const filmTmdb = { cle:'zzz introuvable|1972', annee:'1972',
+                     _cleFr:'parrain|1972', _cleOrig:'godfather|1972' };
+  ok('le titre du fichier reste la premiere tentative',
+     await edPour({ cle:'parrain|1972', _cleFr:'', _cleOrig:'' },
+                  [{cle:'parrain|1972', editeur:'FICHIER'}], null) === 'FICHIER');
+  ok('a defaut, le titre francais de TMDb rapproche',
+     await edPour(filmTmdb, [{cle:'parrain|1972', editeur:'TMDB_FR'}], null) === 'TMDB_FR');
+  ok('a defaut encore, le titre original',
+     await edPour(filmTmdb, [{cle:'godfather|1972', editeur:'TMDB_VO'}], null) === 'TMDB_VO');
+  ok('le titre du fichier passe AVANT les titres TMDb',
+     await edPour({ cle:'parrain|1972', _cleFr:'godfather|1972', _cleOrig:'godfather|1972' },
+                  [{cle:'parrain|1972', editeur:'FICHIER'},
+                   {cle:'godfather|1972', editeur:'TMDB'}], null) === 'FICHIER');
+  ok('et le titre francais passe avant l\'original',
+     await edPour(filmTmdb, [{cle:'parrain|1972', editeur:'TMDB_FR'},
+                             {cle:'godfather|1972', editeur:'TMDB_VO'}], null) === 'TMDB_FR');
+  /* Le rattachement manuel est un fait : il bat les trois jointures. */
+  ok('un rattachement manuel bat le rapprochement par titre TMDb',
+     await edPour(filmTmdb, [{cle:'parrain|1972', editeur:'TMDB_FR'},
+                             {cle:'godfather|1972', editeur:'TMDB_VO'},
+                             {cle:'choisi|1972', editeur:'MAIN'}],
+                  {cle_dvdfr:'choisi|1972'}) === 'MAIN');
+  ok('un film sans titre TMDb ne rapproche toujours rien',
+     await edPour({ cle:'inconnu|1972', _cleFr:'', _cleOrig:'' },
+                  [{cle:'parrain|1972', editeur:'X'}], null) === null);
+
   // 18 bis. L'ecran : 2 300 lignes ne se rendent pas d'un coup
   await page.evaluate(()=>{
      estAdmin = true;

@@ -15,6 +15,7 @@ function film(id, titre){
 
 const echecs = [];
 const appels = [];                       // trace des écritures vers Supabase
+let selectVth = '';                      // les colonnes demandées à videotheque
 
 /* Les trois tables de Ma vidéothèque, aux VRAIES tailles : c'est le seul
    moyen de prouver que la pagination franchit le plafond de PostgREST. */
@@ -148,6 +149,7 @@ const file = [
        a de normal. C'est cette troncature muette que la pagination doit
        franchir — sans le plafond ici, le test ne prouverait rien. */
     if(p === '/rest/v1/videotheque' || p === '/rest/v1/editions_dvdfr'){
+      if(p === '/rest/v1/videotheque') selectVth = u.searchParams.get('select') || '';
       const total = (p === '/rest/v1/videotheque') ? VTH_FILMS : VTH_EDTS;
       const rg = String(req.headers()['range'] || '0-999').split('-');
       const d = Number(rg[0]) || 0;
@@ -341,6 +343,11 @@ const file = [
      appels.filter(a => a === 'GET /rest/v1/editions_dvdfr').length === 19);
   ok('cent lignes rendues, pas deux mille trois cents',
      await page.locator('.vtrow').count() === 100);
+  /* Les titres TMDb servent de seconde chance au rapprochement : s'ils ne
+     sont pas demandes a Supabase, les deux cles de secours restent vides et
+     le rapprochement retombe silencieusement au comportement d'avant. */
+  ok('les deux titres TMDb sont demandes a la table videotheque',
+     selectVth.indexOf('titre_fr') >= 0 && selectVth.indexOf('titre_original') >= 0);
 
   // 6 ter. L'écriture : la seule table que l'app touche
   const cleVth = await page.evaluate(async ()=>{
