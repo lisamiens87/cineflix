@@ -1421,10 +1421,13 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.evaluate(()=>{
      estAdmin = true;
      const films = [], edts = [];
+     /* Les cinq dossiers reels du NAS. « 720p & 1080p » porte une esperluette :
+        il verifie du meme coup que les options sont echappees. */
+     const DOSSIERS = ['4K','Full Bluray','720p & 1080p','DVD','Rip 700mo'];
      for(let i = 0; i < 250; i++){
        const cle = 'film ' + i + '|2020';
        films.push({ cle:cle, titre:'Film ' + String(i).padStart(3,'0'), annee:'2020',
-                    palier: i % 2 ? 'BLURAY' : 'DVD', dossier: i % 2 ? '4K' : 'DVD',
+                    palier: i % 2 ? 'BLURAY' : 'DVD', dossier: DOSSIERS[i % 5],
                     chemin:'\\\\nas\\Films\\f' + i + '.mkv', taille_octets: 2147483648 });
        if(i % 2 === 0) edts.push({ cle:cle, titre:'Film ' + String(i).padStart(3,'0'),
                                    annee:'2020', editeur:'Editeur', meilleur_support:'UHD4K' });
@@ -1436,11 +1439,21 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
      ui.vth.films = films; ui.vth.edts = edts;
      ui.vth.edtsParCle = {}; edts.forEach(e => { e._n = normVth(e.titre);
                                                  ui.vth.edtsParCle[e.cle] = e; });
-     ui.vth.corr = {}; ui.vth.dossiers = ['4K','DVD','Full Bluray'];
+     /* L'ORDRE REEL : le premier rendu a lieu AVANT que les trois tables ne
+        soient revenues, donc la liste des dossiers est encore vide. La
+        pre-remplir ici testerait l'ordre inverse, celui qui ne se produit
+        jamais - c'est ce qui avait laisse passer un select vide a vie. */
+     ui.vth.corr = {}; ui.vth.dossiers = [];
      films.forEach(f => { f._n = normVth(f.titre); });
      films.sort((a,b)=> String(a.titre).localeCompare(String(b.titre), 'fr'));
      ui.vth.filtre = ''; ui.vth.q = ''; ui.vth.dossier = ''; ui.vth.page = 0;
      ui.vth.charge = true; ui.vth.loading = false; ui.vth.err = '';
+     /* Sorties est marque charge : sans ca, son chargement se termine pendant
+        le test et appelle render(), ce qui reconstruit TOUT le corps - et
+        remplit le select des dossiers par accident. En vrai, Sorties a fini
+        depuis longtemps quand on ouvre ce volet, et ce render() n'arrive
+        jamais. C'est ce render() parasite qui rendait le banc aveugle. */
+     ui.sorties.charge = true; ui.sorties.loading = false;
      recalculerCouleursVth();
      ui.cineVolet = 'vth';
      go('sorties');
@@ -1452,6 +1465,50 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   ok('cent lignes rendues sur 251, pas les 251',
      await page.locator('.vtrow').count() === 100 &&
      await page.locator('.plus .btn').count() === 1);
+
+  /* Le select des dossiers vit dans .vtfiltres, VOLONTAIREMENT hors de la
+     zone repeinte : c'est ce qui protege le curseur du champ de recherche.
+     Mais ses options, elles, dependent des donnees. Il faut donc que le
+     repeint les reecrive, sinon le select garde a vie ce qu'il avait au
+     premier rendu - c'est-a-dire rien. */
+  ok('au premier rendu, le select n\'a que « Tous les dossiers »',
+     await page.locator('#vthdos option').count() === 1);
+  /* On simule la fin du chargement exactement comme chargerVideotheque() :
+     distinct sur le tableau COMPLET, tri, puis repeint. */
+  await page.evaluate(()=>{
+     const v = ui.vth, d = [];
+     for(let i = 0; i < v.films.length; i++)
+       if(v.films[i].dossier && d.indexOf(v.films[i].dossier) < 0) d.push(v.films[i].dossier);
+     d.sort();
+     v.dossiers = d;
+     peindreVthTout();
+  });
+  await page.waitForTimeout(200);
+  const dosRemplis = await page.locator('#vthdos option').count() === 6 &&
+     (await page.locator('#vthdos option').allInnerTexts()).join('|') ===
+       'Tous les dossiers|4K|720p & 1080p|DVD|Full Bluray|Rip 700mo';
+  ok('le chargement remplit le select des cinq dossiers', dosRemplis);
+  /* Les deux controles suivants manipulent le select : sans options, ils ne
+     planteraient pas le banc, ils compteraient rouge comme le premier. */
+  if(dosRemplis){
+    await page.selectOption('#vthdos', 'Rip 700mo');
+    await page.waitForTimeout(200);
+    ok('le filtre par dossier ne garde que ce dossier',
+       await page.locator('.vtrow').count() === 50 &&
+       await page.evaluate(()=> ui.vth.dossier) === 'Rip 700mo');
+    /* Un repeint ne doit pas ramener le select a « Tous les dossiers » : la
+       valeur choisie est relue avant reecriture, et reappliquee apres. */
+    await page.evaluate(()=> peindreVthTout());
+    await page.waitForTimeout(200);
+    ok('et il survit au repeint suivant',
+       await page.evaluate(()=> document.getElementById('vthdos').value) === 'Rip 700mo' &&
+       await page.evaluate(()=> ui.vth.dossier) === 'Rip 700mo');
+    await page.selectOption('#vthdos', '');
+    await page.waitForTimeout(200);
+  }else{
+    ok('le filtre par dossier ne garde que ce dossier', false);
+    ok('et il survit au repeint suivant', false);
+  }
   await page.click('.plus .btn');
   await page.waitForTimeout(200);
   ok('« Voir plus » ajoute un lot de cent',

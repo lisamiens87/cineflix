@@ -281,6 +281,18 @@ function peindreVthTout(){
   if(!c || !l) return render();
   c.innerHTML = compteursVthHtml();
   l.innerHTML = listeVthHtml();
+  /* Troisieme noeud : le select des dossiers. Il vit dans .vtfiltres, hors
+     de la zone repeinte - c'est voulu, c'est ce qui protege le curseur du
+     champ de recherche - mais ses options dependent des donnees, qui
+     arrivent apres le premier rendu. Sans cette ligne il reste vide a vie.
+     Reecrire les options remet la selection a zero : on relit la valeur
+     avant, on la repose apres. */
+  const d = document.getElementById('vthdos');
+  if(d){
+    const garde = d.value;
+    d.innerHTML = optionsDossiersHtml();
+    d.value = garde;
+  }
 }
 
 function compteursVthHtml(){
@@ -321,6 +333,16 @@ function listeVthHtml(){
   return html;
 }
 
+/* Les dossiers arrivent APRES le premier rendu : la liste est vide quand le
+   select est bati, et .vtfiltres n'est jamais reecrit. Ses options sont donc
+   sorties ici pour que le repeint puisse les refaire. */
+function optionsDossiersHtml(){
+  const v = ui.vth;
+  return '<option value="">Tous les dossiers</option>'+
+    (v.dossiers||[]).map(d=>'<option value="'+esc(d)+'"'+
+      (v.dossier===d?' selected':'')+'>'+esc(d)+'</option>').join('');
+}
+
 function corpsVideotheque(){
   const v = ui.vth;
   return '<div class="chips vtcpt" id="vthcpt">'+compteursVthHtml()+'</div>'+
@@ -329,9 +351,7 @@ function corpsVideotheque(){
         'autocomplete="off" autocorrect="off" spellcheck="false" '+
         'value="'+esc(v.q)+'" oninput="vthCherche(this.value)">'+
       '<select id="vthdos" onchange="vthDossier(this.value)">'+
-        '<option value="">Tous les dossiers</option>'+
-        (v.dossiers||[]).map(d=>'<option value="'+esc(d)+'"'+
-          (v.dossier===d?' selected':'')+'>'+esc(d)+'</option>').join('')+
+        optionsDossiersHtml()+
       '</select>'+
     '</div>'+
     '<div id="vthres">'+listeVthHtml()+'</div>'+
