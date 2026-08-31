@@ -10,79 +10,118 @@
 <helmet>
   <style>
     body{margin:0}
-    a{color:#c6a664}a:hover{color:#dcc08a}
+    a{color:#e8623c}a:hover{color:#f18a68}
   </style>
 </helmet>
-<div style="width:390px;height:844px;background:#09090b;color:#ece9e3;font-family:'Archivo',-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden">
+<div style="width:390px;height:844px;background:#0a0a0c;color:#ede9e3;font-family:'Archivo',-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;position:relative">
 
-  <div style="display:flex;align-items:flex-end;justify-content:space-between;padding:20px 20px 0">
-    <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:19px;letter-spacing:.14em;color:#ece9e3">PREMIER RANG</div>
-    <div style="width:30px;height:30px;border-radius:50%;border:1px solid #2a2a30;display:grid;place-items:center">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#85838c" stroke-width="1.4"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-3.8 4-5.6 7.5-5.6s6.3 1.8 7.5 5.6"/></svg>
-    </div>
+  <!-- AFFICHE PLEIN CADRE : composition graphique, pas une photo -->
+  <div style="position:absolute;top:0;left:0;right:0;height:548px;overflow:hidden;background:#120c10">
+    <svg width="390" height="548" viewBox="0 0 390 548" style="display:block">
+      <defs>
+        <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#2a1410"/><stop offset="1" stop-color="#0a0a0c"/>
+        </linearGradient>
+        <radialGradient id="sun" cx="50%" cy="50%">
+          <stop offset="0" stop-color="#ffb066"/><stop offset="0.62" stop-color="#e8623c"/><stop offset="1" stop-color="#8e2f22"/>
+        </radialGradient>
+      </defs>
+      <rect width="390" height="548" fill="url(#sky)"/>
+      <circle cx="195" cy="250" r="140" fill="url(#sun)" opacity="0.92"/>
+      <g opacity="0.5">
+        <rect x="0" y="196" width="390" height="3" fill="#0a0a0c"/>
+        <rect x="0" y="228" width="390" height="5" fill="#0a0a0c"/>
+        <rect x="0" y="268" width="390" height="7" fill="#0a0a0c"/>
+        <rect x="0" y="316" width="390" height="10" fill="#0a0a0c"/>
+      </g>
+      <path d="M0 430 L92 372 L168 412 L246 356 L318 400 L390 366 L390 548 L0 548 Z" fill="#0a0a0c"/>
+      <rect x="186" y="392" width="4" height="42" fill="#0a0a0c"/>
+      <circle cx="188" cy="386" r="7" fill="#0a0a0c"/>
+    </svg>
+    <div style="position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,10,12,.62) 0%,rgba(10,10,12,0) 26%,rgba(10,10,12,.55) 66%,#0a0a0c 100%)"></div>
   </div>
 
-  <div style="display:flex;gap:24px;padding:22px 20px 0;align-items:center">
-    <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#ece9e3;padding-bottom:8px;box-shadow:inset 0 -1px 0 #c6a664">Tout</div>
-    <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6d6b74;padding-bottom:8px">Films</div>
-    <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:11.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6d6b74;padding-bottom:8px">Séries</div>
-    <div style="flex:1"></div>
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#85838c" stroke-width="1.5" style="margin-bottom:8px"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+  <div style="position:relative;display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0">
+    <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:16px;letter-spacing:.16em;color:#ede9e3">PREMIER RANG</div>
+    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ede9e3" stroke-width="1.5" opacity=".85"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
   </div>
-  <div style="height:1px;background:#1c1c21;margin:0 20px"></div>
 
-  <div style="padding:26px 20px 0;flex:1;min-height:0">
-    <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:16px">
-      <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.2em;color:#c6a664">01</div>
-      <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#ece9e3">À l'affiche</div>
-      <div style="flex:1;height:1px;background:#1c1c21"></div>
+  <div style="flex:1"></div>
+
+  <div style="position:relative;padding:0 20px">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#e8623c">Ce soir</div>
+      <div style="width:26px;height:1px;background:rgba(237,233,227,.28)"></div>
+      <div style="font-size:10px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:rgba(237,233,227,.55)">Science-fiction · 2h 49</div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
-      <div>
-        <div style="aspect-ratio:2/3;border-radius:3px;background:linear-gradient(165deg,#1d3f45,#0d1f23);display:grid;place-items:end start;padding:12px;box-shadow:inset 0 0 0 1px rgba(236,233,227,.07)">
-          <div style="font-family:'Playfair Display',Georgia,serif;font-size:17px;color:#cfe3e2">Heat</div>
-        </div>
-        <div style="font-size:12.5px;font-weight:600;margin-top:10px;letter-spacing:.01em">Heat</div>
-        <div style="font-size:11px;color:#85838c;letter-spacing:.06em;margin-top:2px">1995 · MICHAEL MANN</div>
+    <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:38px;font-weight:800;line-height:.94;letter-spacing:-.015em;text-transform:uppercase;text-wrap:balance">Interstellar</div>
+    <div style="font-size:13px;color:rgba(237,233,227,.62);margin-top:12px;line-height:1.45;max-width:300px">Christopher Nolan · 2014 &nbsp;·&nbsp; <span style="color:#ede9e3;font-weight:700">8,4</span></div>
+
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <div style="flex:1;height:48px;border-radius:2px;background:#ede9e3;color:#0a0a0c;display:flex;align-items:center;justify-content:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="#0a0a0c"><path d="M7 4.5 19.5 12 7 19.5z"/></svg>Regarder
       </div>
-      <div>
-        <div style="aspect-ratio:2/3;border-radius:3px;background:linear-gradient(165deg,#4a3418,#211709);display:grid;place-items:end start;padding:12px;box-shadow:inset 0 0 0 1px rgba(236,233,227,.07)">
-          <div style="font-family:'Playfair Display',Georgia,serif;font-size:17px;color:#e8d3ac">Casino</div>
-        </div>
-        <div style="font-size:12.5px;font-weight:600;margin-top:10px;letter-spacing:.01em">Casino</div>
-        <div style="font-size:11px;color:#85838c;letter-spacing:.06em;margin-top:2px">1995 · M. SCORSESE</div>
+      <div style="width:48px;height:48px;border-radius:2px;border:1px solid rgba(237,233,227,.28);display:grid;place-items:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ede9e3" stroke-width="1.6"><path d="M12 5.5v13M5.5 12h13"/></svg>
       </div>
-    </div>
-
-    <div style="display:flex;align-items:baseline;gap:12px;margin:28px 0 16px">
-      <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:10.5px;font-weight:800;letter-spacing:.2em;color:#c6a664">02</div>
-      <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:11px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:#ece9e3">Sorties physiques</div>
-      <div style="flex:1;height:1px;background:#1c1c21"></div>
-    </div>
-    <div style="display:flex;gap:14px">
-      <div style="width:96px;aspect-ratio:2/3;border-radius:3px;background:linear-gradient(165deg,#2b2f52,#121428);box-shadow:inset 0 0 0 1px rgba(236,233,227,.07)"></div>
-      <div style="width:96px;aspect-ratio:2/3;border-radius:3px;background:linear-gradient(165deg,#4a1f26,#210e12);box-shadow:inset 0 0 0 1px rgba(236,233,227,.07)"></div>
-      <div style="width:96px;aspect-ratio:2/3;border-radius:3px;background:linear-gradient(165deg,#3d4426,#1c1f11);box-shadow:inset 0 0 0 1px rgba(236,233,227,.07)"></div>
     </div>
   </div>
 
-  <div style="border-top:1px solid #1c1c21;padding:12px 0 14px">
+  <div style="position:relative;padding:26px 0 0 20px">
+    <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:12px;padding-right:20px">
+      <div style="font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:#ede9e3">À l'affiche</div>
+      <div style="flex:1;height:1px;background:rgba(237,233,227,.13)"></div>
+      <div style="font-size:10.5px;font-weight:600;letter-spacing:.1em;color:rgba(237,233,227,.45)">12</div>
+    </div>
+    <div style="display:flex;gap:11px;overflow:hidden">
+      <div style="width:104px;flex:none">
+        <div style="aspect-ratio:2/3;background:#1a0d0d;position:relative;overflow:hidden">
+          <svg width="104" height="156" viewBox="0 0 104 156" style="display:block"><rect width="104" height="156" fill="#12080a"/><rect x="0" y="86" width="104" height="70" fill="#c3352b"/><rect x="22" y="66" width="60" height="30" rx="3" fill="#efe6d8"/><text x="52" y="86" fill="#12080a" font-family="Archivo,sans-serif" font-size="9" font-weight="800" text-anchor="middle" letter-spacing="1">SOAP</text></svg>
+        </div>
+        <div style="font-size:11px;font-weight:700;margin-top:8px">Fight Club</div>
+        <div style="font-size:10px;color:rgba(237,233,227,.42);margin-top:1px">1999</div>
+      </div>
+      <div style="width:104px;flex:none">
+        <div style="aspect-ratio:2/3;background:#07120c;position:relative;overflow:hidden">
+          <svg width="104" height="156" viewBox="0 0 104 156" style="display:block"><rect width="104" height="156" fill="#05100a"/><g fill="#2ee06a" opacity=".85"><rect x="10" y="14" width="2" height="52"/><rect x="24" y="30" width="2" height="74"/><rect x="38" y="6" width="2" height="96"/><rect x="52" y="42" width="2" height="62"/><rect x="66" y="18" width="2" height="88"/><rect x="80" y="52" width="2" height="46"/><rect x="92" y="24" width="2" height="70"/></g><rect x="0" y="116" width="104" height="1" fill="#2ee06a" opacity=".5"/></svg>
+        </div>
+        <div style="font-size:11px;font-weight:700;margin-top:8px">Matrix</div>
+        <div style="font-size:10px;color:rgba(237,233,227,.42);margin-top:1px">1999</div>
+      </div>
+      <div style="width:104px;flex:none">
+        <div style="aspect-ratio:2/3;background:#141416;position:relative;overflow:hidden">
+          <svg width="104" height="156" viewBox="0 0 104 156" style="display:block"><rect width="104" height="156" fill="#1a1a1c"/><rect x="0" y="60" width="104" height="36" fill="#d8d3c8"/><rect x="34" y="60" width="36" height="36" fill="#1a1a1c"/><rect x="0" y="112" width="104" height="2" fill="#8a8577"/></svg>
+        </div>
+        <div style="font-size:11px;font-weight:700;margin-top:8px">Parasite</div>
+        <div style="font-size:10px;color:rgba(237,233,227,.42);margin-top:1px">2019</div>
+      </div>
+      <div style="width:104px;flex:none">
+        <div style="aspect-ratio:2/3;background:#1a1206;overflow:hidden">
+          <svg width="104" height="156" viewBox="0 0 104 156" style="display:block"><rect width="104" height="156" fill="#1c1305"/><path d="M0 96 L38 40 L60 96 Z" fill="#e07a1f"/><path d="M46 108 L82 46 L104 108 Z" fill="#1f6f76"/><rect x="0" y="126" width="104" height="4" fill="#e07a1f"/></svg>
+        </div>
+        <div style="font-size:11px;font-weight:700;margin-top:8px">Mad Max</div>
+        <div style="font-size:10px;color:rgba(237,233,227,.42);margin-top:1px">2015</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="position:relative;margin-top:20px;border-top:1px solid rgba(237,233,227,.1);padding:11px 0 13px;background:rgba(10,10,12,.86)">
     <div style="display:grid;grid-template-columns:repeat(4,1fr)">
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#c6a664" stroke-width="1.4"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2 5.4-5.4 2 2-5.4z"/></svg>
-        <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#c6a664">Découvrir</div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#e8623c" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2 5.4-5.4 2 2-5.4z"/></svg>
+        <div style="font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#e8623c">Découvrir</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6d6b74" stroke-width="1.4"><path d="M12 3.5 13.9 9 19.5 11 13.9 13 12 18.5 10.1 13 4.5 11 10.1 9z"/></svg>
-        <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6d6b74">Guide-moi</div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="1.5"><path d="M12 3.5 13.9 9 19.5 11 13.9 13 12 18.5 10.1 13 4.5 11 10.1 9z"/></svg>
+        <div style="font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#6b6862">Guide-moi</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6d6b74" stroke-width="1.4"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9z"/></svg>
-        <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6d6b74">Ma liste</div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="1.5"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9z"/></svg>
+        <div style="font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#6b6862">Ma liste</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:6px">
-        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="#6d6b74" stroke-width="1.4"><rect x="3" y="9" width="18" height="11" rx="1"/><path d="m3.6 9 2.6-4.4 3.4 3.6 2.6-4.4 3.4 3.6 2.6-4.4"/></svg>
-        <div style="font-family:'Archivo Expanded',Archivo,sans-serif;font-size:8.5px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#6d6b74">Cinéma</div>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6b6862" stroke-width="1.5"><rect x="3" y="9" width="18" height="11" rx="1"/><path d="m3.6 9 2.6-4.4 3.4 3.6 2.6-4.4 3.4 3.6 2.6-4.4"/></svg>
+        <div style="font-size:8.5px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:#6b6862">Cinéma</div>
       </div>
     </div>
   </div>

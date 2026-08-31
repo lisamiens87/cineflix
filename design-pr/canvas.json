@@ -1,15 +1,15 @@
 {
   "artboards": [
     { "file": "Actuel.dc.html",     "x": 0,    "y": 0, "w": 390, "h": 844, "title": "Aujourd'hui" },
-    { "file": "Main.dc.html",       "x": 510,  "y": 0, "w": 390, "h": 844, "title": "A — Cinemathèque" },
-    { "file": "DirectionB.dc.html", "x": 1020, "y": 0, "w": 390, "h": 844, "title": "B — Velours" },
-    { "file": "DirectionC.dc.html", "x": 1530, "y": 0, "w": 390, "h": 844, "title": "C — Pellicule" }
+    { "file": "Main.dc.html",       "x": 510,  "y": 0, "w": 390, "h": 844, "title": "A — Plein cadre" },
+    { "file": "DirectionB.dc.html", "x": 1020, "y": 0, "w": 390, "h": 844, "title": "B — La revue" },
+    { "file": "DirectionC.dc.html", "x": 1530, "y": 0, "w": 390, "h": 844, "title": "C — Le mur" }
   ],
   "annotations": [
-    { "id": "brief", "x": 0, "y": -220, "w": 390, "text": "AUJOURD'HUI — la référence.\n\nCe qui coûte le plus cher en perception :\n· les emoji dans la barre d'onglets\n· les pastilles rouges pleines des filtres\n· un or sous le logo qui concurrence le rouge\n· peu d'air, beaucoup de bordures" },
-    { "id": "note-a", "x": 510, "y": -220, "w": 390, "text": "A — CINÉMATHÈQUE\nLe luxe par la retenue.\n\nAccent champagne unique, filets d'un pixel, sections numérotées comme un programme, affiches à angles nets. Zéro aplat.\n\nTradeoff : le rouge de l'identité disparaît. Sans belles affiches, l'écran peut sembler vide." },
-    { "id": "note-b", "x": 1020, "y": -220, "w": 390, "text": "B — VELOURS\nLe luxe par la matière.\n\nNoir chaud teinté grenat, ivoire, laiton. Halo lumineux derrière les affiches plutôt que des bordures. Playfair passe en titres de section.\n\nTradeoff : le plus chaleureux, mais le dégradé demande de la mesure — trop, et ça date." },
-    { "id": "note-c", "x": 1530, "y": -220, "w": 390, "text": "C — PELLICULE\nLe luxe par l'effacement.\n\nZéro couleur dans l'interface : toute la couleur vient des affiches. Accent = blanc. Archivo Expanded en gros titres, grille 3, angles à 2 px.\n\nTradeoff : le plus « pro » et le plus éditorial, mais on perd le rouge, et ça peut sembler froid." }
+    { "id": "brief", "x": 0, "y": -250, "w": 390, "text": "AUJOURD'HUI\n\nUne grille d'affiches, un en-tête, une barre d'onglets. Tout l'écran est au même niveau : rien ne domine, donc rien n'attire.\n\nCe qui coûte le plus cher :\n· les emoji de la barre d'onglets\n· les pastilles rouges pleines\n· un or sous le logo qui concurrence le rouge" },
+    { "id": "note-a", "x": 510, "y": -250, "w": 390, "text": "A — PLEIN CADRE\nUn film occupe l'écran.\n\nL'affiche monte jusqu'en haut, le titre est posé dessus en très grand, deux actions franches, et le reste défile en dessous. C'est la grammaire des grandes apps de cinéma.\n\nLe plus DYNAMIQUE des trois : une image domine, tout le reste lui obéit.\n\nTradeoff : ça repose entièrement sur la qualité de l'affiche mise en avant." },
+    { "id": "note-b", "x": 1020, "y": -250, "w": 390, "text": "B — LA REVUE\nUne page de magazine, pas une liste.\n\nFond papier, sections numérotées, colonnes asymétriques, une citation en Playfair italique, des filets. Le contraire d'une grille.\n\nLe plus SIGNÉ des trois — personne d'autre ne ressemble à ça.\n\nTradeoff : le fond clair rompt avec l'app actuelle, et il faut du texte (résumé, citation) pour que ça tienne." },
+    { "id": "note-c", "x": 1530, "y": -250, "w": 390, "text": "C — LE MUR\nLes affiches bord à bord, sans marges.\n\nZéro habillage : les affiches SONT l'interface. En-tête et pied flottent en surimpression. La densité comme luxe, à la manière d'une étagère.\n\nLe plus RADICAL, et le plus facile à charger vite.\n\nTradeoff : sans marge, deux affiches voisines peuvent jurer ; et il n'y a plus de place pour la moindre métadonnée." }
   ],
   "launch": { "view": "canvas" }
 }
