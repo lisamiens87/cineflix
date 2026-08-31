@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap">
+</head>
+<body>
+<x-dc>
+<helmet>
+  <style>
+    body{margin:0}
+    a{color:#b08d57}a:hover{color:#cba97a}
+  </style>
+</helmet>
+<div style="width:390px;height:844px;background:#0d0a0b;color:#f1e9e1;font-family:'Archivo',-apple-system,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden;position:relative">
+  <div style="position:absolute;inset:0;background:radial-gradient(120% 55% at 50% -8%,rgba(122,42,38,.30),rgba(13,10,11,0) 62%);pointer-events:none"></div>
+
+  <div style="position:relative;display:flex;align-items:center;justify-content:space-between;padding:20px 20px 0">
+    <div style="font-family:'Playfair Display',Georgia,serif;font-weight:700;font-size:22px;letter-spacing:.03em;color:#f6efe6">Premier Rang</div>
+    <div style="width:32px;height:32px;border-radius:50%;background:rgba(176,141,87,.14);display:grid;place-items:center">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#b08d57" stroke-width="1.5"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1.2-3.8 4-5.6 7.5-5.6s6.3 1.8 7.5 5.6"/></svg>
+    </div>
+  </div>
+
+  <div style="position:relative;display:flex;gap:26px;padding:20px 20px 0;align-items:center">
+    <div style="font-size:13px;font-weight:700;letter-spacing:.05em;color:#f6efe6;padding-bottom:9px;box-shadow:inset 0 -2px 0 #b08d57">Tout</div>
+    <div style="font-size:13px;font-weight:600;letter-spacing:.05em;color:#8d7c76;padding-bottom:9px">Films</div>
+    <div style="font-size:13px;font-weight:600;letter-spacing:.05em;color:#8d7c76;padding-bottom:9px">Séries</div>
+    <div style="flex:1"></div>
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#8d7c76" stroke-width="1.6" style="margin-bottom:9px"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5 21 21"/></svg>
+  </div>
+
+  <div style="position:relative;padding:26px 20px 0;flex:1;min-height:0">
+    <div style="font-family:'Playfair Display',Georgia,serif;font-size:20px;font-weight:700;margin-bottom:4px;color:#f6efe6">À l'affiche</div>
+    <div style="font-size:11.5px;color:#8d7c76;letter-spacing:.04em;margin-bottom:16px">Ce que la salle passe cette semaine</div>
+    <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+      <div>
+        <div style="aspect-ratio:2/3;border-radius:12px;background:linear-gradient(165deg,#1d3f45,#0d1f23);display:grid;place-items:end start;padding:12px;box-shadow:0 14px 34px rgba(0,0,0,.62),0 0 26px rgba(176,141,87,.12)">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:17px;color:#cfe3e2">Heat</div>
+        </div>
+        <div style="font-size:13px;font-weight:700;margin-top:11px">Heat</div>
+        <div style="font-size:11.5px;color:#8d7c76;margin-top:2px">1995 · Michael Mann</div>
+      </div>
+      <div>
+        <div style="aspect-ratio:2/3;border-radius:12px;background:linear-gradient(165deg,#4a3418,#211709);display:grid;place-items:end start;padding:12px;box-shadow:0 14px 34px rgba(0,0,0,.62),0 0 26px rgba(176,141,87,.12)">
+          <div style="font-family:'Playfair Display',Georgia,serif;font-size:17px;color:#e8d3ac">Casino</div>
+        </div>
+        <div style="font-size:13px;font-weight:700;margin-top:11px">Casino</div>
+        <div style="font-size:11.5px;color:#8d7c76;margin-top:2px">1995 · M. Scorsese</div>
+      </div>
+    </div>
+
+    <div style="font-family:'Playfair Display',Georgia,serif;font-size:20px;font-weight:700;margin:26px 0 14px;color:#f6efe6">Sorties physiques</div>
+    <div style="display:flex;gap:14px">
+      <div style="width:96px;aspect-ratio:2/3;border-radius:12px;background:linear-gradient(165deg,#2b2f52,#121428);box-shadow:0 12px 28px rgba(0,0,0,.6)"></div>
+      <div style="width:96px;aspect-ratio:2/3;border-radius:12px;background:linear-gradient(165deg,#4a1f26,#210e12);box-shadow:0 12px 28px rgba(0,0,0,.6)"></div>
+      <div style="width:96px;aspect-ratio:2/3;border-radius:12px;background:linear-gradient(165deg,#3d4426,#1c1f11);box-shadow:0 12px 28px rgba(0,0,0,.6)"></div>
+    </div>
+  </div>
+
+  <div style="position:relative;background:linear-gradient(180deg,rgba(13,10,11,0),rgba(20,14,15,.98) 34%);padding:16px 0 14px">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr)">
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#b08d57" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="m15.2 8.8-2 5.4-5.4 2 2-5.4z"/></svg>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;color:#b08d57">Découvrir</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7d6f69" stroke-width="1.5"><path d="M12 3.5 13.9 9 19.5 11 13.9 13 12 18.5 10.1 13 4.5 11 10.1 9z"/></svg>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;color:#7d6f69">Guide-moi</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7d6f69" stroke-width="1.5"><path d="M12 20s-7-4.4-7-9a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 4.6-7 9-7 9z"/></svg>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;color:#7d6f69">Ma liste</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#7d6f69" stroke-width="1.5"><rect x="3" y="9" width="18" height="11" rx="1"/><path d="m3.6 9 2.6-4.4 3.4 3.6 2.6-4.4 3.4 3.6 2.6-4.4"/></svg>
+        <div style="font-size:9.5px;font-weight:700;letter-spacing:.05em;color:#7d6f69">Cinéma</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

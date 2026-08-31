@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Actuel.dc.html",     "x": 0,    "y": 0, "w": 390, "h": 844, "title": "Aujourd'hui" },
+    { "file": "Main.dc.html",       "x": 510,  "y": 0, "w": 390, "h": 844, "title": "A — Cinemathèque" },
+    { "file": "DirectionB.dc.html", "x": 1020, "y": 0, "w": 390, "h": 844, "title": "B — Velours" },
+    { "file": "DirectionC.dc.html", "x": 1530, "y": 0, "w": 390, "h": 844, "title": "C — Pellicule" }
+  ],
+  "annotations": [
+    { "id": "brief", "x": 0, "y": -220, "w": 390, "text": "AUJOURD'HUI — la référence.\n\nCe qui coûte le plus cher en perception :\n· les emoji dans la barre d'onglets\n· les pastilles rouges pleines des filtres\n· un or sous le logo qui concurrence le rouge\n· peu d'air, beaucoup de bordures" },
+    { "id": "note-a", "x": 510, "y": -220, "w": 390, "text": "A — CINÉMATHÈQUE\nLe luxe par la retenue.\n\nAccent champagne unique, filets d'un pixel, sections numérotées comme un programme, affiches à angles nets. Zéro aplat.\n\nTradeoff : le rouge de l'identité disparaît. Sans belles affiches, l'écran peut sembler vide." },
+    { "id": "note-b", "x": 1020, "y": -220, "w": 390, "text": "B — VELOURS\nLe luxe par la matière.\n\nNoir chaud teinté grenat, ivoire, laiton. Halo lumineux derrière les affiches plutôt que des bordures. Playfair passe en titres de section.\n\nTradeoff : le plus chaleureux, mais le dégradé demande de la mesure — trop, et ça date." },
+    { "id": "note-c", "x": 1530, "y": -220, "w": 390, "text": "C — PELLICULE\nLe luxe par l'effacement.\n\nZéro couleur dans l'interface : toute la couleur vient des affiches. Accent = blanc. Archivo Expanded en gros titres, grille 3, angles à 2 px.\n\nTradeoff : le plus « pro » et le plus éditorial, mais on perd le rouge, et ça peut sembler froid." }
+  ],
+  "launch": { "view": "canvas" }
+}

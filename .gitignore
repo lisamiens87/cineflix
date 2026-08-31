@@ -2,3 +2,7 @@
 # Le reste du depot est volontairement sans dependance : ni framework, ni
 # bundler, ni package.json. Ces binaires ne sont pas du code de l app.
 node_modules/
+
+# Le canevas assemble des maquettes (design-pr/) : 2,5 Mo d'editeur embarque,
+# regenere a chaque fois depuis les .dc.html voisins, qui eux sont versionnes.
+design-pr/premier-rang-directions.html
