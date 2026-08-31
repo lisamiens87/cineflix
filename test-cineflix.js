@@ -1456,8 +1456,8 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.waitForTimeout(200);
   ok('« Voir plus » ajoute un lot de cent',
      await page.locator('.vtrow').count() === 200);
-  ok('les quatre compteurs sont la, et comptent tout le catalogue',
-     await page.locator('#vthcpt .chip').count() === 4 &&
+  ok('les cinq compteurs sont la, et comptent tout le catalogue',
+     await page.locator('#vthcpt .chip').count() === 5 &&
      await page.evaluate(()=> ui.vth.compte.ameli === 125 && ui.vth.compte.rappr === 126));
   await page.click('#vthcpt .chip:has-text("Ameliorable"), #vthcpt .chip:has-text("Améliorable")');
   await page.waitForTimeout(200);
@@ -1498,6 +1498,69 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
        .indexOf('Blu-ray') >= 0);
   await page.evaluate(()=> closeSheet());
   await page.waitForTimeout(200);
+
+  // 18 ter. Revenir sur une decision
+  /* Un film traite quitte sa file : sans un moyen de relire et d'annuler la
+     correction, une erreur devenait definitive. */
+  await page.evaluate(()=>{
+     const rouge = ui.vth.films.filter(x => x._cl === 'rouge')[0];
+     const orange = ui.vth.films.filter(x => x._cl === 'orange')[0];
+     ui.vth.corr[rouge.cle]  = { cle:rouge.cle, statut:'VERIFIE_MAX',
+                                 verifie_le:'2026-08-30T10:00:00Z' };
+     ui.vth.corr[orange.cle] = { cle:orange.cle, support_force:'BLURAY' };
+     ui.vth._essaiRouge = rouge.cle; ui.vth._essaiOrange = orange.cle;
+     recalculerCouleursVth(); ui.vth.page = 0; peindreVthTout();
+  });
+  await page.waitForTimeout(200);
+  ok('le cinquieme compteur compte les films corriges',
+     await page.locator('#vthcpt .chip').count() === 5 &&
+     await page.evaluate(()=> ui.vth.compte.corrige) === 2);
+  ok('un film marque « verifie » passe au vert et quitte la file',
+     await page.evaluate(()=> {
+        const f = ui.vth.films.filter(x => x.cle === ui.vth._essaiRouge)[0];
+        return f._cl === 'vert' && fileVth().indexOf(f) < 0;
+     }));
+  await page.click('#vthcpt .chip:has-text("Corrig")');
+  await page.waitForTimeout(200);
+  /* Le filtre « Corrige » n'est pas une couleur : il garde les deux films
+     touches a la main, l'un vert et l'autre orange. */
+  ok('le filtre « Corrige » retrouve les films traites, toutes couleurs melees',
+     await page.locator('.vtrow').count() === 2 &&
+     await page.locator('.vtrow .vtp.vert').count() === 1 &&
+     await page.locator('.vtrow .vtp.orange').count() === 1);
+
+  /* Point 3 : le panneau s'ouvre bien sur un film deja traite - vert compris. */
+  await page.evaluate(()=>{
+     const f = ui.vth.films.filter(x => x.cle === ui.vth._essaiRouge)[0];
+     ouvrirFilmVth(ui.vth.films.indexOf(f));
+  });
+  await page.waitForSelector('.sheet.show', {timeout:5000});
+  ok('le panneau s\'ouvre sur un film vert deja traite',
+     (await page.locator('#sheetin').innerText()).toLowerCase()
+       .indexOf('correction en place') >= 0 &&
+     await page.locator('#sheetin .vtcorr .btn').count() === 1);
+  ok('et il rappelle CE qui a ete decide, avec la date',
+     /verifie au maximum le 30\/08\/2026/i.test(
+       (await page.locator('#sheetin .vtcorr').innerText())
+         .normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+  await page.evaluate(()=> closeSheet());
+  await page.waitForTimeout(150);
+
+  await page.evaluate(()=>{
+     const f = ui.vth.films.filter(x => x.cle === ui.vth._essaiOrange)[0];
+     ouvrirFilmVth(ui.vth.films.indexOf(f));
+  });
+  await page.waitForSelector('.sheet.show', {timeout:5000});
+  ok('un support force est annonce lui aussi, et annulable',
+     /support force : blu-ray/i.test((await page.locator('#sheetin .vtcorr').innerText())
+       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+  await page.evaluate(()=> closeSheet());
+  await page.waitForTimeout(150);
+  await page.evaluate(()=>{ ui.vth.corr = {}; ui.vth.filtre = '';
+                            recalculerCouleursVth(); peindreVthTout(); });
+  await page.waitForTimeout(200);
+  ok('sans correction, le cinquieme compteur retombe a zero',
+     await page.evaluate(()=> ui.vth.compte.corrige) === 0);
 
 
   await browser.close();
