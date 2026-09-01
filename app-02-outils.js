@@ -132,7 +132,12 @@ let ui = {
   sorties:{ mode:'bluray', res:[], loading:false, err:'', charge:false },
   listeTab:'favoris',
   cineVolet:'sorties',                   // écran Cinéma : Sorties | Suggestions | Ma vidéothèque
-  sugg:{ l:[], plie:{}, loading:false, err:'', charge:false },
+  sugg:{ l:[], plie:{}, loading:false, err:'', charge:false, onglet:'cat' },
+  /* « Absents en 4K » (app-16) : 884 films lus une fois depuis le dépôt et
+     gardés ici pour la session, avec leur titre normalisé et la liste des
+     décennies dans l'ordre du fichier. */
+  a4k:{ l:[], decs:[], genere:'', q:'', dec:'', page:0,
+        loading:false, err:'', charge:false },
   /* Ma vidéothèque (app-15) : les trois tables sont lourdes, elles sont donc
      lues une fois et gardées ici pour toute la session. */
   vth:{ films:[], edts:[], edtsParCle:{}, corr:{}, dossiers:[], compte:null,
@@ -422,8 +427,12 @@ function render(){
   if(view === 'guide' && typeof restaurerDefilCat === 'function') restaurerDefilCat();
   /* L'écran Cinéma porte les Sorties ET les Suggestions (3008p) : y revenir
      doit relancer le chargement qui manque, selon le volet ouvert. */
-  if(view === 'sorties' && ui.cineVolet === 'sugg' && !ui.sugg.charge && !ui.sugg.loading)
+  if(view === 'sorties' && ui.cineVolet === 'sugg' && ui.sugg.onglet === 'cat' &&
+     !ui.sugg.charge && !ui.sugg.loading)
     chargerSuggestions();
+  if(view === 'sorties' && ui.cineVolet === 'sugg' && ui.sugg.onglet === 'q4k' &&
+     !ui.a4k.charge && !ui.a4k.loading)
+    chargerAbsents4k();
   if(view === 'sorties' && ui.cineVolet === 'vth' && !ui.vth.charge && !ui.vth.loading)
     chargerVideotheque();
 }

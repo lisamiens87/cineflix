@@ -586,7 +586,7 @@ async function apresConnexion(){
   await Promise.all([ catalogueDepuisSupabase().catch(e=>{ CAT.erreur = e.message; }),
                       chargerElements().catch(()=>{}),
                       chargerGouts().catch(()=>{}),
-                      chargerEcartes().catch(()=>{}),
+                      chargerEcartes().catch(()=>{}), chargerRefus().catch(()=>{}),
                       verifierAdmin() ]);
   await pousserEnAttente();
   choisirJellyfin();

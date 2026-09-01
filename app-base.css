@@ -1112,6 +1112,21 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 
 
+/* ---- Absents en 4K (app-16) : le mur ----
+   Une grille, pas une rangée qui défile : ici on parcourt 884 titres, on ne
+   feuillette pas dix suggestions. Le titre de décennie reprend le filet des
+   sections, et les deux gestes réutilisent .sgact — mêmes places, mêmes
+   couleurs qu'ailleurs, le cœur à gauche et l'irréversible à droite. */
+.a4kgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(102px,1fr));
+  gap:12px 10px;padding:0 16px 4px;align-items:start}
+.a4ktitre{padding:0 16px;margin:18px 0 10px}
+.a4kc{cursor:pointer;min-width:0}
+.a4kc .sgnom{-webkit-line-clamp:2}
+.a4kc .sgy{display:block;font-size:10px;color:var(--muted);margin-top:1px}
+/* Un sous-onglet annoncé mais sans données : visible pour dire ce qui vient,
+   inerte pour ne rien promettre. */
+.chips .chip.off,.souschips .chip.off{opacity:.38;cursor:default;pointer-events:none}
+
 /* ================= Ma vidéothèque (app-15) =================
    Écran d'administration : 2 300 lignes confrontées au catalogue des
    éditions physiques. Tout est bâti sur `.crow`, la ligne maison, pour que

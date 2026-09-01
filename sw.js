@@ -5,15 +5,20 @@
    afficherait « déjà sur le serveur » pour un titre qui n'y est plus.
 
    VERSION : suivre le BUILD d'index.html. Changer les deux ensemble. */
-const BUILD = '3108n';
+const BUILD = '3108o';
 const CACHE = 'cineflix-' + BUILD;
+/* suggestions-4k.json n'est PAS dans cette liste tant qu'il n'est pas dans le
+   dépôt : l'installation ci-dessous n'a volontairement pas de .catch(), donc
+   un seul fichier manquant ferait échouer tout le service worker et l'app
+   perdrait le hors-ligne. Il rejoindra le SHELL quand le fichier sera
+   déposé — d'ici là il est lu au vol, comme n'importe quelle donnée. */
 const SHELL = ['./', './index.html', './manifest.json', './icon.svg',
                './app-base.css', './app-mobile.css', './app-site.css', './config.js', './suggestions-n4.json', './app-01-noyau.js', './app-02-outils.js',
                './app-03-decouvrir.js', './app-04-sorties.js', './app-05-fiche.js',
                './app-06-maliste.js', './app-07-profil.js', './app-08-compte.js',
                './app-09-profils.js', './app-10-guide.js', './app-11-taxo.js',
                './app-12-citation.js', './app-13-affiche.js', './app-14-cache.js',
-               './app-15-videotheque.js']
+               './app-15-videotheque.js', './app-16-absents.js']
   .map(p => p.endsWith('.js') || p.endsWith('.css') ? p + '?b=' + BUILD : p);
 
 self.addEventListener('install', e => {

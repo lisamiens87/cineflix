@@ -310,7 +310,37 @@ function coeurSugg(id){
   render();
 }
 
+/* Les trois sous-onglets de Suggestions. « Catégories » est l'écran
+   d'origine, intact ; « Absents en 4K » vit dans app-16 ; « Absents en
+   Blu-ray » est annoncé mais sans données, donc inerte plutôt qu'absent —
+   dire ce qui vient vaut mieux que le cacher. */
+const SUGG_ONGLETS = [
+  { id:'cat', label:'Catégories' },
+  { id:'q4k', label:'Absents en 4K' },
+  { id:'bd',  label:'Absents en Blu-ray', off:true }
+];
+
+function setSuggOnglet(id){
+  const o = SUGG_ONGLETS.find(x => x.id === id);
+  if(!o || o.off) return;
+  ui.sugg.onglet = id;
+  render();
+}
+
+function sousOngletsSuggHtml(){
+  return '<div class="chips souschips">'+SUGG_ONGLETS.map(o=>
+    '<button class="chip '+(ui.sugg.onglet===o.id?'on':'')+(o.off?' off':'')+'"'+
+    (o.off ? ' disabled aria-disabled="true"' : ' onclick="setSuggOnglet(\''+o.id+'\')"')+
+    '>'+esc(o.label)+'</button>').join('')+'</div>';
+}
+
 function corpsSuggestions(){
+  if(!SUGG_ONGLETS.some(o => o.id === ui.sugg.onglet && !o.off)) ui.sugg.onglet = 'cat';
+  return sousOngletsSuggHtml() +
+    (ui.sugg.onglet === 'q4k' ? corpsAbsents4k() : corpsCategories());
+}
+
+function corpsCategories(){
   const s = ui.sugg;
   if(s.loading || (!s.charge && !s.err))
     return '<div class="empty"><span class="spin"></span>'+

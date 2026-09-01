@@ -48,6 +48,35 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   page.on('console', m => { if(m.type() === 'error') echecs.push('console: '+m.text()); });
   page.on('pageerror', e => echecs.push('pageerror: '+e.message));
 
+  /* suggestions-4k.json n'est pas versionne (Alexandre le depose lui-meme) :
+     le banc le sert, avec de quoi exercer chaque regle - deux decennies dans
+     un ordre NON alphabetique pour verifier qu'on suit le fichier, un film
+     sans affiche, et un film present au catalogue qui doit disparaitre. */
+  const F4K = { source:'banc', genere_le:'2026-09-01', total:7, films:[
+    { id:9314, titre:'Mille neuf cent quatre-vingt-quatre', annee:1984,
+      affiche:'/a.jpg', decennie:'Annees 1980' },
+    { id:9315, titre:'Brazil', annee:1985, affiche:'/b.jpg', decennie:'Annees 1980' },
+    { id:9316, titre:'Sans affiche du tout', annee:1988, affiche:'',
+      decennie:'Annees 1980' },
+    { id:9317, titre:'Elephant Man', annee:1980, affiche:'/d.jpg',
+      decennie:'Annees 1980' },
+    { id:9318, titre:'Alien', annee:1979, affiche:'/e.jpg', decennie:'Annees 1970' },
+    { id:9319, titre:'Orange mecanique', annee:1971, affiche:'/f.jpg',
+      decennie:'Annees 1970' },
+    /* Celui-ci est au catalogue du banc : il doit sortir du mur tout seul. */
+    { id:550, titre:'Fight Club', annee:1999, affiche:'/g.jpg',
+      decennie:'Annees 1990' }
+  ]};
+  await page.route('**/suggestions-4k.json*', r => r.fulfill({status:200,
+    contentType:'application/json', body: JSON.stringify(F4K)}));
+  /* Sans cette route, aucune affiche ne charge (le bac a sable ne sort pas
+     vers image.tmdb.org), posterFail() les remplace TOUTES par un cadre vide,
+     et « un film sans affiche garde son cadre » passerait pour la mauvaise
+     raison - il n'y aurait plus que des cadres vides. */
+  await page.route('**://image.tmdb.org/**', r => r.fulfill({status:200,
+    contentType:'image/svg+xml',
+    body:'<svg xmlns="http://www.w3.org/2000/svg" width="4" height="6"/>'}));
+
   await page.route('**://api.themoviedb.org/**', route => {
     const u = new URL(route.request().url());
     const p = u.pathname.replace('/3','');
@@ -1528,6 +1557,127 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   ok('un film sans titre TMDb ne rapproche toujours rien',
      await edPour({ cle:'inconnu|1972', _cleFr:'', _cleOrig:'' },
                   [{cle:'parrain|1972', editeur:'X'}], null) === null);
+
+  // 17 quater. Absents en 4K : le mur, ses filtres, et le refus definitif
+  await page.evaluate(()=>{
+     estAdmin = true; ui.cineVolet = 'sugg'; ui.sugg.onglet = 'cat';
+     ui.sorties.charge = true; ui.sorties.loading = false;
+     ui.sugg.charge = true; ui.sugg.l = [];
+     db.refus = {}; saveDB();
+     go('sorties');
+  });
+  await page.waitForTimeout(400);
+  ok('Suggestions porte trois sous-onglets, le Blu-ray inerte',
+     await page.locator('.souschips .chip').count() === 3 &&
+     await page.locator('.souschips .chip.off').count() === 1 &&
+     await page.locator('.souschips .chip.off[disabled]').count() === 1);
+  /* Le premier rendu a lieu AVANT que le fichier ne soit lu : le select des
+     decennies est donc vide, et c'est le repeint qui doit le remplir. C'est
+     la panne qui avait laisse le select des dossiers vide a vie (3108k). */
+  await page.evaluate(()=> setSuggOnglet('q4k'));
+  await page.waitForFunction(()=> ui.a4k.charge === true, null, {timeout:8000});
+  await page.waitForTimeout(400);
+  const optTxt = ()=> page.evaluate(()=>
+     [...document.querySelectorAll('#a4kdec option')].map(o => o.textContent).join('|'));
+  ok('le select des decennies porte les decennies du fichier',
+     await optTxt() === 'Toutes les décennies|Annees 1980|Annees 1970|Annees 1990');
+  /* Le select vit HORS de la zone repeinte - c'est ce qui protege le curseur
+     du champ de recherche - mais ses options dependent des donnees. On le vide
+     a la main pour verifier que le repeint sait les refaire : c'est la panne
+     qui avait laisse le select des dossiers vide a vie (3108k). Un test de
+     course de temps ne prouverait rien, le fichier arrivant en 150 ms. */
+  await page.evaluate(()=>{ document.getElementById('a4kdec').innerHTML = ''; });
+  ok('un select vide est reconstruit par le repeint',
+     await optTxt() === '' &&
+     await page.evaluate(()=>{ peindre4kTout();
+       return [...document.querySelectorAll('#a4kdec option')].length; }) === 4);
+  ok('les decennies suivent l\'ordre du fichier, pas l\'alphabet',
+     await page.evaluate(()=> ui.a4k.decs.join('|')) ===
+       'Annees 1980|Annees 1970|Annees 1990');
+  /* 7 films au fichier, mais Fight Club est au catalogue du banc. */
+  ok('un film deja au catalogue ne s\'affiche pas',
+     await page.locator('.a4kc').count() === 6 &&
+     (await page.locator('#a4kres').innerText()).indexOf('Fight Club') < 0);
+  const titresDec = ()=> page.evaluate(()=>
+     [...document.querySelectorAll('#a4kres .a4ktitre')].map(o => o.textContent).join('|'));
+  ok('le mur est groupe par decennie, titres en tete',
+     await titresDec() === 'Annees 1980|Annees 1970' &&
+     await page.locator('.a4kgrid').count() === 2);
+  /* Juge le marquage que la carte PRODUIT, pas ce qui survit a l'ecran : le
+     bac a sable ne sort pas vers image.tmdb.org, posterFail() a donc deja
+     remplace chaque <img> par un cadre vide dans le DOM vivant. Lire l'ecran
+     ne prouverait rien ; la fonction, si. */
+  const cartes = await page.evaluate(()=> ({
+     avec: carte4kHtml(ui.a4k.l.find(f => f.id === 9314)),
+     sans: carte4kHtml(ui.a4k.l.find(f => f.id === 9316))
+  }));
+  ok('une affiche est demandee a la bonne taille et au bon chemin',
+     cartes.avec.indexOf('https://image.tmdb.org/t/p/w342/a.jpg') >= 0 &&
+     cartes.avec.indexOf('loading="lazy"') >= 0);
+  ok('et le film sans affiche garde un cadre portant son titre, pas un trou',
+     cartes.sans.indexOf('<img') < 0 &&
+     /class="poster ph[^"]*">Sans affiche du tout</.test(cartes.sans));
+  ok('chaque affiche porte les deux gestes, visibles sans survol',
+     await page.locator('.a4kc .sgact.sgg button').count() === 6 &&
+     await page.locator('.a4kc .sgact button.no').count() === 6);
+
+  /* Recherche et decennie travaillent sur le tableau COMPLET en memoire. */
+  await page.fill('#a4kq', 'orange');
+  await page.waitForTimeout(300);
+  ok('la recherche porte sur toute la liste, pas sur le lot affiche',
+     await page.locator('.a4kc').count() === 1 &&
+     (await page.locator('.a4kc .sgnom').innerText()).indexOf('Orange') === 0);
+  ok('et le champ de recherche garde le curseur',
+     await page.evaluate(()=> document.activeElement &&
+                              document.activeElement.id === 'a4kq'));
+  await page.fill('#a4kq', '');
+  await page.waitForTimeout(250);
+  await page.selectOption('#a4kdec', 'Annees 1970');
+  await page.waitForTimeout(250);
+  ok('le filtre de decennie ne garde que la sienne',
+     await page.locator('.a4kc').count() === 2 &&
+     await page.locator('#a4kres .a4ktitre').count() === 1);
+  ok('et il survit au repeint suivant',
+     await page.evaluate(()=>{ peindre4kTout();
+       return document.getElementById('a4kdec').value; }) === 'Annees 1970');
+  await page.selectOption('#a4kdec', '');
+  await page.waitForTimeout(250);
+
+  /* Le coeur : meme mecanisme que Categories, et le film RESTE au mur. */
+  await page.evaluate(()=> coeur4k(9318));
+  await page.waitForTimeout(250);
+  ok('le coeur cree un favori sans faire disparaitre le film',
+     await page.evaluate(()=> !!(item('movie', 9318)||{}).fav) &&
+     await page.locator('.a4kc').count() === 6 &&
+     await page.locator('.a4kc .sgact.sgg button.on').count() === 1);
+
+  /* La croix : refus DEFINITIF. Le banc tourne sans Supabase, donc rien
+     n'est pousse - mais le film doit quitter le mur et y rester etranger. */
+  await page.evaluate(()=> refuser4k(9319));
+  await page.waitForTimeout(300);
+  ok('la croix retire le film du mur',
+     await page.locator('.a4kc').count() === 5 &&
+     (await page.locator('#a4kres').innerText()).indexOf('Orange') < 0);
+  ok('et un bandeau permet de revenir sur le geste',
+     await page.locator('#refusbar').count() === 1 &&
+     /annuler/i.test(await page.locator('#refusbar button').innerText()));
+  ok('le refus est range par liste, pas en vrac',
+     await page.evaluate(()=> !!(db.refus && db.refus['4k'] && db.refus['4k'][9319])));
+  await page.click('#refusbar button');
+  await page.waitForTimeout(300);
+  ok('annuler le rend au mur, et efface le refus',
+     await page.locator('.a4kc').count() === 6 &&
+     await page.evaluate(()=> !(db.refus['4k']||{})[9319]) &&
+     await page.locator('#refusbar').count() === 0);
+
+  /* Retour a Categories : l'ecran d'origine ne doit pas avoir bouge. */
+  await page.evaluate(()=> setSuggOnglet('cat'));
+  await page.waitForTimeout(250);
+  ok('revenir a Categories rend l\'ecran d\'origine',
+     await page.locator('.a4kc').count() === 0 &&
+     await page.locator('.souschips .chip.on').count() === 1 &&
+     (await page.locator('.souschips .chip.on').innerText())
+       .toLowerCase().indexOf('cat') === 0);
 
   // 18 bis. L'ecran : 2 300 lignes ne se rendent pas d'un coup
   await page.evaluate(()=>{

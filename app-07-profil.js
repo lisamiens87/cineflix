@@ -361,7 +361,7 @@ async function boot(){
   await chargerCatalogue();
   if(sbPret() && connecte()){
     await Promise.all([ chargerElements().catch(()=>{}), chargerGouts().catch(()=>{}),
-                        chargerEcartes().catch(()=>{}), verifierAdmin() ]);
+                        chargerEcartes().catch(()=>{}), chargerRefus().catch(()=>{}), verifierAdmin() ]);
     pousserEnAttente();
     majProfil();
   }

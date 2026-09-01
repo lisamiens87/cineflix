@@ -72,8 +72,8 @@ code (`outils-nas/`) et un dossier de configuration CI (`.github/`).
 ├── manifest.json              manifeste PWA (nom, icônes, mode standalone)
 ├── sw.js                      service worker : coquille hors-ligne
 │
-├── app-01-noyau.js …          les 15 modules de l'application (voir §4)
-├── app-15-videotheque.js
+├── app-01-noyau.js …          les 16 modules de l'application (voir §4)
+├── app-16-absents.js
 │
 ├── app-base.css               tronc commun, mobile-first
 ├── app-mobile.css             affinages petits écrans (max-width)
@@ -83,6 +83,7 @@ code (`outils-nas/`) et un dossier de configuration CI (`.github/`).
 ├── cineflix.json              catalogue d'exemple (identifiants TMDB + fiches)
 ├── suggestions-n4.json        suggestions éditoriales (~140 Ko, servi avec l'app)
 ├── suggestions-historique.json  identifiants déjà proposés, pour ne pas se répéter
+├── suggestions-4k.json        les films sortis en 4K UHD absents du NAS (déposé à la main, hors dépôt tant qu'il n'est pas régénéré)
 │
 ├── supabase-cineflix.sql      schéma Supabase : tables, vues, politiques RLS
 ├── outils-nas/
@@ -121,6 +122,7 @@ l'inverse n'est vrai que par appel différé (`render()`, un `onclick`).
 | `app-12-citation.js` | La **citation d'ouverture** : au démarrage à froid *et* au retour d'arrière-plan après une heure d'inactivité. Liste embarquée, fonctionne hors ligne. |
 | `app-13-affiche.js` | La **visionneuse d'affiche** : pincer-zoomer, écrit à la main parce que l'app interdit volontairement le zoom du navigateur. Trois définitions successives, jamais d'écran vide. |
 | `app-15-videotheque.js` | **Ma vidéothèque**, troisième volet de l'écran Cinéma, réservé à l'administration : les films du NAS confrontés au catalogue des éditions physiques. Trois tables Supabase lues une fois et gardées en mémoire, une couleur par film (au maximum / amélioration prévue / améliorable / à rapprocher / non référencé), la pile « prévue » recueillant les films dont la meilleure édition est annoncée mais pas encore sortie — ils en ressortent seuls, la date passée, sans écriture, le rapprochement avec les éditions tenté sur trois clés successives — titre du fichier, puis titre français et titre original venus de TMDb, `cleVth()` étant le miroir JS de `Normalize-Titre` de `Pousser_Videotheque_Supabase.ps1`, le script du dépôt scripts-nas qui écrit ces clés — et les corrections manuelles, saisies en deux étapes numérotées (chercher dans DVDFr, puis déclarer ce que l'on sait de son propre exemplaire), réversibles et retrouvables par un cinquième compteur — la seule écriture de l'app hors `elements`, `profils` et `gouts`. |
+| `app-16-absents.js` | **Absents en 4K**, deuxième sous-onglet de Suggestions : le mur des films sortis en 4K UHD en France que le NAS n'a pas. La soustraction est faite DEHORS, à la main, dans `suggestions-4k.json` — l'app affiche et écarte, elle ne calcule rien. Deux gestes par affiche, dont un seul réversible : le cœur ajoute aux favoris, la croix écrit un refus **définitif** dans la table `refus` (une ligne par utilisateur, liste et film). Table à part et non `ecartes` : `retablirEcartes()` fait un DELETE sur toutes les lignes de l'utilisateur, un seul appui ressusciterait les bannis. |
 | `app-14-cache.js` | Le **cache des données lourdes** (IndexedDB) : catalogue, notes Télérama, sorties physiques. Ne change rien à l'affichage, seulement le moment où l'app redemande — né d'un dépassement de quota Supabase. |
 
 ### État global

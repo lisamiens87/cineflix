@@ -69,6 +69,10 @@ let db = {
      de six mois. Le serveur fait foi (table `ecartes`), ceci n'est que
      l'écho local qui fait répondre l'écran sans attendre le réseau. */
   ecartes:{},
+  /* Les refus DÉFINITIFS des murs « Absents en… », par liste : le serveur
+     (table `refus`) fait foi, ceci n'est que l'écho local qui fait répondre
+     l'écran avant l'aller-retour. Rien ne les fait revenir. */
+  refus:{},
   onboarde:false, v:1
 };
 
