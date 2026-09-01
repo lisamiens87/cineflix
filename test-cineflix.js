@@ -65,6 +65,18 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
       decennie:'Annees 1970' },
     /* Celui-ci est au catalogue du banc : il doit sortir du mur tout seul. */
     { id:550, titre:'Fight Club', annee:1999, affiche:'/g.jpg',
+      decennie:'Annees 1990' },
+    /* Deux defauts du VRAI fichier livre le 01/09 : 21 coffrets sans
+       identifiant TMDb, et une fiche repetee quatre fois. */
+    /* Rangees par decennie comme le vrai fichier, qui va de « Avant 1950 » a
+       « Sans annee » sans jamais revenir en arriere. */
+    { id:null, titre:'Hellraiser - Tetralogie', annee:null, affiche:null,
+      decennie:'Annees 1970' },
+    { id:null, titre:'Trois couleurs : Bleu, Blanc, Rouge', annee:1993,
+      affiche:null, decennie:'Annees 1990' },
+    { id:9320, titre:'Justice League', annee:2024, affiche:'/h.jpg',
+      decennie:'Annees 1990' },
+    { id:9320, titre:'Justice League', annee:2024, affiche:'/h.jpg',
       decennie:'Annees 1990' }
   ]};
   await page.route('**/suggestions-4k.json*', r => r.fulfill({status:200,
@@ -1596,13 +1608,13 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
        'Annees 1980|Annees 1970|Annees 1990');
   /* 7 films au fichier, mais Fight Club est au catalogue du banc. */
   ok('un film deja au catalogue ne s\'affiche pas',
-     await page.locator('.a4kc').count() === 6 &&
+     await page.locator('.a4kc').count() === 9 &&
      (await page.locator('#a4kres').innerText()).indexOf('Fight Club') < 0);
   const titresDec = ()=> page.evaluate(()=>
      [...document.querySelectorAll('#a4kres .a4ktitre')].map(o => o.textContent).join('|'));
   ok('le mur est groupe par decennie, titres en tete',
-     await titresDec() === 'Annees 1980|Annees 1970' &&
-     await page.locator('.a4kgrid').count() === 2);
+     await titresDec() === 'Annees 1980|Annees 1970|Annees 1990' &&
+     await page.locator('.a4kgrid').count() === 3);
   /* Juge le marquage que la carte PRODUIT, pas ce qui survit a l'ecran : le
      bac a sable ne sort pas vers image.tmdb.org, posterFail() a donc deja
      remplace chaque <img> par un cadre vide dans le DOM vivant. Lire l'ecran
@@ -1617,9 +1629,18 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   ok('et le film sans affiche garde un cadre portant son titre, pas un trou',
      cartes.sans.indexOf('<img') < 0 &&
      /class="poster ph[^"]*">Sans affiche du tout</.test(cartes.sans));
-  ok('chaque affiche porte les deux gestes, visibles sans survol',
-     await page.locator('.a4kc .sgact.sgg button').count() === 6 &&
-     await page.locator('.a4kc .sgact button.no').count() === 6);
+  /* Sept cartes agissantes sur neuf : les deux coffrets sans identifiant
+     restent au mur mais sans gestes - on ne sait pas les designer. */
+  ok('chaque affiche identifiable porte les deux gestes, visibles sans survol',
+     await page.locator('.a4kc .sgact.sgg button').count() === 7 &&
+     await page.locator('.a4kc .sgact button.no').count() === 7);
+  ok('une fiche repetee n\'est montree qu\'une fois',
+     await page.evaluate(()=> ui.a4k.l.filter(f => f.id === 9320).length) === 1);
+  ok('un coffret sans identifiant reste visible, mais muet',
+     await page.locator('.a4kc.muet').count() === 2 &&
+     await page.locator('.a4kc.muet button').count() === 0 &&
+     await page.evaluate(()=> carte4kHtml({id:null,titre:'X',annee:null,affiche:null}))
+       .then(h => h.indexOf('ouvrirFiche') < 0) === true);
 
   /* Recherche et decennie travaillent sur le tableau COMPLET en memoire. */
   await page.fill('#a4kq', 'orange');
@@ -1635,7 +1656,7 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.selectOption('#a4kdec', 'Annees 1970');
   await page.waitForTimeout(250);
   ok('le filtre de decennie ne garde que la sienne',
-     await page.locator('.a4kc').count() === 2 &&
+     await page.locator('.a4kc').count() === 3 &&
      await page.locator('#a4kres .a4ktitre').count() === 1);
   ok('et il survit au repeint suivant',
      await page.evaluate(()=>{ peindre4kTout();
@@ -1648,7 +1669,7 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.waitForTimeout(250);
   ok('le coeur cree un favori sans faire disparaitre le film',
      await page.evaluate(()=> !!(item('movie', 9318)||{}).fav) &&
-     await page.locator('.a4kc').count() === 6 &&
+     await page.locator('.a4kc').count() === 9 &&
      await page.locator('.a4kc .sgact.sgg button.on').count() === 1);
 
   /* La croix : refus DEFINITIF. Le banc tourne sans Supabase, donc rien
@@ -1656,7 +1677,7 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.evaluate(()=> refuser4k(9319));
   await page.waitForTimeout(300);
   ok('la croix retire le film du mur',
-     await page.locator('.a4kc').count() === 5 &&
+     await page.locator('.a4kc').count() === 8 &&
      (await page.locator('#a4kres').innerText()).indexOf('Orange') < 0);
   ok('et un bandeau permet de revenir sur le geste',
      await page.locator('#refusbar').count() === 1 &&
@@ -1666,7 +1687,7 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.click('#refusbar button');
   await page.waitForTimeout(300);
   ok('annuler le rend au mur, et efface le refus',
-     await page.locator('.a4kc').count() === 6 &&
+     await page.locator('.a4kc').count() === 9 &&
      await page.evaluate(()=> !(db.refus['4k']||{})[9319]) &&
      await page.locator('#refusbar').count() === 0);
 

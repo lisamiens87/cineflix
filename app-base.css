@@ -1121,6 +1121,9 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
   gap:12px 10px;padding:0 16px 4px;align-items:start}
 .a4ktitre{padding:0 16px;margin:18px 0 10px}
 .a4kc{cursor:pointer;min-width:0}
+/* Coffrets et integrales sans fiche TMDb : vignette montree, gestes retires. */
+.a4kc.muet{cursor:default}
+.a4kc.muet .sgnom{color:var(--muted)}
 .a4kc .sgnom{-webkit-line-clamp:2}
 .a4kc .sgy{display:block;font-size:10px;color:var(--muted);margin-top:1px}
 /* Un sous-onglet annoncé mais sans données : visible pour dire ce qui vient,

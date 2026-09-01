@@ -44,6 +44,18 @@ async function chargerAbsents4k(){
       const d = a.l[i].decennie;
       if(d && a.decs.indexOf(d) < 0) a.decs.push(d);
     }
+    /* Le fichier livré répète « Justice League : Crisis on Infinite Earths
+       Partie 1 » quatre fois. Un doublon d'identifiant, c'est la même fiche :
+       on garde la première ligne et on jette les suivantes, plutôt que
+       d'afficher quatre fois la même affiche. Les films SANS identifiant ne
+       sont pas dédoublonnés — rien ne permet de dire qu'ils sont les mêmes. */
+    const vus = {};
+    a.l = a.l.filter(f=>{
+      const id = id4k(f);
+      if(!id) return true;
+      if(vus[id]) return false;
+      vus[id] = 1; return true;
+    });
     a.charge = true;
   }catch(e){
     a.err = 'Impossible de charger la liste des absents en 4K';
@@ -51,6 +63,17 @@ async function chargerAbsents4k(){
   a.loading = false;
   a.page = 0;
   peindre4kTout();
+}
+
+/* L'identifiant TMDb, quand il existe. Le fichier livré en compte 21 sans :
+   des coffrets et des intégrales qui n'ont pas de fiche TMDb (« Hellraiser -
+   Tétralogie », « Trois couleurs : Bleu, Blanc, Rouge »). Ils sont de vrais
+   titres, donc ils RESTENT au mur — mais sans identifiant on ne peut ni les
+   mettre en favori ni les refuser : deux d'entre eux ne se distinguent pas.
+   Leurs deux boutons sont donc retirés plutôt que menteurs. */
+function id4k(f){
+  const n = Number(f && f.id);
+  return (f && f.id != null && isFinite(n) && n > 0) ? n : 0;
 }
 
 /* ---------- Ce qui reste à voir ----------
@@ -64,8 +87,9 @@ function absents4kVisibles(){
   const res = [];
   for(let i = 0; i < a.l.length; i++){
     const f = a.l[i];
-    if(ref[f.id]) continue;
-    if(surCineflix('movie', f.id)) continue;
+    const id = id4k(f);
+    if(id && ref[id]) continue;
+    if(id && surCineflix('movie', id)) continue;
     if(a.dec && f.decennie !== a.dec) continue;
     if(q && (f._n || '').indexOf(q) < 0) continue;
     res.push(f);
@@ -80,6 +104,7 @@ function absents4kVisibles(){
    ferait revenir un film qu'Alexandre croit banni. */
 async function refuser4k(id){
   id = Number(id);
+  if(!id) return;                    /* jamais d'écriture sur un film sans fiche */
   db.refus = db.refus || {};
   db.refus[A4K_LISTE] = db.refus[A4K_LISTE] || {};
   db.refus[A4K_LISTE][id] = Date.now();
@@ -143,7 +168,7 @@ function fermerBandeau4k(){
 }
 function bandeau4k(id){
   fermerBandeau4k();
-  const f = (ui.a4k.l||[]).find(x => Number(x.id) === id);
+  const f = (ui.a4k.l||[]).find(x => id4k(x) === id);
   const el = document.createElement('div');
   el.id = 'refusbar'; el.className = 'ecartbar';
   el.innerHTML = '<span>'+esc((f && f.titre) || 'Film')+' écarté définitivement</span>'+
@@ -160,7 +185,8 @@ function bandeau4k(id){
    telle quelle. Le film NE DISPARAÎT PAS du mur — le cœur se remplit. */
 function coeur4k(id){
   id = Number(id);
-  const f = (ui.a4k.l||[]).find(x => Number(x.id) === id);
+  if(!id) return;
+  const f = (ui.a4k.l||[]).find(x => id4k(x) === id);
   if(!f) return;
   basculerFavori({ id:f.id, title:f.titre, poster_path:f.affiche||null,
                    release_date:String(f.annee||'')+'-01-01' }, 'movie');
@@ -247,16 +273,26 @@ function mur4kHtml(){
    positif d'un côté, l'irréversible de l'autre. Les deux sont VISIBLES en
    permanence — au doigt, il n'y a pas de survol. */
 function carte4kHtml(f){
-  const it = item('movie', f.id);
+  const id = id4k(f);
+  /* Sans identifiant : la vignette reste, mais muette. Ouvrir une fiche sur
+     un identifiant absent donnerait un panneau vide, et les deux gestes
+     porteraient sur un film qu'on ne sait pas désigner. */
+  if(!id)
+    return '<div class="a4kc muet">'+
+      '<div class="wrapimg">'+posterEl(f.affiche,'w342','',f.titre)+'</div>'+
+      '<div class="sgnom">'+esc(f.titre)+'</div>'+
+      '<div class="sgy">'+esc(String(f.annee||''))+'</div>'+
+    '</div>';
+  const it = item('movie', id);
   const fav = !!(it && it.fav);
-  return '<div class="a4kc" onclick="ouvrirFiche('+f.id+',\'movie\')">'+
+  return '<div class="a4kc" onclick="ouvrirFiche('+id+',\'movie\')">'+
     '<div class="wrapimg">'+posterEl(f.affiche,'w342','',f.titre)+
       '<div class="sgact sgg">'+
-        '<button class="'+(fav?'on':'')+'" onclick="event.stopPropagation();coeur4k('+f.id+')" '+
+        '<button class="'+(fav?'on':'')+'" onclick="event.stopPropagation();coeur4k('+id+')" '+
           'aria-label="Je le veux">'+(fav ? '♥' : '♡')+'</button>'+
       '</div>'+
       '<div class="sgact">'+
-        '<button class="no" onclick="event.stopPropagation();refuser4k('+f.id+')" '+
+        '<button class="no" onclick="event.stopPropagation();refuser4k('+id+')" '+
           'aria-label="Jamais celui-là">✕</button>'+
       '</div>'+
     '</div>'+
