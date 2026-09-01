@@ -1123,8 +1123,13 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
 .chip.vtf{display:inline-flex;align-items:center;gap:7px}
 .chip.vtf::before{content:"";width:8px;height:8px;border-radius:50%;flex:0 0 auto}
 .chip.vtf.vert::before{background:#9FE1CB}
+.chip.vtf.prevu::before{background:#E24B4A}
 .chip.vtf.orange::before{background:#FAC775}
-.chip.vtf.rouge::before{background:#F7C1C1}
+/* « À rapprocher » passe au violet : le rouge est désormais celui de
+   « Amélioration prévue », la pile qu'on veut voir en premier. La CLASSE
+   garde son nom de couleur d'origine — renommer aurait touché le banc pour
+   rien, nettoyage remis à plus tard (décision d'Alexandre). */
+.chip.vtf.rouge::before{background:#7F77DD}
 .chip.vtf.gris::before{background:#B4B2A9}
 .chip.vtf span{opacity:.65}
 /* La puce active passe en accent (règle générique) : son point garde la
@@ -1143,9 +1148,13 @@ body{overflow-x:clip}     /* le héros déborde de la colonne : rien ne dépasse
   font-family:Archivo,Inter,sans-serif;font-size:11.5px;font-weight:700;
   letter-spacing:.02em;white-space:nowrap;flex:0 0 auto}
 .vtp.vert  {background:#04342C;color:#9FE1CB}
+.vtp.prevu {background:#3A1211;color:#E24B4A}
 .vtp.orange{background:#412402;color:#FAC775}
-.vtp.rouge {background:#501313;color:#F7C1C1}
+.vtp.rouge {background:#1E1C42;color:#7F77DD}
 .vtp.gris  {background:#2C2C2A;color:#B4B2A9}
+/* La sortie annoncée, en fin de ligne de méta : la phrase reste au gris du
+   sous-titre, seule la date passe en accent — c'est elle qu'on cherche. */
+.vtdispo b{color:#E24B4A;font-weight:750}
 /* Le rappel de la correction en place, en tête du panneau : c'est la
    première chose à voir quand on rouvre un film déjà traité. */
 .vtcorr{background:var(--accent-dim);border:1px solid #ff4d3d55;border-radius:10px;

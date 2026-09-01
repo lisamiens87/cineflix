@@ -1417,6 +1417,42 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   ok('un palier inconnu ne passe pas pour un maximum',
      await vthCouleur({palier:'ZZZ'}, edDVD, null) === 'orange');
 
+  /* 18 ter bis. La sortie annoncee.
+     Un film AMELIORABLE dont la meilleure edition n'est pas encore sortie
+     n'a rien a traiter : il attend dans sa propre pile. Une date passee l'en
+     fait ressortir SANS ECRITURE - c'est tout l'interet de la regle. */
+  const dansNJoursISO = n => {
+     const d = new Date(); d.setDate(d.getDate() + n);
+     return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+
+            String(d.getDate()).padStart(2,'0');
+  };
+  const FUTUR = dansNJoursISO(40), PASSE = dansNJoursISO(-40), HIER = dansNJoursISO(-1);
+  ok('une date future sort le film des ameliorables',
+     await vthCouleur(DVD, edBR, { dispo_le: FUTUR }) === 'prevu');
+  ok('une mention de sortie suffit, sans date',
+     await vthCouleur(DVD, edBR, { dispo_texte:'T4 2026' }) === 'prevu');
+  ok('une date passee le laisse ameliorable, sans rien effacer',
+     await vthCouleur(DVD, edBR, { dispo_le: PASSE }) === 'orange' &&
+     await vthCouleur(DVD, edBR, { dispo_le: HIER }) === 'orange');
+  ok('aujourd\'hui n\'est pas posterieur a aujourd\'hui',
+     await vthCouleur(DVD, edBR, { dispo_le: dansNJoursISO(0) }) === 'orange');
+  ok('sans les deux colonnes, rien ne change',
+     await vthCouleur(DVD, edBR, {}) === 'orange' &&
+     await vthCouleur(DVD, edBR, { dispo_le:null, dispo_texte:'' }) === 'orange');
+  /* La regle ne s'applique qu'a ce qui serait AMELIORABLE : elle ne doit
+     voler ni un vert, ni un rouge, ni un gris. */
+  ok('un film deja au maximum n\'est pas capture par une date',
+     await vthCouleur(BR, edBR, { dispo_le: FUTUR }) === 'vert');
+  ok('la 4K et le verdict humain passent toujours devant',
+     await vthCouleur(UHD, edBR, { dispo_le: FUTUR }) === 'vert' &&
+     await vthCouleur(DVD, edBR, { statut:'VERIFIE_MAX', dispo_le: FUTUR }) === 'vert');
+  ok('un film non rapproche reste dans sa file malgre une date',
+     await vthCouleur(BR, null, { dispo_le: FUTUR }) === 'rouge' &&
+     await vthCouleur(DVD, null, { dispo_le: FUTUR }) === 'gris');
+  ok('la pastille annonce l\'attente, pas le support',
+     await page.evaluate(a => couleurFilm({palier:'DVD'}, {meilleur_support:'BLURAY'},
+       {dispo_le:a}).libelle, FUTUR) === 'Amélioration prévue');
+
   /* 18 quater. La cle de rapprochement.
      cleVth() est le miroir JS de Get-TitreNormalise (scripts-nas). Ce qui la
      distingue de normVth(), et ce qui se casserait en silence si les deux
@@ -1520,6 +1556,18 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
         pre-remplir ici testerait l'ordre inverse, celui qui ne se produit
         jamais - c'est ce qui avait laisse passer un select vide a vie. */
      ui.vth.corr = {}; ui.vth.dossiers = [];
+     /* Deux films dont la meilleure edition est annoncee : l'un par date,
+        l'autre par mention. Le second force le support pour verifier que la
+        phrase dit « 4K » et non le support de l'edition. */
+     const j = n => { const d = new Date(); d.setDate(d.getDate()+n);
+       return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+
+              String(d.getDate()).padStart(2,'0'); };
+     /* Le premier force le support : la phrase doit dire « Blu-ray ». Le
+        second n'en force aucun, le mot vient donc de l'edition rapprochee
+        (UHD4K) et doit dire « 4K » - c'est le support RESOLU qui parle. */
+     ui.vth.corr['film 0|2020'] = { cle:'film 0|2020', dispo_le: j(40),
+                                    support_force:'BLURAY' };
+     ui.vth.corr['film 2|2020'] = { cle:'film 2|2020', dispo_texte:'T4 2026' };
      films.forEach(f => { f._n = normVth(f.titre); });
      films.sort((a,b)=> String(a.titre).localeCompare(String(b.titre), 'fr'));
      ui.vth.filtre = ''; ui.vth.q = ''; ui.vth.dossier = ''; ui.vth.page = 0;
@@ -1547,6 +1595,56 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
      Mais ses options, elles, dependent des donnees. Il faut donc que le
      repeint les reecrive, sinon le select garde a vie ce qu'il avait au
      premier rendu - c'est-a-dire rien. */
+  /* La nouvelle pile et sa phrase de fin de ligne. */
+  ok('le compteur « Amélioration prévue » est en 2e position',
+     (await page.locator('#vthcpt .chip').allInnerTexts()).length === 6 &&
+     /prevue/i.test((await page.locator('#vthcpt .chip').nth(1).innerText())
+       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+  ok('et il compte les deux films annonces',
+     await page.evaluate(()=> ui.vth.compte.prevu) === 2);
+  const phrases = (await page.locator('.vtrow .vtdispo').allInnerTexts())
+     .map(t => t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  ok('une date future donne « prevue le JJ Mmm prochain »',
+     phrases.some(t => /^sortie prochaine en Blu-ray prevue le \d{2} [A-Z][a-z]{2} prochain$/.test(t)));
+  ok('une mention donne « annoncee pour ... », avec le support force',
+     phrases.some(t => t === 'sortie prochaine en 4K annoncee pour T4 2026'));
+  ok('seule la date est en accent, pas toute la phrase',
+     await page.locator('.vtrow .vtdispo b').count() === 2 &&
+     /^\d{2} [A-Z][a-z]{2}$/.test(await page.locator('.vtrow .vtdispo b').first().innerText()));
+  ok('aucun autre film ne porte de phrase de sortie',
+     await page.locator('.vtrow .vtdispo').count() === 2);
+  /* Un film annonce est un film RAPPROCHE : son panneau est celui du haut,
+     pas la file de travail en deux etapes. */
+  /* Le panneau, si tant est qu'un film soit passe dans la nouvelle pile :
+     sans ce garde, l'absence de film ferait PLANTER le banc au lieu de le
+     faire compter rouge, et le rapport d'echecs ne s'afficherait jamais. */
+  const ouvert = await page.evaluate(()=>{
+     const f = ui.vth.films.filter(x => x._cl === 'prevu')[0];
+     if(!f) return false;
+     ouvrirFilmVth(ui.vth.films.indexOf(f));
+     return true;
+  });
+  if(ouvert) await page.waitForSelector('.sheet.show', {timeout:5000});
+  ok('le panneau d\'un film annonce est celui d\'un film rapproche',
+     ouvert &&
+     await page.locator('#sheetin .vtetape').count() === 0 &&
+     await page.locator('#sheetin #vthsup').count() === 1);
+  ok('et le rappel de correction annonce la sortie',
+     ouvert &&
+     /sortie annoncee/i.test((await page.locator('#sheetin .vtcorr').innerText())
+       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
+  if(ouvert){ await page.evaluate(()=> closeSheet()); await page.waitForTimeout(200); }
+  await page.evaluate(()=> setFiltreVth('prevu'));
+  await page.waitForTimeout(200);
+  ok('le filtre ne garde que les films annonces',
+     await page.locator('.vtrow').count() === 2 &&
+     await page.locator('.vtrow .vtp.prevu').count() === 2);
+  await page.evaluate(()=> setFiltreVth('prevu'));   /* on eteint le filtre */
+  await page.waitForTimeout(200);
+  ok('et l\'eteindre rend toute la liste',
+     await page.evaluate(()=> ui.vth.filtre) === '' &&
+     await page.locator('.vtrow').count() === 100);
+
   ok('au premier rendu, le select n\'a que « Tous les dossiers »',
      await page.locator('#vthdos option').count() === 1);
   /* On simule la fin du chargement exactement comme chargerVideotheque() :
@@ -1589,9 +1687,16 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   await page.waitForTimeout(200);
   ok('« Voir plus » ajoute un lot de cent',
      await page.locator('.vtrow').count() === 200);
-  ok('les cinq compteurs sont la, et comptent tout le catalogue',
-     await page.locator('#vthcpt .chip').count() === 5 &&
-     await page.evaluate(()=> ui.vth.compte.ameli === 125 && ui.vth.compte.rappr === 126));
+  /* Six piles depuis « Amélioration prévue ». Deux des 125 ameliorables ont
+     une sortie annoncee en fixture : ils comptent desormais ailleurs, et le
+     total des six doit toujours retomber sur les 251 films. */
+  ok('les six compteurs sont la, et comptent tout le catalogue',
+     await page.locator('#vthcpt .chip').count() === 6 &&
+     await page.evaluate(()=> ui.vth.compte.ameli === 123 &&
+                              ui.vth.compte.prevu === 2 &&
+                              ui.vth.compte.rappr === 126) &&
+     await page.evaluate(()=> { const c = ui.vth.compte;
+       return c.max + c.prevu + c.ameli + c.rappr + c.nonref === ui.vth.films.length; }));
   await page.click('#vthcpt .chip:has-text("Ameliorable"), #vthcpt .chip:has-text("Améliorable")');
   await page.waitForTimeout(200);
   ok('un filtre de couleur ne garde que sa couleur',
@@ -1667,6 +1772,10 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
   /* Un film traite quitte sa file : sans un moyen de relire et d'annuler la
      correction, une erreur devenait definitive. */
   await page.evaluate(()=>{
+     /* Ardoise propre : les sorties annoncees posees en 18 bis compteraient
+        elles aussi comme corrections et fausseraient les deux mesures. */
+     ui.vth.corr = {};
+     recalculerCouleursVth();
      const rouge = ui.vth.films.filter(x => x._cl === 'rouge')[0];
      const orange = ui.vth.films.filter(x => x._cl === 'orange')[0];
      ui.vth.corr[rouge.cle]  = { cle:rouge.cle, statut:'VERIFIE_MAX',
@@ -1676,8 +1785,8 @@ let nbDiscover = 0;                // combien de /discover ont été demandés e
      recalculerCouleursVth(); ui.vth.page = 0; peindreVthTout();
   });
   await page.waitForTimeout(200);
-  ok('le cinquieme compteur compte les films corriges',
-     await page.locator('#vthcpt .chip').count() === 5 &&
+  ok('le compteur de provenance compte les films corriges',
+     await page.locator('#vthcpt .chip').count() === 6 &&
      await page.evaluate(()=> ui.vth.compte.corrige) === 2);
   ok('un film marque « verifie » passe au vert et quitte la file',
      await page.evaluate(()=> {

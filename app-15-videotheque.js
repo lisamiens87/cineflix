@@ -31,6 +31,10 @@ const VTH_LIB_SUPPORT  = { DVD:'DVD', BLURAY:'Blu-ray', UHD4K:'4K' };
    de l'urgence : ce qui va bien d'abord, ce qui demande du travail ensuite. */
 const VTH_FILTRES = [
   { id:'max',    cl:'vert',   label:'Au maximum' },
+  /* Entre « au maximum » et « améliorable » : le film EST améliorable, mais
+     rien n'est à faire tant que l'édition n'est pas sortie. Le distinguer,
+     c'est ne pas le rechercher trois fois pour rien. */
+  { id:'prevu',  cl:'prevu',  label:'Amélioration prévue' },
   { id:'ameli',  cl:'orange', label:'Améliorable' },
   { id:'rappr',  cl:'rouge',  label:'À rapprocher' },
   { id:'nonref', cl:'gris',   label:'Non référencé' },
@@ -41,7 +45,8 @@ const VTH_FILTRES = [
      l'app a classés toute seule. */
   { id:'corrige', cl:'corrige', label:'Corrigé' }
 ];
-const VTH_CL_PAR_FILTRE = { max:'vert', ameli:'orange', rappr:'rouge', nonref:'gris' };
+const VTH_CL_PAR_FILTRE = { max:'vert', prevu:'prevu', ameli:'orange',
+                            rappr:'rouge', nonref:'gris' };
 
 /* ---------- Normalisation ----------
    Même règle que la clé du NAS : ligatures développées, minuscules, accents
@@ -85,6 +90,48 @@ function cleVth(titre, annee){
   /* Un seul article retire, jamais deux : « Le Un » donne « un ». */
   if(mots.length > 1 && VTH_ARTICLES.indexOf(mots[0]) >= 0) mots.shift();
   return mots.join(' ') + '|' + (annee || '');
+}
+
+/* ---------- La sortie annoncée ----------
+   `dispo_le` et `dispo_texte` disent qu'une meilleure édition EXISTERA. Tant
+   qu'elle n'est pas sortie, chercher ce film dans DVDFr ne donnera rien : il
+   sort de la file des améliorables pour attendre dans sa propre pile.
+
+   La bascule inverse ne coûte AUCUNE écriture : la date passée cesse
+   simplement d'être future, et le film revient améliorable au chargement
+   suivant. C'est ce qui permet de poser une date et de l'oublier. */
+
+/* La date du jour, heure LOCALE. Volontairement différente de todayISO()
+   d'app-02, qui passe par toISOString() donc par UTC : en France, entre
+   minuit et deux heures du matin, UTC est encore la veille et une édition
+   sortant AUJOURD'HUI passerait pour future. Comparer deux chaînes
+   « AAAA-MM-JJ » évite en prime toute arithmétique de fuseau. */
+function aujourdhuiVth(){
+  const d = new Date();
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0');
+}
+
+function sortiePrevue(c){
+  if(!c) return false;
+  if(String(c.dispo_texte || '').trim()) return true;
+  const d = String(c.dispo_le || '').slice(0, 10);
+  return d.length === 10 && d > aujourdhuiVth();
+}
+
+/* Juin et juillet ne se distinguent pas sur trois lettres strictes : la
+   table dit « Jun » et « Jul », comme convenu avec Alexandre. */
+const VTH_MOIS = ['Jan','Fév','Mar','Avr','Mai','Jun','Jul','Aoû','Sep','Oct','Nov','Déc'];
+
+/* « 2026-10-07 » donne « 07 Oct ». Découpage de la CHAÎNE, sans passer par
+   un objet Date : une date nue interprétée en UTC puis relue en local
+   reculerait d'un jour à l'ouest de Greenwich. */
+function fmtJourMois(iso){
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
+  if(!m) return '';
+  const mois = VTH_MOIS[Number(m[2]) - 1];
+  return mois ? m[3] + ' ' + mois : '';
 }
 
 function fmtOctets(n){
@@ -142,7 +189,7 @@ async function chargerVideotheque(){
       vthTout('editions_dvdfr',
               'cle,titre,annee,realisateur,editeur,meilleur_support'),
       vthTout('videotheque_corrections',
-              'cle,statut,support_force,cle_dvdfr,verifie_le')
+              'cle,statut,support_force,cle_dvdfr,verifie_le,dispo_le,dispo_texte')
     ]);
     v.films = lots[0];
     v.edts  = lots[1];
@@ -226,8 +273,14 @@ function couleurFilm(film, edition, correction){
        regarder que le classer d'office « au maximum ». */
     const rp = VTH_RANG_PALIER[film.palier];
     const rs = VTH_RANG_SUPPORT[sup];
-    return { cl: (rs <= (rp === undefined ? 0 : rp)) ? 'vert' : 'orange',
-             libelle: VTH_LIB_SUPPORT[sup], support: sup };
+    if(rs <= (rp === undefined ? 0 : rp))
+      return { cl:'vert', libelle: VTH_LIB_SUPPORT[sup], support: sup };
+    /* Améliorable — sauf si la meilleure édition n'est pas encore sortie.
+       Le film est alors mis de côté : il n'y a rien à chercher, juste à
+       attendre. Il redeviendra améliorable tout seul, la date passée. */
+    if(sortiePrevue(c))
+      return { cl:'prevu', libelle:'Amélioration prévue', support: sup };
+    return { cl:'orange', libelle: VTH_LIB_SUPPORT[sup], support: sup };
   }
 
   /* 4. Rien trouvé. Un Blu-ray ou un 1080p sans édition connue est
@@ -263,12 +316,13 @@ function editionVth(f){
    fois, il serait absurde de la recalculer à chaque passage. */
 function recalculerCouleursVth(){
   const v = ui.vth;
-  v.compte = { max:0, ameli:0, rappr:0, nonref:0, corrige:0 };
+  v.compte = { max:0, prevu:0, ameli:0, rappr:0, nonref:0, corrige:0 };
   for(let i = 0; i < v.films.length; i++){
     const f = v.films[i];
     const r = couleurFilm(f, editionVth(f), v.corr[f.cle] || null);
     f._cl = r.cl; f._lib = r.libelle; f._sup = r.support;
     if(r.cl === 'vert')        v.compte.max++;
+    else if(r.cl === 'prevu')  v.compte.prevu++;
     else if(r.cl === 'orange') v.compte.ameli++;
     else if(r.cl === 'rouge')  v.compte.rappr++;
     else                       v.compte.nonref++;
@@ -353,13 +407,39 @@ function compteursVthHtml(){
     ' <span>'+((v.compte||{})[f.id] || 0)+'</span></button>').join('');
 }
 
+/* La phrase de sortie annoncée, en deux couleurs : le texte courant, et la
+   date SEULE en accent gras — c'est elle qu'on cherche des yeux en balayant
+   la liste. Le mot du support est celui que couleurFilm() a RÉSOLU (forcé à
+   la main, sinon celui de l'édition rapprochée) : dire « 4K » sur un film
+   qui n'attend qu'un Blu-ray serait faux. */
+function sortieVthHtml(f, c){
+  if(!sortiePrevue(c)) return '';
+  const mot = VTH_LIB_SUPPORT[f._sup] || VTH_LIB_SUPPORT.UHD4K;
+  const jm = fmtJourMois(c.dispo_le);
+  const txt = String(c.dispo_texte || '').trim();
+  /* La date prime sur la mention : « 07 Oct » vaut mieux que « T4 2026 ».
+     Mais une date passée ne dit plus rien — c'est alors le texte qui parle. */
+  const dateVaut = jm && String(c.dispo_le || '').slice(0, 10) > aujourdhuiVth();
+  if(dateVaut)
+    return '<span class="vtdispo">sortie prochaine en ' + esc(mot) +
+           ' prévue le <b>' + esc(jm) + '</b> prochain</span>';
+  if(txt)
+    return '<span class="vtdispo">sortie prochaine en ' + esc(mot) +
+           ' annoncée pour <b>' + esc(txt) + '</b></span>';
+  return '';
+}
+
 function ligneVthHtml(f, i){
   const sous = [f.annee || '', f.dossier || '', fmtOctets(f.taille_octets),
                 ((editionVth(f)||{}).editeur || '')].filter(Boolean).join(' · ');
+  /* Dernier segment de la ligne de méta, pour les seuls films dont la
+     meilleure édition est annoncée. Il porte du HTML (deux couleurs), d'où
+     la concaténation plutôt qu'un ajout au tableau échappé au-dessus. */
+  const dispo = sortieVthHtml(f, ui.vth.corr[f.cle] || null);
   return '<button class="crow vtrow" onclick="ouvrirFilmVth('+i+')">'+
     '<div class="cinfo">'+
       '<div class="cname2">'+esc(f.titre || '(sans titre)')+'</div>'+
-      '<div class="csub">'+esc(sous)+'</div>'+
+      '<div class="csub">'+esc(sous)+(dispo ? ' · '+dispo : '')+'</div>'+
     '</div>'+
     '<span class="vtp '+f._cl+'">'+esc(f._lib)+'</span>'+
   '</button>';
@@ -435,7 +515,7 @@ function sheetVthHtml(i){
       esc([f.annee || '', (edVue && edVue.realisateur) || ''].filter(Boolean).join(' · '))+'</p>'+
     correctionVthHtml(f, c);
 
-  if(f._cl === 'vert' || f._cl === 'orange'){
+  if(f._cl === 'vert' || f._cl === 'orange' || f._cl === 'prevu'){
     h += '<div class="fgrp">Ce que je possède</div>'+
       '<div class="small muted">'+esc([f.dossier || '',
         (f.chemin || '').split(/[\\/]/).pop() || '', fmtOctets(f.taille_octets)]
@@ -584,6 +664,14 @@ function correctionVthHtml(f, c){
     const e = ui.vth.edtsParCle[c.cle_dvdfr];
     dits.push('Rattaché à ' + (e ? (e.titre || c.cle_dvdfr) : c.cle_dvdfr));
   }
+  /* La sortie annoncée est une correction comme les autres : elle DOIT
+     figurer ici, sinon « Annuler » effacerait une information qu'Alexandre
+     n'a jamais vue. Formulée au passé du fait posé, pas au futur du film. */
+  if(String(c.dispo_texte || '').trim())
+    dits.push('Sortie annoncée pour ' + String(c.dispo_texte).trim());
+  if(fmtJourMois(c.dispo_le))
+    dits.push('Sortie annoncée le ' + fmtJourMois(c.dispo_le) +
+              (String(c.dispo_le).slice(0, 10) > aujourdhuiVth() ? '' : ' (passée)'));
   if(!dits.length) dits.push('Correction enregistrée');
   return '<div class="vtcorr">'+
       '<div class="fgrp" style="margin-top:0">Correction en place</div>'+
